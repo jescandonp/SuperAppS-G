@@ -1,0 +1,6 @@
+numero_identificacion,nombre_completo,estado_laboral,cargo,fecha_ingreso,fecha_retiro,salario_base
+1099000001,Empleado Valido I2,ACTIVO,Guarda de Seguridad,2025-01-15,,1900000
+1012345678,Empleado Existente,ACTIVO,Guarda de Seguridad,2024-02-01,,1850000
+,Empleado Sin Documento,ACTIVO,Guarda de Seguridad,2025-02-01,,1900000
+1099000004,Empleado Fecha Invalida,ACTIVO,Supervisor,32/13/2025,,2450000
+1099000005,Empleado Salario Invalido,RETIRADO,Auxiliar TH,2023-01-10,2025-12-20,1.8MM

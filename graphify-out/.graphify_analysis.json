@@ -1,0 +1,373 @@
+{
+  "communities": {
+    "0": [
+      "color_accent_danger",
+      "color_accent_info",
+      "color_accent_success",
+      "color_background_dark",
+      "component_card",
+      "component_commitment_input",
+      "component_data_table",
+      "component_demo_prompt",
+      "component_flow_diagram",
+      "component_glass_panel",
+      "component_roi_calc",
+      "component_section_snap",
+      "component_sidebar_nav",
+      "component_sidebar_timer",
+      "concept_ecosystem_sg",
+      "concept_notebooklm",
+      "concept_power_automate",
+      "css_variable_accent",
+      "css_variable_bg",
+      "css_variable_glass",
+      "css_variable_sidebar_w",
+      "css_variable_transition",
+      "dark_gold_theme",
+      "layout_grid_system",
+      "lib_chartjs",
+      "pattern_glassmorphism",
+      "pattern_scroll_snap",
+      "section_cierre_roi",
+      "section_demo_vivo",
+      "section_diagnostico",
+      "section_liderazgo",
+      "section_paradigma",
+      "stitch_redesign_page"
+    ],
+    "1": [
+      "redesign_comenzar_cta",
+      "redesign_dark_sidebar",
+      "redesign_hero_adn_hibrido",
+      "redesign_instructor_tag",
+      "redesign_module_navigation",
+      "redesign_progress_tracker",
+      "redesign_seg_gestion_tag",
+      "redesign_workshop_app",
+      "redesign_workshop_badge",
+      "shared_juan_manuel_escandon",
+      "shared_yellow_gold_palette",
+      "stitch_cta_listo_para_evolucionar",
+      "stitch_dark_theme",
+      "stitch_diagnostico_adn",
+      "stitch_escalamiento_elite",
+      "stitch_fases_implementacion",
+      "stitch_hero_section",
+      "stitch_instructor_profile",
+      "stitch_inversion_estrategica",
+      "stitch_kpi_metrics",
+      "stitch_la_tormenta_perfecta",
+      "stitch_landing_page",
+      "stitch_mercado_integracion_chart",
+      "stitch_module_cards",
+      "stitch_pricing_base",
+      "stitch_pricing_partner",
+      "stitch_pricing_premier",
+      "stitch_security_ai_theme",
+      "stitch_tecnologia_hibrido",
+      "stitch_top_navigation",
+      "stitch_workshop_adn_hibrido"
+    ],
+    "2": [
+      "brand_sng",
+      "color_primary_gold",
+      "color_surface_tokens",
+      "component_bento_grid",
+      "component_cta_section",
+      "component_donut_chart",
+      "component_expert_profile",
+      "component_footer",
+      "component_hero_section",
+      "component_pricing_tiers",
+      "component_roadmap_phases",
+      "component_side_navbar",
+      "component_stats_bar",
+      "component_timeline_workshop",
+      "component_top_navbar",
+      "concept_adn_hibrido",
+      "concept_peea_model",
+      "concept_workshop_modules",
+      "font_manrope",
+      "font_space_grotesk",
+      "layout_golden_thread",
+      "lib_material_icons",
+      "lib_tailwind",
+      "pattern_dark_mode",
+      "person_juan_escandon",
+      "stitch_sng_ia_page",
+      "tailwind_design_system"
+    ],
+    "3": [
+      "area_innovacion_transversal",
+      "camilo_piedrahita",
+      "context_ia_automatizacion_seguridad",
+      "context_research_inicial_perplexity",
+      "context_reto_research_pdf",
+      "dofa_sg",
+      "juan_m_escandon",
+      "liderazgo_aumentado",
+      "microsoft_365_ecosystem",
+      "notebooklm",
+      "peea_matrix",
+      "poder_automate_flujo_whatsapp",
+      "prosegur_lexia",
+      "revision_puestos_xlsx",
+      "roi_calculo_sg",
+      "sector_seguridad_privada_colombia_2026",
+      "seguridad_gestion_ltda",
+      "sevicol_alice",
+      "sg_ia_dashboard",
+      "taller_abre_bocas",
+      "workshop_adn_hibrido",
+      "workshop_estructura_md"
+    ],
+    "4": [
+      "consensus_tool",
+      "consulta_conocimiento",
+      "crm_customer_service_tool",
+      "estudios_y_bd",
+      "genspark_tool",
+      "investigacion_gestion_conocimiento",
+      "manus_tool",
+      "mendeley_tool",
+      "mobile_app_channel",
+      "modelos_lenguaje_avanzados_estudios",
+      "notebooklm_tool",
+      "perplexity_tool",
+      "plataforma_integracion_usuario",
+      "plataformas_comunicacion_integrada",
+      "qwen_studio_tool",
+      "semantic_scholar_tool",
+      "sintesis_voz_alta_fidelidad",
+      "solicitud_generacion",
+      "telegram_tool",
+      "whatsapp_tool",
+      "zotero_tool"
+    ],
+    "5": [
+      "ai21_tool",
+      "asistentes_conversacionales_texto",
+      "aws_cloud",
+      "azure_cloud",
+      "bing_chat_tool",
+      "capa_infraestructura_computo",
+      "cerebras_hardware",
+      "claude_tool",
+      "deepseek_tool",
+      "flujo_datos_multimodal",
+      "gemini_tool",
+      "google_cloud_platform",
+      "grok_tool",
+      "mapa_conceptual_ecosistema_ia",
+      "motor_razonamiento_ajuste_fino",
+      "nvidia_hardware",
+      "openai_tool",
+      "pytorch_framework",
+      "tensorboard_tool",
+      "tensorflow_framework"
+    ],
+    "6": [
+      "dall_e_tool",
+      "generacion_multimedia_creativa",
+      "generacion_video_generativa",
+      "github_copilot_tool",
+      "ideogram_tool",
+      "kling_ai_tool",
+      "pika_tool",
+      "runway_tool",
+      "sora_tool",
+      "stable_diffusion_tool",
+      "suno_tool",
+      "udio_tool"
+    ],
+    "7": [
+      "adn_hibrido_sesion1_design",
+      "adn_hibrido_sesion1_plan",
+      "context_html_design_system_v1",
+      "context_html_design_system_v2",
+      "dark_gold_design_tokens",
+      "sg_adn_hibrido_sesion1_html",
+      "sg_ia_propuesta_comercial",
+      "stitch_design_md",
+      "stitch_redesign_design_md"
+    ],
+    "8": [
+      "jm_person",
+      "jm_portrait_casual",
+      "jm_portrait_professional",
+      "security_industry_context",
+      "seguridad_gestion_ltda_brand",
+      "seguridad_gestion_ltda_company",
+      "sg_logo_shield_symbol",
+      "sg_visual_style"
+    ]
+  },
+  "cohesion": {
+    "0": 0.08,
+    "1": 0.09,
+    "2": 0.1,
+    "3": 0.15,
+    "4": 0.1,
+    "5": 0.12,
+    "6": 0.17,
+    "7": 0.39,
+    "8": 0.39
+  },
+  "gods": [
+    {
+      "id": "stitch_redesign_page",
+      "label": "ADN H\u00edbrido \u00b7 Sesi\u00f3n 1 \u00b7 S&G (Visual Redesign Workshop Page)",
+      "degree": 37
+    },
+    {
+      "id": "stitch_sng_ia_page",
+      "label": "S&G + IA | El H\u00edbrido Humano (Stitch Landing Page)",
+      "degree": 30
+    },
+    {
+      "id": "stitch_landing_page",
+      "label": "Stitch Landing Page - El Hibrido Humano IA en Seguridad",
+      "degree": 10
+    },
+    {
+      "id": "redesign_workshop_app",
+      "label": "ADN Hibrido Workshop App - Visual Redesign Screen",
+      "degree": 10
+    },
+    {
+      "id": "investigacion_gestion_conocimiento",
+      "label": "Investigaci\u00f3n y Gesti\u00f3n de Conocimiento",
+      "degree": 9
+    },
+    {
+      "id": "generacion_multimedia_creativa",
+      "label": "Generaci\u00f3n Multimedia Creativa",
+      "degree": 9
+    },
+    {
+      "id": "capa_infraestructura_computo",
+      "label": "Capa de Infraestructura de C\u00f3mputo y Red",
+      "degree": 9
+    },
+    {
+      "id": "asistentes_conversacionales_texto",
+      "label": "Asistentes Conversacionales y de Texto",
+      "degree": 8
+    },
+    {
+      "id": "sg_ia_propuesta_comercial",
+      "label": "S&G + IA Propuesta Comercial Educativa",
+      "degree": 7
+    },
+    {
+      "id": "context_ia_automatizacion_seguridad",
+      "label": "Informe: Transformaci\u00f3n Digital y IA en Seguridad y Gesti\u00f3n Ltda.",
+      "degree": 7
+    }
+  ],
+  "surprises": [
+    {
+      "source": "HTML Design System \u2014 Documento Base Reutilizable v2",
+      "target": "ADN H\u00edbrido Sesi\u00f3n 1 \u2014 Presentaci\u00f3n HTML",
+      "source_files": [
+        "Context/HTML_Design_System__Documento_Base_Reutilizable_v2.pdf",
+        "SG_ADN_Hibrido_Sesion1.html"
+      ],
+      "confidence": "INFERRED",
+      "relation": "conceptually_related_to",
+      "why": "inferred connection - not explicitly stated in source; crosses file types (doc \u2194 paper); connects across different repos/directories; peripheral node `HTML Design System \u2014 Documento Base Reutilizable v2` unexpectedly reaches hub `ADN H\u00edbrido Sesi\u00f3n 1 \u2014 Presentaci\u00f3n HTML`"
+    },
+    {
+      "source": "HTML Design System \u2014 Documento Base Reutilizable v1",
+      "target": "S&G + IA Propuesta Comercial Educativa",
+      "source_files": [
+        "Context/HTML_Design_System__Documento_Base_Reutilizable.pdf",
+        "SG_IA_Propuesta_Comercial.html"
+      ],
+      "confidence": "INFERRED",
+      "relation": "conceptually_related_to",
+      "why": "inferred connection - not explicitly stated in source; crosses file types (doc \u2194 paper); connects across different repos/directories; peripheral node `HTML Design System \u2014 Documento Base Reutilizable v1` unexpectedly reaches hub `S&G + IA Propuesta Comercial Educativa`"
+    },
+    {
+      "source": "Color Token: Primary Gold (#e6c487 / #d4af37)",
+      "target": "CSS Variable: --accent (#d4af37)",
+      "source_files": [
+        "stitch/code.html",
+        "stitch_website_visual_redesign/code.html"
+      ],
+      "confidence": "INFERRED",
+      "relation": "semantically_similar_to",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities; semantically similar concepts with no structural link"
+    },
+    {
+      "source": "Color Token: Background Dark (#131315 / #050505)",
+      "target": "CSS Variable: --bg (#050505)",
+      "source_files": [
+        "stitch/code.html",
+        "stitch_website_visual_redesign/code.html"
+      ],
+      "confidence": "INFERRED",
+      "relation": "semantically_similar_to",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; semantically similar concepts with no structural link"
+    },
+    {
+      "source": "Stitch Landing Page - El Hibrido Humano IA en Seguridad",
+      "target": "ADN Hibrido Workshop App - Visual Redesign Screen",
+      "source_files": [
+        "stitch/screen.png",
+        "stitch_website_visual_redesign/screen.png"
+      ],
+      "confidence": "INFERRED",
+      "relation": "semantically_similar_to",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; semantically similar concepts with no structural link"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `ADN H\u00edbrido \u00b7 Sesi\u00f3n 1 \u00b7 S&G (Visual Redesign Workshop Page)` connect `UI Design Tokens & Components` to `S&G Brand & Marketing Site`?",
+      "why": "High betweenness centrality (0.074) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `Plataforma de Integraci\u00f3n del Usuario` connect `AI Knowledge & Research Tools` to `Conversational AI & Cloud Infra`, `Creative AI & Multimedia`?",
+      "why": "High betweenness centrality (0.061) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `S&G + IA | El H\u00edbrido Humano (Stitch Landing Page)` connect `S&G Brand & Marketing Site` to `UI Design Tokens & Components`?",
+      "why": "High betweenness centrality (0.057) - this node is a cross-community bridge."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 2 inferred relationships involving `ADN Hibrido Workshop App - Visual Redesign Screen` (e.g. with `Stitch Landing Page - El Hibrido Humano IA en Seguridad` and `Workshop ADN Hibrido Section - Module Structure`) actually correct?",
+      "why": "`ADN Hibrido Workshop App - Visual Redesign Screen` has 2 INFERRED edges - model-reasoned connections that need verification."
+    },
+    {
+      "type": "isolated_nodes",
+      "question": "What connects `Flujo Power Automate \u2014 Automatizaci\u00f3n WhatsApp/Incidentes`, `C\u00e1lculo ROI \u2014 Productividad Recuperada S&G (COP 33.750.000/a\u00f1o)`, `Color Token: Danger Red (#ff4d4d)` to the rest of the system?",
+      "why": "78 weakly-connected nodes found - possible documentation gaps or missing edges."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `UI Design Tokens & Components` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.08 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `ADN Hibrido Redesign App` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.09 - nodes in this community are weakly interconnected."
+    }
+  ],
+  "labels": {
+    "0": "UI Design Tokens & Components",
+    "1": "ADN Hibrido Redesign App",
+    "2": "S&G Brand & Marketing Site",
+    "3": "S&G Strategy & Research",
+    "4": "AI Knowledge & Research Tools",
+    "5": "Conversational AI & Cloud Infra",
+    "6": "Creative AI & Multimedia",
+    "7": "Design System & Docs",
+    "8": "Brand Identity & People"
+  }
+}

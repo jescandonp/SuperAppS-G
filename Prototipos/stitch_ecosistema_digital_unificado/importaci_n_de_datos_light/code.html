@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>S&amp;G Portal - Centro de Importación</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Montserrat:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-container": "#ffc703",
+                    "on-surface-variant": "#43474f",
+                    "error": "#ba1a1a",
+                    "on-secondary": "#ffffff",
+                    "status-error": "#A4262C",
+                    "on-surface": "#191c1d",
+                    "on-tertiary-fixed": "#1b1b1c",
+                    "outline": "#737780",
+                    "on-primary": "#ffffff",
+                    "on-primary-fixed-variant": "#1f477b",
+                    "tertiary-fixed-dim": "#c8c6c5",
+                    "primary-container": "#003366",
+                    "surface-dim": "#d9dadb",
+                    "secondary-fixed-dim": "#f5bf00",
+                    "inverse-primary": "#a7c8ff",
+                    "on-secondary-container": "#6e5400",
+                    "secondary": "#765b00",
+                    "tertiary-container": "#333333",
+                    "on-primary-fixed": "#001b3c",
+                    "on-tertiary-container": "#9d9b9b",
+                    "status-info": "#0078D4",
+                    "secondary-fixed": "#ffdf94",
+                    "surface-tint": "#3a5f94",
+                    "outline-variant": "#c3c6d1",
+                    "surface-container-lowest": "#ffffff",
+                    "background": "#f8f9fa",
+                    "surface-bright": "#f8f9fa",
+                    "primary-fixed": "#d5e3ff",
+                    "on-secondary-fixed-variant": "#594400",
+                    "surface-container-high": "#e7e8e9",
+                    "tertiary": "#1e1e1e",
+                    "primary-fixed-dim": "#a7c8ff",
+                    "surface-container-highest": "#e1e3e4",
+                    "surface-container": "#edeeef",
+                    "surface": "#f8f9fa",
+                    "on-error-container": "#93000a",
+                    "on-tertiary": "#ffffff",
+                    "surface-variant": "#e1e3e4",
+                    "on-tertiary-fixed-variant": "#474746",
+                    "status-success": "#107C10",
+                    "surface-container-low": "#f3f4f5",
+                    "primary": "#001e40",
+                    "on-primary-container": "#799dd6",
+                    "error-container": "#ffdad6",
+                    "on-error": "#ffffff",
+                    "tertiary-fixed": "#e5e2e1",
+                    "inverse-surface": "#2e3132",
+                    "on-secondary-fixed": "#251a00",
+                    "status-warning": "#D83B01",
+                    "surface-border": "#E1E4E8",
+                    "inverse-on-surface": "#f0f1f2",
+                    "on-background": "#191c1d"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "base": "4px",
+                    "gutter": "24px",
+                    "container-max-width": "1440px",
+                    "margin-mobile": "16px",
+                    "margin-desktop": "40px"
+            },
+            "fontFamily": {
+                    "label-md": ["Inter"],
+                    "label-sm": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "headline-lg-mobile": ["Montserrat"],
+                    "display-lg": ["Montserrat"],
+                    "headline-sm": ["Montserrat"],
+                    "body-md": ["Inter"],
+                    "headline-md": ["Montserrat"],
+                    "headline-lg": ["Montserrat"]
+            },
+            "fontSize": {
+                    "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "label-sm": ["11px", {"lineHeight": "14px", "fontWeight": "500"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { background-color: #f8f9fa; color: #191c1d; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-card { background: #ffffff; border: 1px solid #E1E4E8; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #c3c6d1; border-radius: 10px; }
+        .drag-over { border-color: #003366; background-color: rgba(0, 51, 102, 0.04); }
+    </style>
+</head>
+<body class="font-body-md overflow-x-hidden">
+<!-- Sidebar Navigation -->
+<aside class="bg-primary w-[260px] h-screen fixed left-0 top-0 border-r border-surface-border flex flex-col py-gutter z-50">
+<div class="px-margin-mobile mb-gutter">
+<img alt="Sentinel Enterprise Logo" class="h-8 object-contain brightness-0 invert" src="https://lh3.googleusercontent.com/aida/ADBb0uhGqL0NW2raGVbnb5g7vYPK1gkbWCIweelNf839fAHPX33zYdXFXTOHARyg8WSpEh-nY3_0SZMvo9aGZIt1oyrr6ndueZpUEKOq9TLqPaLQUUcEXQrxrZykAoGDmIt2F6pcqW8ObrhOMAhKWY1Uys0zXqTaNFR22t55bKlCSZKskWWf94xr4YLyEgj8GuRetppLFUB9LNwkdhHtRk3NQDlijaKEVjryT9MOiZcQAWcJjM-41j-zcA3r"/>
+<p class="text-on-primary/60 font-label-md text-[10px] mt-2 uppercase tracking-widest">Sentinel Enterprise</p>
+</div>
+<nav class="flex-1 space-y-1 overflow-y-auto px-base custom-scrollbar">
+<a class="flex items-center gap-base p-body-md rounded text-on-primary/70 hover:bg-on-primary/10 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-medium">Inicio</span>
+</a>
+<a class="flex items-center gap-base p-body-md rounded text-on-primary/70 hover:bg-on-primary/10 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">badge</span>
+<span class="font-medium">Empleados</span>
+</a>
+<a class="flex items-center gap-base p-body-md rounded text-on-primary/70 hover:bg-on-primary/10 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">location_on</span>
+<span class="font-medium">Puestos de Servicio</span>
+</a>
+<a class="flex items-center gap-base p-body-md rounded text-on-primary/70 hover:bg-on-primary/10 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">school</span>
+<span class="font-medium">Cursos</span>
+</a>
+<a class="flex items-center gap-base p-body-md rounded text-on-primary/70 hover:bg-on-primary/10 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">verified</span>
+<span class="font-medium">Certificaciones</span>
+</a>
+<a class="flex items-center gap-base p-body-md rounded text-on-primary/70 hover:bg-on-primary/10 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">notifications_active</span>
+<span class="font-medium">Alertas</span>
+</a>
+<!-- Active State -->
+<a class="flex items-center gap-base p-body-md rounded bg-secondary-container text-on-secondary-container font-bold transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">upload_file</span>
+<span>Cargas de Datos</span>
+</a>
+<a class="flex items-center gap-base p-body-md rounded text-on-primary/70 hover:bg-on-primary/10 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-medium">Configuración</span>
+</a>
+</nav>
+<div class="px-base pt-gutter border-t border-on-primary/10 mt-auto">
+<div class="mb-gutter p-body-md bg-secondary-container/10 rounded border border-secondary-container/20">
+<p class="text-secondary-container font-label-md">Sentinel Cloud v2.4</p>
+</div>
+<a class="flex items-center gap-base p-body-md text-on-primary/70 hover:text-on-primary transition-colors" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-medium">Soporte Técnico</span>
+</a>
+<a class="flex items-center gap-base p-body-md text-status-error font-medium hover:opacity-80 transition-colors" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span>Cerrar Sesión</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-[260px] min-h-screen">
+<!-- Top Bar -->
+<header class="h-[64px] bg-white sticky top-0 border-b border-surface-border z-40 flex items-center justify-between px-margin-desktop w-full">
+<div class="flex items-center gap-gutter">
+<span class="font-headline-sm text-headline-sm text-primary uppercase tracking-tight">S&amp;G Gestión</span>
+<div class="hidden md:flex items-center bg-surface-container rounded-lg px-body-md py-1.5 w-80 border border-outline-variant">
+<span class="material-symbols-outlined text-outline text-sm">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-md w-full ml-2" placeholder="Buscar en el portal..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-gutter">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all">notifications</button>
+<div class="flex items-center gap-body-md">
+<div class="text-right hidden sm:block">
+<p class="text-label-md text-on-surface leading-none">Administrador SG</p>
+<p class="text-[10px] text-on-surface-variant uppercase mt-1">Nivel Global</p>
+</div>
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center overflow-hidden border-2 border-white shadow-sm">
+<img alt="User" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDRKyflNozUydOyogTCP3M_OQwaMVxzZvYBlwqte7gdvuZxn8dMLJZBcbAHcyXf5BVDXd-pEaTgR-yqflZWZvMoKMfgLj5z3XrxRjOOD50g5_HwbTDKnP6gnsQVIhlzsEelI2wNG5B_8IIdkKEZ5FQbVN8sGHDOBRuFM6t1qh8bPLWPcLKw1g7kHEuCrawg-jKLokT0pTLxGM2hI3GZEOtu5QnLp0gwPBT8Swuvyb0RtZh-V4TbO921QetlbEFgSeOFZgMBii-Lbw"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Content Canvas -->
+<div class="p-margin-desktop max-w-container-max-width mx-auto space-y-gutter">
+<!-- Header Section -->
+<section class="flex flex-col md:flex-row md:items-end justify-between gap-gutter">
+<div class="space-y-base">
+<h2 class="font-display-lg text-display-lg text-primary">Carga Masiva de Datos</h2>
+<p class="text-on-surface-variant text-body-lg max-w-2xl">Procesa archivos de nómina y puestos con validación automática de reglas de negocio Sentinel.</p>
+</div>
+<button class="px-gutter py-2.5 bg-white border border-outline rounded font-label-md text-primary hover:bg-surface-container transition-all flex items-center gap-base shadow-sm">
+<span class="material-symbols-outlined text-sm">download</span> Descargar Plantilla Excel
+                </button>
+</section>
+<!-- Main Interactive Area -->
+<div class="grid grid-cols-12 gap-gutter items-start">
+<!-- Left: Drag & Drop and Preview -->
+<div class="col-span-12 xl:col-span-8 space-y-gutter">
+<!-- Drag & Drop Zone -->
+<div class="glass-card rounded-xl p-margin-desktop border-2 border-dashed border-outline-variant flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 hover:border-primary hover:bg-primary-container/[0.02] group" id="drop-zone">
+<div class="w-20 h-20 bg-primary-container/5 rounded-full flex items-center justify-center mb-gutter group-hover:scale-105 transition-transform border border-primary-container/10">
+<span class="material-symbols-outlined text-primary text-5xl">cloud_upload</span>
+</div>
+<h3 class="font-headline-md text-primary mb-2">Importar Nuevo Archivo</h3>
+<p class="text-on-surface-variant text-body-md mb-gutter max-w-md mx-auto">Arrastra archivos .xlsx o .csv aquí o selecciona desde tu ordenador para iniciar la validación.</p>
+<button class="bg-primary text-on-primary px-gutter py-3 rounded font-label-md shadow-md hover:bg-primary/90 active:scale-95 transition-all">
+                            Examinar Archivos
+                        </button>
+</div>
+<!-- Validation View -->
+<div class="glass-card rounded-xl overflow-hidden">
+<div class="px-gutter py-body-md bg-surface-container-high border-b border-surface-border flex justify-between items-center">
+<div class="flex items-center gap-base">
+<span class="material-symbols-outlined text-primary">fact_check</span>
+<h4 class="font-headline-sm text-primary">Pre-validación de Registros</h4>
+</div>
+<span class="bg-primary text-white px-body-md py-1 rounded text-label-sm font-bold uppercase tracking-tighter">CARGA_2023_10_25.XLSX</span>
+</div>
+<!-- Validation Metrics -->
+<div class="grid grid-cols-2 md:grid-cols-4 bg-white border-b border-surface-border">
+<div class="p-gutter border-r border-surface-border">
+<p class="text-label-sm text-on-surface-variant uppercase mb-1">Registros Válidos</p>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-bold text-status-success">842</span>
+<span class="text-xs text-on-surface-variant font-medium">84.2%</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 mt-3 rounded-full overflow-hidden">
+<div class="bg-status-success h-full w-[84%]"></div>
+</div>
+</div>
+<div class="p-gutter border-r border-surface-border">
+<p class="text-label-sm text-on-surface-variant uppercase mb-1">Campos Incompletos</p>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-bold text-secondary">42</span>
+<span class="text-xs text-on-surface-variant font-medium">4.2%</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 mt-3 rounded-full overflow-hidden">
+<div class="bg-secondary h-full w-[15%]"></div>
+</div>
+</div>
+<div class="p-gutter border-r border-surface-border">
+<p class="text-label-sm text-on-surface-variant uppercase mb-1">Duplicados</p>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-bold text-on-tertiary-fixed-variant">15</span>
+<span class="text-xs text-on-surface-variant font-medium">1.5%</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 mt-3 rounded-full overflow-hidden">
+<div class="bg-on-tertiary-fixed-variant h-full w-[5%]"></div>
+</div>
+</div>
+<div class="p-gutter">
+<p class="text-label-sm text-on-surface-variant uppercase mb-1">Errores Críticos</p>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-bold text-status-error">28</span>
+<span class="text-xs text-on-surface-variant font-medium">2.8%</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 mt-3 rounded-full overflow-hidden">
+<div class="bg-status-error h-full w-[10%]"></div>
+</div>
+</div>
+</div>
+<!-- Error Detail Table -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-container-low border-b border-surface-border">
+<tr>
+<th class="px-gutter py-4 font-label-md text-primary uppercase">Fila</th>
+<th class="px-gutter py-4 font-label-md text-primary uppercase">Atributo</th>
+<th class="px-gutter py-4 font-label-md text-primary uppercase">Valor Capturado</th>
+<th class="px-gutter py-4 font-label-md text-primary uppercase">Descripción del Error</th>
+<th class="px-gutter py-4 font-label-md text-primary uppercase text-right">Gestión</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-border bg-white">
+<tr class="hover:bg-surface-container/30 transition-colors">
+<td class="px-gutter py-md font-mono text-xs text-primary font-semibold">#124</td>
+<td class="px-gutter py-md text-body-md font-medium">CUIL/CUIT</td>
+<td class="px-gutter py-md text-body-md text-status-error font-medium">20-33444555-X</td>
+<td class="px-gutter py-md">
+<div class="flex items-center gap-2 text-status-error text-body-md">
+<span class="material-symbols-outlined text-[18px]">error</span>
+<span>Formato de CUIT inválido (Dígito verificador).</span>
+</div>
+</td>
+<td class="px-gutter py-md text-right">
+<button class="text-status-info font-label-md hover:underline">Editar celda</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container/30 transition-colors">
+<td class="px-gutter py-md font-mono text-xs text-primary font-semibold">#156</td>
+<td class="px-gutter py-md text-body-md font-medium">Fecha Nac.</td>
+<td class="px-gutter py-md text-body-md text-status-error font-medium">31/02/1990</td>
+<td class="px-gutter py-md">
+<div class="flex items-center gap-2 text-status-error text-body-md">
+<span class="material-symbols-outlined text-[18px]">calendar_today</span>
+<span>Fecha inexistente en el calendario gregoriano.</span>
+</div>
+</td>
+<td class="px-gutter py-md text-right">
+<button class="text-status-info font-label-md hover:underline">Editar celda</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container/30 transition-colors">
+<td class="px-gutter py-md font-mono text-xs text-primary font-semibold">#201</td>
+<td class="px-gutter py-md text-body-md font-medium">Categoría</td>
+<td class="px-gutter py-md text-body-md text-secondary font-medium">S/D</td>
+<td class="px-gutter py-md">
+<div class="flex items-center gap-2 text-secondary text-body-md">
+<span class="material-symbols-outlined text-[18px]">warning</span>
+<span>Campo obligatorio ausente. Se requiere valor.</span>
+</div>
+</td>
+<td class="px-gutter py-md text-right">
+<button class="text-status-info font-label-md hover:underline">Editar celda</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Footer Actions -->
+<div class="px-gutter py-gutter bg-surface-container-low border-t border-surface-border flex flex-col sm:flex-row justify-between items-center gap-gutter">
+<div class="flex items-center gap-body-md bg-status-error/5 border border-status-error/10 px-gutter py-2 rounded-lg">
+<span class="material-symbols-outlined text-status-error">block</span>
+<p class="text-body-md text-status-error font-semibold">Corrija los 28 errores críticos para habilitar la importación definitiva.</p>
+</div>
+<div class="flex gap-body-md w-full sm:w-auto">
+<button class="flex-1 sm:flex-none px-gutter py-2.5 border border-outline rounded font-label-md text-on-surface-variant hover:bg-surface-container transition-all bg-white">
+                                    Descartar Archivo
+                                </button>
+<button class="flex-1 sm:flex-none px-gutter py-2.5 bg-outline-variant text-on-surface-variant rounded font-label-md opacity-50 cursor-not-allowed" disabled="">
+                                    Confirmar Importación
+                                </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Right: Import History -->
+<div class="col-span-12 xl:col-span-4 space-y-gutter">
+<div class="glass-card rounded-xl p-gutter">
+<div class="flex items-center justify-between mb-gutter border-b border-surface-border pb-3">
+<h4 class="font-headline-sm text-primary">Historial de Operaciones</h4>
+<span class="material-symbols-outlined text-primary">history</span>
+</div>
+<div class="space-y-gutter">
+<!-- Item 1 -->
+<div class="p-body-md rounded-lg border border-surface-border bg-white hover:shadow-md transition-all group relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-status-success"></div>
+<div class="flex justify-between items-start mb-2">
+<span class="font-label-md text-primary font-bold">#CAR-9921</span>
+<span class="text-[10px] text-on-surface-variant uppercase font-semibold">Ayer, 14:30</span>
+</div>
+<h5 class="font-body-md font-bold text-on-surface truncate pr-6">Nómina_Seguridad_Mensual.xlsx</h5>
+<div class="flex items-center justify-between mt-gutter">
+<div class="flex items-center gap-1.5 text-[11px] font-bold text-status-success bg-status-success/10 px-2 py-0.5 rounded">
+<span class="material-symbols-outlined text-[12px] font-bold">check_circle</span>
+                                        PROCESADO
+                                    </div>
+<p class="text-xs text-on-surface-variant">1,240 registros</p>
+</div>
+<button class="mt-gutter w-full text-center py-2 text-status-info text-label-md font-bold hover:bg-status-info/5 rounded transition-colors flex items-center justify-center gap-base">
+                                    VER DETALLES <span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+<!-- Item 2 -->
+<div class="p-body-md rounded-lg border border-surface-border bg-white hover:shadow-md transition-all group relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-status-success"></div>
+<div class="flex justify-between items-start mb-2">
+<span class="font-label-md text-primary font-bold">#CAR-9918</span>
+<span class="text-[10px] text-on-surface-variant uppercase font-semibold">22 Oct, 10:15</span>
+</div>
+<h5 class="font-body-md font-bold text-on-surface truncate pr-6">Actualización_Puestos_Z1.csv</h5>
+<div class="flex items-center justify-between mt-gutter">
+<div class="flex items-center gap-1.5 text-[11px] font-bold text-status-success bg-status-success/10 px-2 py-0.5 rounded">
+<span class="material-symbols-outlined text-[12px] font-bold">check_circle</span>
+                                        PROCESADO
+                                    </div>
+<p class="text-xs text-on-surface-variant">45 registros</p>
+</div>
+<button class="mt-gutter w-full text-center py-2 text-status-info text-label-md font-bold hover:bg-status-info/5 rounded transition-colors flex items-center justify-center gap-base">
+                                    VER DETALLES <span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+<!-- Item 3 (Failed) -->
+<div class="p-body-md rounded-lg border border-surface-border bg-white hover:shadow-md transition-all group relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-status-error"></div>
+<div class="flex justify-between items-start mb-2">
+<span class="font-label-md text-status-error font-bold">#CAR-9915</span>
+<span class="text-[10px] text-on-surface-variant uppercase font-semibold">20 Oct, 09:45</span>
+</div>
+<h5 class="font-body-md font-bold text-on-surface truncate pr-6">Carga_Masiva_Anual.xlsx</h5>
+<div class="flex items-center justify-between mt-gutter">
+<div class="flex items-center gap-1.5 text-[11px] font-bold text-status-error bg-status-error/10 px-2 py-0.5 rounded">
+<span class="material-symbols-outlined text-[12px] font-bold">cancel</span>
+                                        FALLIDO
+                                    </div>
+<p class="text-xs text-on-surface-variant">0 registros</p>
+</div>
+<button class="mt-gutter w-full text-center py-2 text-status-error text-label-md font-bold hover:bg-status-error/5 rounded transition-colors flex items-center justify-center gap-base">
+                                    REVISAR ERRORES <span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+<button class="mt-gutter w-full py-3 rounded border-2 border-primary text-primary font-bold text-label-md hover:bg-primary hover:text-white transition-all uppercase tracking-wider">
+                            Archivo Completo
+                        </button>
+</div>
+<!-- Guidelines -->
+<div class="bg-primary/5 rounded-xl p-gutter border border-primary/10">
+<div class="flex items-center gap-body-md mb-gutter">
+<div class="w-8 h-8 bg-primary rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-sm">info</span>
+</div>
+<h4 class="font-bold text-primary">Protocolos de Importación</h4>
+</div>
+<ul class="space-y-gutter text-body-md text-on-surface-variant">
+<li class="flex items-start gap-gutter">
+<span class="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0"></span>
+<span>No altere los encabezados originales de la plantilla Excel.</span>
+</li>
+<li class="flex items-start gap-gutter">
+<span class="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0"></span>
+<span>Los campos marcados con (*) son obligatorios para el sistema de control.</span>
+</li>
+<li class="flex items-start gap-gutter">
+<span class="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0"></span>
+<span>La validación de CUIT es mandatoria y debe incluir guiones.</span>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</main>
+<script>
+        const dropZone = document.getElementById('drop-zone');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-over'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-over'), false);
+        });
+
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            let dt = e.dataTransfer;
+            let files = dt.files;
+            console.log('Sentinel Engine: Procesando archivo', files[0].name);
+            alert('Sentinel Enterprise Engine: Archivo "' + files[0].name + '" capturado con éxito. Iniciando motor de validación en tiempo real...');
+        }
+    </script>
+</body></html>

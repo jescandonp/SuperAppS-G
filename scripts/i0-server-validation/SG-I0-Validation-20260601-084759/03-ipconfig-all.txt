@@ -1,0 +1,38 @@
+﻿
+Configuración IP de Windows
+
+   Nombre de host. . . . . . . . . : SERVIDORGESTION
+   Sufijo DNS principal  . . . . . : 
+   Tipo de nodo. . . . . . . . . . : híbrido
+   Enrutamiento IP habilitado. . . : no
+   Proxy WINS habilitado . . . . . : no
+
+Adaptador de Ethernet Ethernet:
+
+   Sufijo DNS específico para la conexión. . : 
+   Descripción . . . . . . . . . . . . . . . : Intel(R) Ethernet Connection I217-LM
+   Dirección física. . . . . . . . . . . . . : 6C-0B-84-91-70-D8
+   DHCP habilitado . . . . . . . . . . . . . : sí
+   Configuración automática habilitada . . . : sí
+   Vínculo: dirección IPv6 local. . . : fe80::2d90:c55f:610a:2b53%12(Preferido) 
+   Dirección IPv4. . . . . . . . . . . . . . : 192.168.1.15(Preferido) 
+   Máscara de subred . . . . . . . . . . . . : 255.255.255.0
+   Concesión obtenida. . . . . . . . . . . . : miércoles, 1 de abril de 2026 03:20:32 p. m.
+   La concesión expira . . . . . . . . . . . : jueves, 8 de julio de 2162 03:16:17 p. m.
+   Puerta de enlace predeterminada . . . . . : 192.168.1.254
+   Servidor DHCP . . . . . . . . . . . . . . : 192.168.1.254
+   IAID DHCPv6 . . . . . . . . . . . . . . . : 208407428
+   DUID de cliente DHCPv6. . . . . . . . . . : 00-01-00-01-1E-A6-8F-ED-6C-0B-84-91-70-D8
+   Servidores DNS. . . . . . . . . . . . . . : 200.75.51.132
+                                       200.75.51.133
+   NetBIOS sobre TCP/IP. . . . . . . . . . . : habilitado
+
+Adaptador de túnel isatap.{99A3C0EF-21E2-460C-B5D7-8AA455DBECAF}:
+
+   Estado de los medios. . . . . . . . . . . : medios desconectados
+   Sufijo DNS específico para la conexión. . : 
+   Descripción . . . . . . . . . . . . . . . : Adaptador ISATAP de Microsoft
+   Dirección física. . . . . . . . . . . . . : 00-00-00-00-00-00-00-E0
+   DHCP habilitado . . . . . . . . . . . . . : no
+   Configuración automática habilitada . . . : sí
+

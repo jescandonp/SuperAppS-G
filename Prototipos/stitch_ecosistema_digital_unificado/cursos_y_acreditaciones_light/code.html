@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Montserrat:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-container": "#ffc703",
+                        "on-surface-variant": "#43474f",
+                        "error": "#ba1a1a",
+                        "on-secondary": "#ffffff",
+                        "status-error": "#A4262C",
+                        "on-surface": "#191c1d",
+                        "on-tertiary-fixed": "#1b1b1c",
+                        "outline": "#737780",
+                        "on-primary": "#ffffff",
+                        "on-primary-fixed-variant": "#1f477b",
+                        "tertiary-fixed-dim": "#c8c6c5",
+                        "primary-container": "#003366",
+                        "surface-dim": "#d9dadb",
+                        "secondary-fixed-dim": "#f5bf00",
+                        "inverse-primary": "#a7c8ff",
+                        "on-secondary-container": "#6e5400",
+                        "secondary": "#765b00",
+                        "tertiary-container": "#333333",
+                        "on-primary-fixed": "#001b3c",
+                        "on-tertiary-container": "#9d9b9b",
+                        "status-info": "#0078D4",
+                        "secondary-fixed": "#ffdf94",
+                        "surface-tint": "#3a5f94",
+                        "outline-variant": "#c3c6d1",
+                        "surface-container-lowest": "#ffffff",
+                        "background": "#f8f9fa",
+                        "surface-bright": "#f8f9fa",
+                        "primary-fixed": "#d5e3ff",
+                        "on-secondary-fixed-variant": "#594400",
+                        "surface-container-high": "#e7e8e9",
+                        "tertiary": "#1e1e1e",
+                        "primary-fixed-dim": "#a7c8ff",
+                        "surface-container-highest": "#e1e3e4",
+                        "surface-container": "#edeeef",
+                        "surface": "#f8f9fa",
+                        "on-error-container": "#93000a",
+                        "on-tertiary": "#ffffff",
+                        "surface-variant": "#e1e3e4",
+                        "on-tertiary-fixed-variant": "#474746",
+                        "status-success": "#107C10",
+                        "surface-container-low": "#f3f4f5",
+                        "primary": "#001e40",
+                        "on-primary-container": "#799dd6",
+                        "error-container": "#ffdad6",
+                        "on-error": "#ffffff",
+                        "tertiary-fixed": "#e5e2e1",
+                        "inverse-surface": "#2e3132",
+                        "on-secondary-fixed": "#251a00",
+                        "status-warning": "#D83B01",
+                        "surface-border": "#E1E4E8",
+                        "inverse-on-surface": "#f0f1f2",
+                        "on-background": "#191c1d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "base": "4px",
+                        "gutter": "24px",
+                        "container-max-width": "1440px",
+                        "margin-mobile": "16px",
+                        "margin-desktop": "40px"
+                    },
+                    "fontFamily": {
+                        "label-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg-mobile": ["Montserrat"],
+                        "display-lg": ["Montserrat"],
+                        "headline-sm": ["Montserrat"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Montserrat"],
+                        "headline-lg": ["Montserrat"]
+                    },
+                    "fontSize": {
+                        "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                        "label-sm": ["11px", {"lineHeight": "14px", "fontWeight": "500"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "700"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { background-color: #f8f9fa; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #c3c6d1; border-radius: 10px; }
+    </style>
+</head>
+<body class="font-body-md text-on-surface">
+<!-- SideNavBar -->
+<aside class="w-[260px] h-screen fixed left-0 top-0 bg-primary text-on-primary flex flex-col py-6 border-r border-outline/20 z-50">
+<div class="px-6 mb-8">
+<img alt="Sentinel Enterprise" class="h-10 mb-4 brightness-0 invert object-contain" src="https://lh3.googleusercontent.com/aida/ADBb0uhGqL0NW2raGVbnb5g7vYPK1gkbWCIweelNf839fAHPX33zYdXFXTOHARyg8WSpEh-nY3_0SZMvo9aGZIt1oyrr6ndueZpUEKOq9TLqPaLQUUcEXQrxrZykAoGDmIt2F6pcqW8ObrhOMAhKWY1Uys0zXqTaNFR22t55bKlCSZKskWWf94xr4YLyEgj8GuRetppLFUB9LNwkdhHtRk3NQDlijaKEVjryT9MOiZcQAWcJjM-41j-zcA3r"/>
+<p class="font-label-md text-on-primary-container uppercase tracking-widest opacity-80">Administración Central</p>
+</div>
+<nav class="flex-1 px-3 space-y-1 overflow-y-auto custom-scrollbar">
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-primary/70 hover:text-on-primary hover:bg-white/10 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-md font-medium">Inicio</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-primary/70 hover:text-on-primary hover:bg-white/10 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">badge</span>
+<span class="font-body-md font-medium">Empleados</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-primary/70 hover:text-on-primary hover:bg-white/10 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">location_on</span>
+<span class="font-body-md font-medium">Puestos de Servicio</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg bg-secondary-container text-on-secondary-container font-bold transition-all shadow-sm" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">school</span>
+<span class="font-body-md">Cursos</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-primary/70 hover:text-on-primary hover:bg-white/10 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">verified</span>
+<span class="font-body-md font-medium">Certificaciones</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-primary/70 hover:text-on-primary hover:bg-white/10 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">notifications_active</span>
+<span class="font-body-md font-medium">Alertas</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-primary/70 hover:text-on-primary hover:bg-white/10 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">upload_file</span>
+<span class="font-body-md font-medium">Cargas de Datos</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-primary/70 hover:text-on-primary hover:bg-white/10 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md font-medium">Configuración</span>
+</a>
+</nav>
+<div class="mt-auto px-3 border-t border-white/10 pt-6 space-y-1">
+<div class="px-4 py-3 mb-2 text-on-primary/60 font-label-md bg-white/5 rounded-lg border border-white/10">
+                Próximamente: Novedades
+            </div>
+<a class="flex items-center gap-4 px-4 py-2 rounded-lg text-on-primary/70 hover:text-on-primary transition-all" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-body-md">Ayuda</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-2 rounded-lg text-on-primary/70 hover:text-error transition-all" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-body-md">Cerrar Sesión</span>
+</a>
+</div>
+</aside>
+<!-- TopNavBar -->
+<header class="h-[64px] fixed top-0 right-0 left-[260px] bg-white flex justify-between items-center px-10 border-b border-surface-border z-40">
+<div class="flex items-center gap-4 flex-1">
+<div class="relative w-full max-w-[440px]">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded-full pl-12 pr-6 py-2 font-body-md focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none transition-all" placeholder="Buscar cursos o empleados..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container transition-colors relative">
+<span class="material-symbols-outlined text-on-surface-variant">notifications</span>
+<span class="absolute top-2.5 right-2.5 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>
+</button>
+<div class="h-6 w-[1px] bg-outline-variant"></div>
+<div class="flex items-center gap-3 cursor-pointer hover:bg-surface-container p-1 rounded-lg transition-all">
+<div class="text-right hidden sm:block">
+<p class="font-label-md text-on-surface leading-tight">Admin User</p>
+<p class="font-body-sm text-outline leading-tight">Super App Admin</p>
+</div>
+<img alt="User Avatar" class="w-9 h-9 rounded-full object-cover border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC4w0AK-qy85GA4pAmoLtZ0ijHkUph_NSpvt2xw-vhI1O-pA5UlTgIOWLtzJsetIC8k-dXOS5Rnn51vuZnzCb2wESRsUxU660TdjVpuHHfncSpN7aEcS46bRPBCgj9JgKLEY6axbgIoTBscePkhFbzIly06z5iLgp-rtQOI9bqsEOC1U7PNdNTJF0tqInvZuLjQ0nVTVCLCvuZbtQQb8eJUl17auPoJxiZ8q9vcVM2RbAbSCN08zNBDJuefhEVxS65O4CkgGjbagA"/>
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="ml-[260px] pt-[64px] min-h-screen">
+<div class="max-w-[1440px] mx-auto p-10">
+<!-- Module Header -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-6">
+<div>
+<h2 class="font-headline-lg text-primary mb-1">Cursos y Acreditaciones</h2>
+<p class="font-body-lg text-on-surface-variant">Gestión de cumplimiento normativo y vigencia de capacitaciones.</p>
+</div>
+<div class="flex gap-4">
+<button class="flex items-center gap-2 px-6 py-2.5 border border-outline text-on-surface rounded-lg font-label-md hover:bg-surface-container transition-all">
+<span class="material-symbols-outlined text-lg">download</span>
+                        Exportar Resumen
+                    </button>
+<button class="flex items-center gap-2 px-6 py-2.5 bg-primary text-on-primary rounded-lg font-label-md hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-[0.98]">
+<span class="material-symbols-outlined text-lg">add_task</span>
+                        Registrar Renovación
+                    </button>
+</div>
+</div>
+<!-- Dashboard Metrics -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+<div class="bg-white p-6 rounded-xl border border-surface-border shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-center mb-4">
+<div class="w-10 h-10 bg-primary/5 text-primary rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">groups</span>
+</div>
+<span class="text-outline-variant material-symbols-outlined">trending_flat</span>
+</div>
+<p class="font-label-md text-outline uppercase">Total Empleados</p>
+<h3 class="text-3xl font-bold text-on-surface">1,284</h3>
+</div>
+<div class="bg-white p-6 rounded-xl border border-error/20 shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-center mb-4">
+<div class="w-10 h-10 bg-error/10 text-error rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<span class="text-error material-symbols-outlined">priority_high</span>
+</div>
+<p class="font-label-md text-error uppercase">Vencidos</p>
+<h3 class="text-3xl font-bold text-error">42</h3>
+</div>
+<div class="bg-white p-6 rounded-xl border border-secondary/20 shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-center mb-4">
+<div class="w-10 h-10 bg-secondary/10 text-secondary rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">schedule</span>
+</div>
+<span class="text-secondary material-symbols-outlined">event</span>
+</div>
+<p class="font-label-md text-secondary uppercase">Próximos 30 Días</p>
+<h3 class="text-3xl font-bold text-secondary">115</h3>
+</div>
+<div class="bg-white p-6 rounded-xl border border-status-success/20 shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-center mb-4">
+<div class="w-10 h-10 bg-status-success/10 text-status-success rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<span class="text-status-success material-symbols-outlined">trending_up</span>
+</div>
+<p class="font-label-md text-status-success uppercase">Cumplimiento Global</p>
+<h3 class="text-3xl font-bold text-status-success">94.2%</h3>
+</div>
+</div>
+<!-- Table Container -->
+<div class="bg-white rounded-xl border border-surface-border shadow-sm overflow-hidden mb-10">
+<!-- Filters Bar -->
+<div class="px-6 py-4 border-b border-surface-border bg-surface-container-low flex flex-wrap items-center justify-between gap-4">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-on-surface-variant mr-2">Filtrar:</span>
+<button class="px-4 py-1.5 bg-primary text-on-primary rounded-full font-label-md shadow-sm">Todos</button>
+<button class="px-4 py-1.5 bg-surface-container text-on-surface-variant hover:bg-error/10 hover:text-error rounded-full font-label-md transition-colors">Vencidos</button>
+<button class="px-4 py-1.5 bg-surface-container text-on-surface-variant hover:bg-secondary/10 hover:text-secondary rounded-full font-label-md transition-colors">Críticos</button>
+</div>
+<div class="flex items-center gap-3">
+<select class="bg-white border border-outline-variant rounded-lg font-body-sm px-4 py-1.5 focus:ring-2 focus:ring-primary/20 focus:outline-none">
+<option>Todos los Puestos</option>
+<option>Seguridad Física</option>
+<option>Vigilancia Móvil</option>
+</select>
+</div>
+</div>
+<!-- Data Table -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-lowest">
+<th class="px-6 py-4 font-label-md text-outline uppercase tracking-wider border-b border-surface-border">Empleado</th>
+<th class="px-6 py-4 font-label-md text-outline uppercase tracking-wider border-b border-surface-border">Curso / Acreditación</th>
+<th class="px-6 py-4 font-label-md text-outline uppercase tracking-wider border-b border-surface-border">Vencimiento</th>
+<th class="px-6 py-4 font-label-md text-outline uppercase tracking-wider border-b border-surface-border">Estado</th>
+<th class="px-6 py-4 font-label-md text-outline uppercase tracking-wider border-b border-surface-border text-right">Acciones</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-border">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-primary/5 flex items-center justify-center font-bold text-primary border border-primary/10">RM</div>
+<div>
+<p class="font-body-md font-semibold text-on-surface">Rodriguez, Marcos</p>
+<p class="font-label-sm text-outline">SG-4492</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4">
+<p class="font-body-md text-on-surface">Portación de Armas (ANMAC)</p>
+<p class="font-label-sm text-outline">Nivel: Crítico Operacional</p>
+</td>
+<td class="px-6 py-4">
+<span class="font-mono text-error font-semibold">12/05/2024</span>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-error/10 text-error font-label-md border border-error/20">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+                                        Vencido
+                                    </span>
+</td>
+<td class="px-6 py-4 text-right">
+<div class="flex justify-end gap-1">
+<button class="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors" title="Renovar">
+<span class="material-symbols-outlined text-xl">refresh</span>
+</button>
+<button class="p-2 text-outline hover:text-on-surface rounded-lg transition-colors">
+<span class="material-symbols-outlined text-xl">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-primary/5 flex items-center justify-center font-bold text-primary border border-primary/10">SL</div>
+<div>
+<p class="font-body-md font-semibold text-on-surface">Sosa, Luciana</p>
+<p class="font-label-sm text-outline">SG-5102</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4">
+<p class="font-body-md text-on-surface">Primeros Auxilios Avanzados</p>
+<p class="font-label-sm text-outline">Nivel: Preventivo</p>
+</td>
+<td class="px-6 py-4">
+<span class="font-mono text-secondary font-semibold">22/06/2024</span>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary/10 text-secondary font-label-md border border-secondary/20">
+<span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+                                        Crítico
+                                    </span>
+</td>
+<td class="px-6 py-4 text-right">
+<div class="flex justify-end gap-1">
+<button class="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors">
+<span class="material-symbols-outlined text-xl">refresh</span>
+</button>
+<button class="p-2 text-outline hover:text-on-surface rounded-lg transition-colors">
+<span class="material-symbols-outlined text-xl">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-primary/5 flex items-center justify-center font-bold text-primary border border-primary/10">GD</div>
+<div>
+<p class="font-body-md font-semibold text-on-surface">Gomez, Diego</p>
+<p class="font-label-sm text-outline">SG-3310</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4">
+<p class="font-body-md text-on-surface">Seguridad Perimetral Electrónica</p>
+<p class="font-label-sm text-outline">Nivel: Técnico</p>
+</td>
+<td class="px-6 py-4">
+<span class="font-mono text-on-surface-variant">15/12/2025</span>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-status-success/10 text-status-success font-label-md border border-status-success/20">
+<span class="w-2 h-2 rounded-full bg-status-success"></span>
+                                        Vigente
+                                    </span>
+</td>
+<td class="px-6 py-4 text-right">
+<div class="flex justify-end gap-1">
+<button class="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors">
+<span class="material-symbols-outlined text-xl">visibility</span>
+</button>
+<button class="p-2 text-outline hover:text-on-surface rounded-lg transition-colors">
+<span class="material-symbols-outlined text-xl">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="px-6 py-4 bg-surface-container-low border-t border-surface-border flex items-center justify-between">
+<p class="font-body-sm text-outline">Mostrando 1-10 de 1,284 registros</p>
+<div class="flex items-center gap-2">
+<button class="w-8 h-8 flex items-center justify-center border border-outline-variant rounded hover:bg-white disabled:opacity-30" disabled="">
+<span class="material-symbols-outlined text-lg">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center bg-primary text-on-primary rounded font-label-md">1</button>
+<button class="w-8 h-8 flex items-center justify-center hover:bg-white rounded font-label-md transition-colors">2</button>
+<button class="w-8 h-8 flex items-center justify-center hover:bg-white rounded font-label-md transition-colors">3</button>
+<button class="w-8 h-8 flex items-center justify-center border border-outline-variant rounded hover:bg-white transition-colors">
+<span class="material-symbols-outlined text-lg">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Lower Section: Alerts & Quick Actions -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+<!-- Operational Alerts -->
+<div class="lg:col-span-2">
+<div class="flex items-center gap-3 mb-6">
+<div class="w-2 h-8 bg-error rounded-full"></div>
+<h4 class="font-headline-md text-on-surface">Alertas de Cumplimiento Crítico</h4>
+</div>
+<div class="space-y-4">
+<div class="p-5 bg-white border-l-4 border-error shadow-sm rounded-r-xl border border-surface-border flex items-start gap-4 hover:shadow-md transition-all">
+<div class="p-3 bg-error/10 text-error rounded-lg">
+<span class="material-symbols-outlined">assignment_late</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-center mb-1">
+<p class="font-bold text-on-surface">Vencimiento Masivo: Sucursal Norte</p>
+<span class="text-error font-label-md bg-error/5 px-2 py-0.5 rounded">Inmediato</span>
+</div>
+<p class="font-body-sm text-on-surface-variant">12 agentes tienen el curso de Manejo de Crisis vencido. Se requiere acción legal para evitar sanciones operativas.</p>
+<div class="mt-4 flex gap-4">
+<button class="text-primary font-label-md hover:underline flex items-center gap-1">Ver Listado <span class="material-symbols-outlined text-sm">open_in_new</span></button>
+<button class="text-outline font-label-md hover:text-on-surface transition-colors">Notificar Supervisores</button>
+</div>
+</div>
+</div>
+<div class="p-5 bg-white border-l-4 border-secondary shadow-sm rounded-r-xl border border-surface-border flex items-start gap-4 hover:shadow-md transition-all">
+<div class="p-3 bg-secondary/10 text-secondary rounded-lg">
+<span class="material-symbols-outlined">update</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-center mb-1">
+<p class="font-bold text-on-surface">Actualización Protocolo COVID-24</p>
+<span class="text-secondary font-label-md bg-secondary/5 px-2 py-0.5 rounded">7 días restantes</span>
+</div>
+<p class="font-body-sm text-on-surface-variant">Falta validación de 45 empleados para el nuevo protocolo sanitario mandatorio.</p>
+<div class="mt-4">
+<button class="text-primary font-label-md hover:underline">Gestionar Carga Manual</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Quick Actions Panel -->
+<div class="bg-primary/5 rounded-2xl border border-primary/10 p-8">
+<h4 class="font-headline-sm text-primary mb-6">Gestión Operativa</h4>
+<div class="space-y-3">
+<button class="w-full p-4 bg-white rounded-xl border border-surface-border flex items-center gap-4 hover:border-primary hover:shadow-sm transition-all group text-left">
+<div class="w-10 h-10 bg-primary/5 text-primary rounded-lg flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+<span class="material-symbols-outlined">upload_file</span>
+</div>
+<div>
+<p class="font-label-md font-bold text-on-surface">Carga Masiva</p>
+<p class="text-[11px] text-outline uppercase tracking-wider">Excel / CSV</p>
+</div>
+</button>
+<button class="w-full p-4 bg-white rounded-xl border border-surface-border flex items-center gap-4 hover:border-primary hover:shadow-sm transition-all group text-left">
+<div class="w-10 h-10 bg-primary/5 text-primary rounded-lg flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+<span class="material-symbols-outlined">history</span>
+</div>
+<div>
+<p class="font-label-md font-bold text-on-surface">Historial</p>
+<p class="text-[11px] text-outline uppercase tracking-wider">Registro de Cambios</p>
+</div>
+</button>
+<div class="mt-8 p-6 bg-white rounded-xl border-2 border-dashed border-outline-variant flex flex-col items-center justify-center text-center gap-3">
+<span class="material-symbols-outlined text-outline text-4xl">cloud_upload</span>
+<p class="font-body-sm text-on-surface-variant">Suelte certificados escaneados para procesamiento automático vía OCR</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Button click feedback
+            const buttons = document.querySelectorAll('button');
+            buttons.forEach(btn => {
+                btn.addEventListener('mousedown', () => btn.classList.add('opacity-80'));
+                btn.addEventListener('mouseup', () => btn.classList.remove('opacity-80'));
+            });
+        });
+    </script>
+</body></html>

@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>S&amp;G Portal - Generador de Certificaciones</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Montserrat:wght@600;700&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-container": "#ffc703",
+                    "on-surface-variant": "#43474f",
+                    "error": "#ba1a1a",
+                    "on-secondary": "#ffffff",
+                    "status-error": "#A4262C",
+                    "on-surface": "#191c1d",
+                    "on-tertiary-fixed": "#1b1b1c",
+                    "outline": "#737780",
+                    "on-primary": "#ffffff",
+                    "on-primary-fixed-variant": "#1f477b",
+                    "tertiary-fixed-dim": "#c8c6c5",
+                    "primary-container": "#003366",
+                    "surface-dim": "#d9dadb",
+                    "secondary-fixed-dim": "#f5bf00",
+                    "inverse-primary": "#a7c8ff",
+                    "on-secondary-container": "#6e5400",
+                    "secondary": "#765b00",
+                    "tertiary-container": "#333333",
+                    "on-primary-fixed": "#001b3c",
+                    "on-tertiary-container": "#9d9b9b",
+                    "status-info": "#0078D4",
+                    "secondary-fixed": "#ffdf94",
+                    "surface-tint": "#3a5f94",
+                    "outline-variant": "#c3c6d1",
+                    "surface-container-lowest": "#ffffff",
+                    "background": "#f8f9fa",
+                    "surface-bright": "#f8f9fa",
+                    "primary-fixed": "#d5e3ff",
+                    "on-secondary-fixed-variant": "#594400",
+                    "surface-container-high": "#e7e8e9",
+                    "tertiary": "#1e1e1e",
+                    "primary-fixed-dim": "#a7c8ff",
+                    "surface-container-highest": "#e1e3e4",
+                    "surface-container": "#edeeef",
+                    "surface": "#f8f9fa",
+                    "on-error-container": "#93000a",
+                    "on-tertiary": "#ffffff",
+                    "surface-variant": "#e1e3e4",
+                    "on-tertiary-fixed-variant": "#474746",
+                    "status-success": "#107C10",
+                    "surface-container-low": "#f3f4f5",
+                    "primary": "#001e40",
+                    "on-primary-container": "#799dd6",
+                    "error-container": "#ffdad6",
+                    "on-error": "#ffffff",
+                    "tertiary-fixed": "#e5e2e1",
+                    "inverse-surface": "#2e3132",
+                    "on-secondary-fixed": "#251a00",
+                    "status-warning": "#D83B01",
+                    "surface-border": "#E1E4E8",
+                    "inverse-on-surface": "#f0f1f2",
+                    "on-background": "#191c1d"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "base": "4px",
+                    "gutter": "24px",
+                    "container-max-width": "1440px",
+                    "margin-mobile": "16px",
+                    "margin-desktop": "40px"
+            },
+            "fontFamily": {
+                    "label-md": ["Inter"],
+                    "label-sm": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "headline-lg-mobile": ["Montserrat"],
+                    "display-lg": ["Montserrat"],
+                    "headline-sm": ["Montserrat"],
+                    "body-md": ["Inter"],
+                    "headline-md": ["Montserrat"],
+                    "headline-lg": ["Montserrat"]
+            },
+            "fontSize": {
+                    "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "label-sm": ["11px", {"lineHeight": "14px", "fontWeight": "500"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "700"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .preview-shadow { box-shadow: 0 10px 40px rgba(0,0,0,0.08); }
+        .document-paper { filter: drop-shadow(0px 4px 12px rgba(0, 0, 0, 0.1)); }
+    </style>
+</head>
+<body class="bg-surface font-body-md text-on-surface">
+<!-- Side Navigation -->
+<aside class="w-[260px] h-screen fixed left-0 top-0 bg-primary-container border-r border-outline-variant flex flex-col py-gutter z-50">
+<div class="px-gutter mb-margin-desktop">
+<img alt="S&amp;G Logo" class="h-8 mb-2" src="https://lh3.googleusercontent.com/aida/ADBb0uhGqL0NW2raGVbnb5g7vYPK1gkbWCIweelNf839fAHPX33zYdXFXTOHARyg8WSpEh-nY3_0SZMvo9aGZIt1oyrr6ndueZpUEKOq9TLqPaLQUUcEXQrxrZykAoGDmIt2F6pcqW8ObrhOMAhKWY1Uys0zXqTaNFR22t55bKlCSZKskWWf94xr4YLyEgj8GuRetppLFUB9LNwkdhHtRk3NQDlijaKEVjryT9MOiZcQAWcJjM-41j-zcA3r"/>
+<p class="font-label-md text-label-md text-on-primary-container opacity-80">Administración Central</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center px-gutter py-2 text-on-primary-container/70 hover:bg-white/10 hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-4">dashboard</span>
+<span class="font-medium">Inicio</span>
+</a>
+<a class="flex items-center px-gutter py-2 text-on-primary-container/70 hover:bg-white/10 hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-4">badge</span>
+<span class="font-medium">Empleados</span>
+</a>
+<a class="flex items-center px-gutter py-2 bg-secondary-container text-on-secondary-container font-bold transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-4">verified</span>
+<span>Certificaciones</span>
+</a>
+<a class="flex items-center px-gutter py-2 text-on-primary-container/70 hover:bg-white/10 hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-4">location_on</span>
+<span class="font-medium">Puestos de Servicio</span>
+</a>
+<a class="flex items-center px-gutter py-2 text-on-primary-container/70 hover:bg-white/10 hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-4">school</span>
+<span class="font-medium">Cursos</span>
+</a>
+<a class="flex items-center px-gutter py-2 text-on-primary-container/70 hover:bg-white/10 hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-4">notifications_active</span>
+<span class="font-medium">Alertas</span>
+</a>
+<a class="flex items-center px-gutter py-2 text-on-primary-container/70 hover:bg-white/10 hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-4">upload_file</span>
+<span class="font-medium">Cargas de Datos</span>
+</a>
+<a class="flex items-center px-gutter py-2 text-on-primary-container/70 hover:bg-white/10 hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-4">settings</span>
+<span class="font-medium">Configuración</span>
+</a>
+</nav>
+<div class="px-gutter mt-auto pt-gutter border-t border-white/10">
+<a class="flex items-center px-gutter py-2 text-on-primary-container/70 hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-4">help</span>
+<span>Ayuda</span>
+</a>
+<a class="flex items-center px-gutter py-2 text-on-primary-container/70 hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-4">logout</span>
+<span>Cerrar Sesión</span>
+</a>
+</div>
+</aside>
+<!-- Top Navigation Bar -->
+<header class="h-[64px] fixed top-0 right-0 left-[260px] bg-white border-b border-surface-border z-40">
+<div class="flex justify-between items-center px-gutter h-full max-w-[1440px] mx-auto">
+<div class="flex items-center space-x-gutter flex-1">
+<div class="relative w-full max-w-md">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-lg focus:ring-2 focus:ring-primary-container focus:outline-none text-body-md" placeholder="Buscar empleados o trámites..." type="text"/>
+</div>
+</div>
+<div class="flex items-center space-x-gutter">
+<button class="relative p-2 text-on-surface-variant hover:text-primary-container transition-all">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1 right-1 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<div class="flex items-center space-x-gutter pl-gutter border-l border-surface-border">
+<div class="text-right hidden sm:block">
+<p class="font-label-md text-label-md font-bold text-on-surface">Admin Usuario</p>
+<p class="text-[10px] text-outline uppercase tracking-wider">Super Administrador</p>
+</div>
+<img alt="User Avatar" class="w-8 h-8 rounded-full border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDQYVZ7H4XP_NT7k0fHYQYITa48Ug1FDnIpHWi3BIwPTvKHsvRhdS0uudtSIUpkVuMn-1EL0khti1ySb0r-rEy64D4O0PNFfjgLTsgz7gm_plI_yFaPPfMGy-DTGQWgYccIGetUWSmfZ32N-GtUg8qSP_1CJIX0Wm7Z-sYlplzkwC2Hvvsob6esoMywk2vhCuSlUZtFN9aR1MgzjLR3ccz2vMpmBW3MIl2NTSSwjyhuZbWG1c60S4XeiuMm7BRm5x66zoQVpjRhRw"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="ml-[260px] pt-[64px] min-h-screen">
+<div class="max-w-[1440px] mx-auto p-gutter">
+<!-- Header Section -->
+<div class="mb-gutter flex justify-between items-end">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-primary-container mb-1">Generador de Certificaciones</h2>
+<p class="text-on-surface-variant font-body-md max-w-2xl">Emisión y gestión de documentos laborales con validez jurídica y firma digital configurada.</p>
+</div>
+<div class="flex space-x-4">
+<button class="flex items-center space-x-2 px-gutter py-2 border border-outline-variant text-on-surface-variant font-label-md rounded-lg hover:bg-surface-container transition-all">
+<span class="material-symbols-outlined text-[20px]">history</span>
+<span>Ver Historial</span>
+</button>
+<button class="flex items-center space-x-2 px-gutter py-2 bg-primary-container text-on-primary font-label-md rounded-lg hover:bg-primary-container/90 shadow-sm transition-all">
+<span class="material-symbols-outlined text-[20px]">add_circle</span>
+<span>Nueva Plantilla</span>
+</button>
+</div>
+</div>
+<div class="grid grid-cols-12 gap-gutter">
+<!-- Configuration Panel -->
+<section class="col-span-12 lg:col-span-5 space-y-gutter">
+<!-- Employee Search & Selection -->
+<div class="bg-white border border-surface-border p-gutter rounded-xl shadow-sm">
+<label class="block font-label-md text-label-md text-outline mb-3 uppercase tracking-wider">Selección de Empleado</label>
+<div class="relative">
+<input class="w-full p-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-lg font-bold focus:ring-2 focus:ring-primary-container focus:outline-none" id="employee-search" placeholder="Buscar por nombre o CC..." type="text" value="Ricardo Alberto Sánchez"/>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-primary-container">person_search</span>
+</div>
+<div class="mt-4 flex items-center p-3 bg-surface-container rounded-lg border border-surface-border">
+<div class="w-10 h-10 rounded bg-primary-fixed flex items-center justify-center mr-4">
+<span class="material-symbols-outlined text-primary-container">badge</span>
+</div>
+<div>
+<p class="text-body-sm font-bold text-on-surface">CC 1.090.455.322</p>
+<p class="text-[11px] text-on-surface-variant">Coordinador de Seguridad - Planta Bogotá</p>
+</div>
+</div>
+</div>
+<!-- Config Form -->
+<div class="bg-white border border-surface-border p-gutter rounded-xl shadow-sm space-y-6">
+<div>
+<label class="block font-label-md text-label-md text-outline mb-3 uppercase tracking-wider">Parámetros del Documento</label>
+<div class="grid grid-cols-2 gap-4">
+<div>
+<label class="text-[11px] font-bold text-on-surface-variant block mb-1">Estado Laboral</label>
+<select class="w-full bg-surface-container-low border border-outline-variant rounded-lg p-2 text-body-md focus:ring-2 focus:ring-primary-container">
+<option>Vínculo Activo</option>
+<option>Retirado / Ex-empleado</option>
+</select>
+</div>
+<div>
+<label class="text-[11px] font-bold text-on-surface-variant block mb-1">Tipo de Certificación</label>
+<select class="w-full bg-surface-container-low border border-outline-variant rounded-lg p-2 text-body-md focus:ring-2 focus:ring-primary-container">
+<option>General</option>
+<option>Financiera (Sueldos)</option>
+<option>Cesantías</option>
+<option>Funciones</option>
+</select>
+</div>
+</div>
+<div class="mt-4">
+<label class="text-[11px] font-bold text-on-surface-variant block mb-1">Destinatario / Motivo</label>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded-lg p-2 text-body-md focus:ring-2 focus:ring-primary-container" placeholder="Ej: A quien interese o Entidad Bancaria" type="text"/>
+</div>
+</div>
+<div class="pt-6 border-t border-surface-border">
+<label class="block font-label-md text-label-md text-outline mb-3 uppercase tracking-wider">Variables Manuales (Devengos)</label>
+<div class="space-y-2">
+<div class="flex items-center justify-between p-3 bg-surface-container-low rounded border border-surface-border">
+<span class="text-body-sm text-on-surface">Horas Extras (Promedio 3 meses)</span>
+<input class="w-32 bg-white border border-outline-variant text-right px-2 py-1 rounded text-body-sm font-bold text-primary-container" type="text" value="$ 450,000"/>
+</div>
+<div class="flex items-center justify-between p-3 bg-surface-container-low rounded border border-surface-border">
+<span class="text-body-sm text-on-surface">Recargos Nocturnos</span>
+<input class="w-32 bg-white border border-outline-variant text-right px-2 py-1 rounded text-body-sm font-bold text-primary-container" type="text" value="$ 120,500"/>
+</div>
+<div class="flex items-center justify-between p-3 bg-surface-container-low rounded border border-surface-border">
+<span class="text-body-sm text-on-surface">Bonificaciones No Prestacionales</span>
+<input class="w-32 bg-white border border-outline-variant text-right px-2 py-1 rounded text-body-sm font-bold text-primary-container" type="text" value="$ 0"/>
+</div>
+</div>
+</div>
+<div class="pt-6 border-t border-surface-border">
+<label class="block font-label-md text-label-md text-outline mb-3 uppercase tracking-wider">Autorización y Firma</label>
+<div class="flex items-center space-x-4 p-4 bg-surface rounded-lg border border-surface-border">
+<img alt="Firmante" class="w-12 h-12 rounded bg-surface-container-highest border border-outline-variant object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAORYcquoyStxgl893h1Ttfs5UqTNyjRehAzOsza9OHUfet4Q9TW7SD7FBiliQ3J9CjznCoP1CV9vl4PiUi8mj3cJ2iQn2wrtG2g2sVOffjysnL7cZS-U-hpcsRM07EO-5Y8LoCBQk0gkBbmtlShCSIe3A42g8A6MnCMMxWu35DMpv5L1NNSgB83EWWd_00CDa8d6IArODgWbK1FQtAw51pJ-2W5iMApBJd9UBJ8fGM5a0nkKcK3j8J4iwRAH3m9iDHmfkm9FQJLA"/>
+<div class="flex-1">
+<p class="text-body-sm font-bold text-on-surface">Dra. Martha Isabel Ortiz</p>
+<p class="text-[10px] text-outline uppercase">Gerente de Talento Humano</p>
+</div>
+<button class="text-primary-container hover:underline text-label-md font-bold">Cambiar</button>
+</div>
+</div>
+<button class="w-full py-4 bg-primary-container text-on-primary rounded-xl font-bold flex items-center justify-center space-x-3 shadow-md hover:bg-primary-container/90 transition-all transform active:scale-[0.98] mt-4">
+<span class="material-symbols-outlined">picture_as_pdf</span>
+<span>APROBAR Y DESCARGAR PDF</span>
+</button>
+</div>
+</section>
+<!-- Preview Panel -->
+<section class="col-span-12 lg:col-span-7">
+<div class="sticky top-[88px] flex flex-col h-[calc(100vh-140px)]">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center space-x-3">
+<span class="flex h-2 w-2 rounded-full bg-status-success"></span>
+<span class="text-label-md font-bold uppercase tracking-widest text-outline">Previsualización en tiempo real</span>
+</div>
+<div class="flex space-x-2">
+<button class="p-2 bg-white border border-surface-border rounded hover:bg-surface-container transition-colors"><span class="material-symbols-outlined text-[18px] text-on-surface-variant">zoom_in</span></button>
+<button class="p-2 bg-white border border-surface-border rounded hover:bg-surface-container transition-colors"><span class="material-symbols-outlined text-[18px] text-on-surface-variant">zoom_out</span></button>
+<button class="p-2 bg-white border border-surface-border rounded hover:bg-surface-container transition-colors"><span class="material-symbols-outlined text-[18px] text-on-surface-variant">print</span></button>
+</div>
+</div>
+<div class="flex-1 bg-surface-container-low rounded-xl overflow-y-auto p-12 flex justify-center border border-surface-border">
+<!-- Paper Document Design -->
+<article class="bg-white w-[595px] min-h-[842px] document-paper p-[60px] text-[#1e293b] flex flex-col font-serif relative">
+<!-- Document Header -->
+<div class="flex justify-between items-start mb-[50px] border-b-2 border-primary-container/10 pb-6">
+<img alt="S&amp;G Logo" class="h-12" src="https://lh3.googleusercontent.com/aida/ADBb0uhGqL0NW2raGVbnb5g7vYPK1gkbWCIweelNf839fAHPX33zYdXFXTOHARyg8WSpEh-nY3_0SZMvo9aGZIt1oyrr6ndueZpUEKOq9TLqPaLQUUcEXQrxrZykAoGDmIt2F6pcqW8ObrhOMAhKWY1Uys0zXqTaNFR22t55bKlCSZKskWWf94xr4YLyEgj8GuRetppLFUB9LNwkdhHtRk3NQDlijaKEVjryT9MOiZcQAWcJjM-41j-zcA3r"/>
+<div class="text-right font-sans">
+<p class="font-bold text-body-lg text-primary-container uppercase">S&amp;G Super App S.A.S.</p>
+<p class="text-body-sm text-outline">NIT: 900.555.221-3</p>
+<p class="text-[10px] text-outline">Calle 100 #11B - 44, Bogotá D.C.</p>
+</div>
+</div>
+<!-- Body -->
+<div class="space-y-6 flex-1">
+<h3 class="text-center font-sans font-bold text-headline-md uppercase tracking-[0.2em] mb-12 underline decoration-2 underline-offset-8 text-primary-container">Certificación Laboral</h3>
+<p class="text-body-lg leading-relaxed text-justify indent-8">
+    La suscrita Gerente de Talento Humano de <strong>S&amp;G SUPER APP S.A.S.</strong>, identificada con NIT 900.555.221-3, hace constar que el señor:
+</p>
+<div class="py-6 text-center">
+<p class="font-sans font-bold text-headline-md text-on-surface">RICARDO ALBERTO SÁNCHEZ</p>
+<p class="text-body-md text-on-surface-variant">Identificado con Cédula de Ciudadanía No. 1.090.455.322</p>
+</div>
+<p class="text-body-lg leading-relaxed text-justify">
+    Se encuentra vinculado laboralmente con nuestra organización mediante un contrato a <strong>Término Indefinido</strong>, desempeñando el cargo de <strong>COORDINADOR DE SEGURIDAD</strong> desde el día 15 de marzo de 2019, con una asignación básica mensual de:
+</p>
+<div class="bg-surface-container p-6 border-l-4 border-secondary-container my-8">
+<p class="font-mono text-xl font-bold text-primary-container">$ 3.250.000 (TRES MILLONES DOSCIENTOS CINCUENTA MIL PESOS M/CTE)</p>
+<p class="text-body-sm text-on-surface-variant mt-2 italic">Adicionalmente, percibe un promedio mensual por concepto de recargos y extras de $ 570,500.</p>
+</div>
+<p class="text-body-lg leading-relaxed">
+    Esta certificación se expide a solicitud del interesado con destino a <strong>A QUIEN INTERESE</strong>, a los veinte (20) días del mes de octubre de dos mil veinticuatro.
+</p>
+</div>
+<!-- Footer/Signature -->
+<div class="mt-12 pt-12 border-t border-surface-border">
+<div class="relative w-48">
+<img alt="Signature" class="w-full grayscale mix-blend-multiply mb-2" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAeNIv4xwDdbUXmt0BmVZdsPS1JX8MYeVB6itJApFzbNorLTxhIirgEV__FJahbIXIZ_H6BU0pVy6UgkJCsD13_ttgg-eVUJ3wYebFk5J2jvVSOgKTGjEVgIeai9kl7pCbaNXRqniAdjP2dh7pwZcWMAQl0o1NqeW6Gf3psJ01fYfUUTrdxyqvBdIYQunqgHnp0Yzdv7ZUtnlh65SQIdK0dcEKdB5lxD_2kOmwU5ogi1FOgFQmUt3qU_-XBa3iecCWeyupNkK-w1Q"/>
+<div class="absolute -top-4 -right-4 opacity-10">
+<span class="material-symbols-outlined text-[80px] text-primary-container">verified_user</span>
+</div>
+</div>
+<p class="font-bold text-body-lg text-on-surface">MARTHA ISABEL ORTIZ</p>
+<p class="text-body-md text-on-surface-variant">Gerente de Talento Humano</p>
+<p class="text-[10px] text-outline mt-8 font-sans">Documento verificado digitalmente vía S&amp;G Portal - ID: CERT-2024-8849-X</p>
+</div>
+</article>
+</div>
+</div>
+</section>
+<!-- History Table Section -->
+<section class="col-span-12 mt-gutter">
+<div class="bg-white border border-surface-border rounded-xl shadow-sm overflow-hidden">
+<div class="px-gutter py-4 border-b border-surface-border flex justify-between items-center bg-surface-container-low">
+<h4 class="font-headline-sm text-headline-sm text-primary-container">Historial de Certificaciones Emitidas</h4>
+<div class="flex space-x-6">
+<button class="text-primary-container font-label-md hover:underline flex items-center space-x-1">
+<span class="material-symbols-outlined text-sm">download</span>
+<span>Exportar Excel</span>
+</button>
+<button class="text-primary-container font-label-md hover:underline flex items-center space-x-1">
+<span class="material-symbols-outlined text-sm">filter_list</span>
+<span>Filtrar</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead>
+<tr class="bg-surface border-b border-surface-border">
+<th class="px-gutter py-3 font-label-md text-outline uppercase tracking-wider">Fecha Emisión</th>
+<th class="px-gutter py-3 font-label-md text-outline uppercase tracking-wider">Empleado</th>
+<th class="px-gutter py-3 font-label-md text-outline uppercase tracking-wider">Tipo</th>
+<th class="px-gutter py-3 font-label-md text-outline uppercase tracking-wider">Destino</th>
+<th class="px-gutter py-3 font-label-md text-outline uppercase tracking-wider">Estado</th>
+<th class="px-gutter py-3 font-label-md text-outline uppercase tracking-wider text-right">Acciones</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-border">
+<tr class="hover:bg-surface-container transition-colors group">
+<td class="px-gutter py-4 font-mono text-[13px] text-on-surface-variant">20/10/2024 14:30</td>
+<td class="px-gutter py-4">
+<p class="font-bold text-on-surface">Ricardo Sánchez</p>
+<p class="text-[11px] text-outline">CC 1.090.455.322</p>
+</td>
+<td class="px-gutter py-4"><span class="px-2 py-0.5 bg-secondary-container/20 text-on-secondary-container border border-secondary-container/30 rounded text-[10px] font-bold uppercase">FINANCIERA</span></td>
+<td class="px-gutter py-4 text-body-sm text-on-surface">Banco de Occidente</td>
+<td class="px-gutter py-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-status-success/10 text-status-success">
+    Emitido
+</span>
+</td>
+<td class="px-gutter py-4 text-right">
+<div class="flex justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 hover:bg-primary-container/10 rounded text-primary-container transition-colors" title="Descargar PDF">
+<span class="material-symbols-outlined text-[20px]">download</span>
+</button>
+<button class="p-1.5 hover:bg-primary-container/10 rounded text-primary-container transition-colors" title="Re-enviar Correo">
+<span class="material-symbols-outlined text-[20px]">mail</span>
+</button>
+</div>
+</td>
+</tr>
+<tr class="hover:bg-surface-container transition-colors group">
+<td class="px-gutter py-4 font-mono text-[13px] text-on-surface-variant">18/10/2024 09:15</td>
+<td class="px-gutter py-4">
+<p class="font-bold text-on-surface">Elena Martínez</p>
+<p class="text-[11px] text-outline">CC 52.331.009</p>
+</td>
+<td class="px-gutter py-4"><span class="px-2 py-0.5 bg-surface-container-highest text-on-surface-variant border border-outline-variant/30 rounded text-[10px] font-bold uppercase">GENERAL</span></td>
+<td class="px-gutter py-4 text-body-sm text-on-surface">A quien interese</td>
+<td class="px-gutter py-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-status-success/10 text-status-success">
+    Emitido
+</span>
+</td>
+<td class="px-gutter py-4 text-right">
+<div class="flex justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 hover:bg-primary-container/10 rounded text-primary-container transition-colors" title="Descargar PDF">
+<span class="material-symbols-outlined text-[20px]">download</span>
+</button>
+<button class="p-1.5 hover:bg-primary-container/10 rounded text-primary-container transition-colors" title="Re-enviar Correo">
+<span class="material-symbols-outlined text-[20px]">mail</span>
+</button>
+</div>
+</td>
+</tr>
+<tr class="hover:bg-surface-container transition-colors group">
+<td class="px-gutter py-4 font-mono text-[13px] text-on-surface-variant">15/10/2024 16:45</td>
+<td class="px-gutter py-4">
+<p class="font-bold text-on-surface">Carlos Arturo Vega</p>
+<p class="text-[11px] text-outline">CC 79.444.121</p>
+</td>
+<td class="px-gutter py-4"><span class="px-2 py-0.5 bg-surface-variant text-outline rounded text-[10px] font-bold uppercase">CESANTÍAS</span></td>
+<td class="px-gutter py-4 text-body-sm text-on-surface">Fondo Nacional del Ahorro</td>
+<td class="px-gutter py-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-error-container text-on-error-container">
+    Anulado
+</span>
+</td>
+<td class="px-gutter py-4 text-right">
+<div class="flex justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 hover:bg-primary-container/10 rounded text-primary-container transition-colors" title="Ver Motivo">
+<span class="material-symbols-outlined text-[20px]">info</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-4 bg-surface-container-low border-t border-surface-border flex justify-center items-center">
+<nav class="flex space-x-4 items-center">
+<button class="p-1.5 border border-outline-variant rounded hover:bg-white transition-colors text-on-surface-variant"><span class="material-symbols-outlined text-[18px]">chevron_left</span></button>
+<span class="text-body-sm font-bold text-on-surface">Página 1 de 12</span>
+<button class="p-1.5 border border-outline-variant rounded hover:bg-white transition-colors text-on-surface-variant"><span class="material-symbols-outlined text-[18px]">chevron_right</span></button>
+</nav>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+<script>
+    // Maintain visual state and search bar animations
+    const searchInput = document.getElementById('employee-search');
+    searchInput.addEventListener('focus', () => {
+        searchInput.parentElement.classList.add('ring-2', 'ring-primary-container/20');
+    });
+    searchInput.addEventListener('blur', () => {
+        searchInput.parentElement.classList.remove('ring-2', 'ring-primary-container/20');
+    });
+
+    // Mock interactive updates
+    document.querySelectorAll('input, select').forEach(el => {
+        el.addEventListener('input', () => {
+            console.log('Update preview triggered for clean enterprise UI');
+        });
+    });
+</script>
+</body></html>

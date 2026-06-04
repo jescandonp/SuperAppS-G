@@ -1,0 +1,54 @@
+﻿
+Configuración de Perfil de dominio: 
+----------------------------------------------------------------------
+Estado                                ACTIVAR
+Directiva de firewall                 BlockInbound,AllowOutbound
+LocalFirewallRules                    N/A (solo almacén de GPO)
+LocalConSecRules                      N/A (solo almacén de GPO)
+InboundUserNotification               Deshabilitar
+RemoteManagement                      Deshabilitar
+UnicastResponseToMulticast            Habilitar
+
+Registro:
+LogAllowedConnections                 Deshabilitar
+LogDroppedConnections                 Deshabilitar
+FileName                              %systemroot%\system32\LogFiles\Firewall\pfirewall.log
+MaxFileSize                           4096
+
+
+Configuración de Perfil privado: 
+----------------------------------------------------------------------
+Estado                                DESACTIVAR
+Directiva de firewall                 BlockInbound,AllowOutbound
+LocalFirewallRules                    N/A (solo almacén de GPO)
+LocalConSecRules                      N/A (solo almacén de GPO)
+InboundUserNotification               Deshabilitar
+RemoteManagement                      Deshabilitar
+UnicastResponseToMulticast            Habilitar
+
+Registro:
+LogAllowedConnections                 Deshabilitar
+LogDroppedConnections                 Deshabilitar
+FileName                              %systemroot%\system32\LogFiles\Firewall\pfirewall.log
+MaxFileSize                           4096
+
+
+Configuración de Perfil público: 
+----------------------------------------------------------------------
+Estado                                DESACTIVAR
+Directiva de firewall                 BlockInbound,AllowOutbound
+LocalFirewallRules                    N/A (solo almacén de GPO)
+LocalConSecRules                      N/A (solo almacén de GPO)
+InboundUserNotification               Deshabilitar
+RemoteManagement                      Deshabilitar
+UnicastResponseToMulticast            Habilitar
+
+Registro:
+LogAllowedConnections                 Deshabilitar
+LogDroppedConnections                 Deshabilitar
+FileName                              %systemroot%\system32\LogFiles\Firewall\pfirewall.log
+MaxFileSize                           4096
+
+Aceptar
+
+

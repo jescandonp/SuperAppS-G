@@ -1,0 +1,207 @@
+{
+  "nodes": [
+    {
+      "id": "jm_person",
+      "label": "JM - Person (Profile Subject)",
+      "file_type": "image",
+      "source_file": "Files/JM_Perfil.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "jm_portrait_casual",
+      "label": "JM - Casual/Creative Portrait (Black & White, Close-up)",
+      "file_type": "image",
+      "source_file": "Files/JM_Perfil.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "jm_portrait_professional",
+      "label": "JM - Professional Business Portrait (Suit & Tie, Arms Crossed)",
+      "file_type": "image",
+      "source_file": "Files/JM_V2.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "seguridad_gestion_ltda_brand",
+      "label": "Seguridad Gestion Ltda - Brand Identity",
+      "file_type": "image",
+      "source_file": "Files/Logo_S&G.jpeg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "seguridad_gestion_ltda_company",
+      "label": "Seguridad Gestion Ltda - Company",
+      "file_type": "image",
+      "source_file": "Files/Logo_S&G.jpeg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sg_logo_shield_symbol",
+      "label": "SG Shield Symbol - Yellow Shield with Eagle Monogram",
+      "file_type": "image",
+      "source_file": "Files/Logo_S&G.jpeg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sg_visual_style",
+      "label": "S&G Visual Style - Yellow/Gold and Dark Grey, Bold Sans-serif",
+      "file_type": "image",
+      "source_file": "Files/Logo_S&G.jpeg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "security_industry_context",
+      "label": "Security Industry - Physical Security / Management Services",
+      "file_type": "image",
+      "source_file": "Files/Logo_S&G.jpeg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "jm_portrait_casual",
+      "target": "jm_person",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "Files/JM_Perfil.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "jm_portrait_professional",
+      "target": "jm_person",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "Files/JM_V2.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "jm_portrait_casual",
+      "target": "jm_portrait_professional",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "Files/JM_V2.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "jm_person",
+      "target": "seguridad_gestion_ltda_company",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "Files/JM_V2.png",
+      "source_location": null,
+      "weight": 0.8
+    },
+    {
+      "source": "jm_portrait_professional",
+      "target": "seguridad_gestion_ltda_company",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "Files/JM_V2.png",
+      "source_location": null,
+      "weight": 0.75
+    },
+    {
+      "source": "seguridad_gestion_ltda_brand",
+      "target": "seguridad_gestion_ltda_company",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "Files/Logo_S&G.jpeg",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sg_logo_shield_symbol",
+      "target": "seguridad_gestion_ltda_brand",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "Files/Logo_S&G.jpeg",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sg_visual_style",
+      "target": "seguridad_gestion_ltda_brand",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "Files/Logo_S&G.jpeg",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "seguridad_gestion_ltda_company",
+      "target": "security_industry_context",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "Files/Logo_S&G.jpeg",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sg_logo_shield_symbol",
+      "target": "security_industry_context",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "Files/Logo_S&G.jpeg",
+      "source_location": null,
+      "weight": 0.9
+    },
+    {
+      "source": "jm_person",
+      "target": "security_industry_context",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.7,
+      "source_file": "Files/JM_V2.png",
+      "source_location": null,
+      "weight": 0.7
+    }
+  ],
+  "hyperedges": [],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

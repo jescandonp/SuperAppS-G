@@ -1,0 +1,43 @@
+# Node / frontend
+node_modules/
+dist/
+build/
+.vite/
+
+# .NET / backend
+bin/
+obj/
+.vs/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.claude/settings.local.json
+.superpowers/
+
+# Local database artifacts
+*.sqlite
+*.db
+
+# Python / generated consulting artifacts
+__pycache__/
+.pytest_cache/
+*.py[cod]
+
+# Local-only consulting workspace
+Artefactos Consultoria/

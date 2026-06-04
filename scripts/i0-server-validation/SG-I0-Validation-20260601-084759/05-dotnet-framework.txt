@@ -1,0 +1,47 @@
+﻿
+
+SP           : 
+Install      : 1
+RegistryPath : HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Client
+Release      : 528049
+Version      : 4.8.03761
+
+SP           : 
+Install      : 1
+RegistryPath : HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Client\1033
+Release      : 528049
+Version      : 4.8.03761
+
+SP           : 
+Install      : 1
+RegistryPath : HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Client\3082
+Release      : 528049
+Version      : 4.8.03761
+
+SP           : 
+Install      : 1
+RegistryPath : HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full
+Release      : 528049
+Version      : 4.8.03761
+
+SP           : 
+Install      : 1
+RegistryPath : HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full\1033
+Release      : 528049
+Version      : 4.8.03761
+
+SP           : 
+Install      : 1
+RegistryPath : HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full\3082
+Release      : 528049
+Version      : 4.8.03761
+
+SP           : 
+Install      : 1
+RegistryPath : HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4.0\Client
+Release      : 
+Version      : 4.0.0.0
+
+
+
+

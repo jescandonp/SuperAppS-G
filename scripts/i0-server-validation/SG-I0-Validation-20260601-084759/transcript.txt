@@ -1,0 +1,92 @@
+﻿**********************
+Inicio de la transcripción de Windows PowerShell
+Hora de inicio: 20260601084759
+Nombre de usuario: SERVIDORGESTION\Administrador
+Usuario RunAs: SERVIDORGESTION\Administrador
+Máquina: SERVIDORGESTION (Microsoft Windows NT 6.3.9600.0)
+Aplicación host: powershell.exe -ExecutionPolicy Bypass -File C:\Users\Administrador\Documents\Script\i0-server-validation\Collect-SGServerInfo.ps1 -OutputRoot C:\Users\Administrador\Documents\Script\i0-server-validation
+Id. de proceso: 7188
+**********************
+Get-WmiObject : No encontrado
+En C:\Users\Administrador\Documents\Script\i0-server-validation\Collect-SGServe
+rInfo.ps1: 143 Carácter: 7
++ $os = Get-WmiObject Win32_OperatingSystem
++       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [Get-WmiObject], Managemen
+   tException
+    + FullyQualifiedErrorId : GetWMIManagementException,Microsoft.PowerShell.C
+   ommands.GetWmiObjectCommand
+
+Get-WmiObject : No encontrado
+En C:\Users\Administrador\Documents\Script\i0-server-validation\Collect-SGServe
+rInfo.ps1: 144 Carácter: 7
++ $cs = Get-WmiObject Win32_ComputerSystem
++       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [Get-WmiObject], Managemen
+   tException
+    + FullyQualifiedErrorId : GetWMIManagementException,Microsoft.PowerShell.C
+   ommands.GetWmiObjectCommand
+
+Get-WmiObject : No encontrado
+En C:\Users\Administrador\Documents\Script\i0-server-validation\Collect-SGServe
+rInfo.ps1: 145 Carácter: 8
++ $cpu = Get-WmiObject Win32_Processor
++        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [Get-WmiObject], Managemen
+   tException
+    + FullyQualifiedErrorId : GetWMIManagementException,Microsoft.PowerShell.C
+   ommands.GetWmiObjectCommand
+
+Get-WmiObject : No encontrado
+En C:\Users\Administrador\Documents\Script\i0-server-validation\Collect-SGServe
+rInfo.ps1: 146 Carácter: 9
++ $bios = Get-WmiObject Win32_BIOS
++         ~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [Get-WmiObject], Managemen
+   tException
+    + FullyQualifiedErrorId : GetWMIManagementException,Microsoft.PowerShell.C
+   ommands.GetWmiObjectCommand
+
+No se puede llamar a un método en una expresión con valor NULL.
+En C:\Users\Administrador\Documents\Script\i0-server-validation\Collect-SGServe
+rInfo.ps1: 163 Carácter: 1
++ Write-Kv "CPU Cores Logical" ((($cpu | Measure-Object
+NumberOfLogicalProcessors  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~
+    + CategoryInfo          : InvalidOperation: (:) [], RuntimeException
+    + FullyQualifiedErrorId : InvokeMethodOnNull
+
+Get-WmiObject : No encontrado
+En C:\Users\Administrador\Documents\Script\i0-server-validation\Collect-SGServe
+rInfo.ps1: 171 Carácter: 10
++ $disks = Get-WmiObject Win32_LogicalDisk -Filter "DriveType=3" |
+Select-Object D ...
++          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [Get-WmiObject], Managemen
+   tException
+    + FullyQualifiedErrorId : GetWMIManagementException,Microsoft.PowerShell.C
+   ommands.GetWmiObjectCommand
+
+Get-WmiObject : No encontrado
+En C:\Users\Administrador\Documents\Script\i0-server-validation\Collect-SGServe
+rInfo.ps1: 176 Carácter: 8
++ $net = Get-WmiObject Win32_NetworkAdapterConfiguration -Filter
+"IPEnabled=True"  ...
++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [Get-WmiObject], Managemen
+   tException
+    + FullyQualifiedErrorId : GetWMIManagementException,Microsoft.PowerShell.C
+   ommands.GetWmiObjectCommand
+
+
+PS>ErrorTerminación(Get-WindowsFeature): "Se detuvo el comando en ejecución porque la variable de preferencia "ErrorActionPreference" o un parámetro común se han establecido en Stop: No encontrado "
+
+PS>ErrorTerminación(Import-Module): "Se detuvo el comando en ejecución porque la variable de preferencia "ErrorActionPreference" o un parámetro común se han establecido en Stop: No se cargó el módulo 'WebAdministration' especificado porque no se encontró ningún archivo de módulo válido en ningún directorio de módulo."
+
+PS>ErrorTerminación(Get-WmiObject): "Se detuvo el comando en ejecución porque la variable de preferencia "ErrorActionPreference" o un parámetro común se han establecido en Stop: No encontrado "
+**********************
+Fin de la transcripción de Windows PowerShell
+Hora de finalización: 20260601084806
+**********************
