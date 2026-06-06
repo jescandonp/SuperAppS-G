@@ -31,7 +31,9 @@ a {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -244,6 +246,27 @@ input {
   padding: 0 0.85rem;
 }
 
+.positions-filters {
+  grid-template-columns: minmax(220px, 1fr) 160px 140px;
+  width: min(100%, 680px);
+}
+
+.certificates-filters {
+  grid-template-columns: minmax(120px, 0.8fr) repeat(4, minmax(140px, 1fr));
+  width: min(100%, 760px);
+}
+
+.positions-filters button {
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-alt);
+  color: #f3f1ea;
+  font-weight: 700;
+  padding: 0 0.85rem;
+  cursor: pointer;
+}
+
 .employees-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.9fr);
@@ -312,6 +335,21 @@ input {
   color: #ffb3b3;
 }
 
+.status-ready {
+  background: rgba(47, 165, 120, 0.18);
+  color: #9ce7c6;
+}
+
+.status-warning {
+  background: rgba(221, 173, 72, 0.18);
+  color: #f7d98d;
+}
+
+.status-pending {
+  background: rgba(81, 132, 201, 0.18);
+  color: #a9ccff;
+}
+
 .employee-detail {
   display: grid;
   gap: 0.75rem;
@@ -340,6 +378,209 @@ input {
   margin: 0;
 }
 
+.position-detail-section {
+  display: grid;
+  gap: 0.65rem;
+  padding-top: 0.25rem;
+}
+
+.compact-header {
+  margin-bottom: 0;
+}
+
+.assignment-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.85rem;
+  align-items: flex-start;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 0.85rem;
+}
+
+.assignment-card p {
+  margin: 0.25rem 0 0;
+}
+
+.normalization-compare {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 0.85rem;
+}
+
+.normalization-compare div {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.normalization-compare strong {
+  overflow-wrap: anywhere;
+}
+
+.compact-empty {
+  min-height: 84px;
+}
+
+.role-note {
+  margin: 0;
+  padding-top: 0.4rem;
+}
+
+.position-form {
+  display: grid;
+  gap: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 0.85rem;
+}
+
+.position-form label {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--accent);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.position-form input,
+.position-form select,
+.position-form textarea {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #0f1116;
+  color: #f3f1ea;
+  padding: 0.65rem 0.75rem;
+}
+
+.position-form textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.position-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.position-form-actions button {
+  min-height: 38px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #171717;
+  font-weight: 700;
+  padding: 0 0.85rem;
+  cursor: pointer;
+}
+
+.position-form-actions .danger-action {
+  border-color: #ba5454;
+  background: rgba(186, 84, 84, 0.18);
+  color: #ffb3b3;
+}
+
+.position-form-actions .secondary-action {
+  border-color: var(--border);
+  background: var(--surface-alt);
+  color: #f3f1ea;
+}
+
+.position-form-actions button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.certificates-workspace {
+  align-content: start;
+}
+
+.certificates-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr);
+}
+
+.certificate-create-panel {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.certificate-signers-panel {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.signers-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.certificate-form-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.4fr) repeat(3, minmax(160px, 1fr));
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.certificate-form-grid label {
+  display: grid;
+  gap: 0.45rem;
+  color: var(--accent);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.certificate-form-grid input,
+.certificate-form-grid select {
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #0f1116;
+  color: #f3f1ea;
+  padding: 0.55rem 0.7rem;
+  text-transform: none;
+}
+
+.certificate-preview-result {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 0.9rem;
+}
+
+.certificate-preview-result > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.preview-box {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #0f1116;
+  color: #f3f1ea;
+  padding: 0.85rem;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.9rem;
+}
+
 .import-summary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -365,6 +606,54 @@ input {
 .error-card p {
   margin: 0.35rem 0;
 }
+
+.import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  padding: 0.8rem 0;
+  border-block: 1px solid var(--border);
+}
+
+.import-actions select,
+.import-actions button {
+  min-height: 38px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #171717;
+  font-weight: 700;
+  padding: 0 0.8rem;
+}
+
+.import-actions select,
+.import-actions .secondary-action {
+  border-color: var(--border);
+  background: var(--surface-alt);
+  color: #f3f1ea;
+}
+
+.import-actions .danger-action {
+  border-color: #ba5454;
+  background: rgba(186, 84, 84, 0.18);
+  color: #ffb3b3;
+}
+
+.import-actions button:disabled {
+  opacity: 0.6;
+}
+
+.import-row-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.row-status-valido { background: rgba(47, 165, 120, 0.18); color: #9ce7c6; }
+.row-status-incompleto { background: rgba(221, 173, 72, 0.18); color: #f7d98d; }
+.row-status-duplicado { background: rgba(81, 132, 201, 0.18); color: #a9ccff; }
+.row-status-erroneo { background: rgba(186, 84, 84, 0.18); color: #ffb3b3; }
 
 .import-upload-panel {
   display: grid;
@@ -425,9 +714,24 @@ input {
   .employees-toolbar,
   .employees-grid,
   .toolbar-filters,
+  .positions-filters,
+  .certificates-filters,
+  .signers-grid,
+  .certificate-form-grid,
   .import-summary-grid,
   .import-upload-controls {
     grid-template-columns: 1fr;
     display: grid;
+  }
+
+  .import-actions,
+  .import-row-heading,
+  .normalization-compare {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .normalization-compare {
+    grid-template-columns: 1fr;
   }
 }

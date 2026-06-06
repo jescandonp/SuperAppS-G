@@ -41,10 +41,10 @@ Cuando exista contradiccion, prevalece el orden definido en `docs/CONSTITUTION.m
 |-----------|-------------|--------|
 | I0 | Descubrimiento tecnico e infraestructura | Cerrado |
 | I1 | Portal base | Cerrado tecnicamente |
-| I2 | Datos maestros e importacion | Activo: SPEC y plan aprobados |
-| I3 | Puestos de servicio y asignaciones | SPEC borrador funcional |
-| I4 | Certificaciones laborales | SPEC borrador funcional |
-| I5 | Cursos y acreditaciones | Pendiente |
+| I2 | Datos maestros e importacion | Cerrado tecnicamente: pendiente solo recorrido visual manual desktop/movil |
+| I3 | Puestos de servicio y asignaciones | Cerrado tecnicamente |
+| I4 | Certificaciones laborales | Cerrado tecnicamente |
+| I5 | Cursos y acreditaciones | Activo: Task 1 cerrada; retake Task 2 |
 | I6 | Alertas y notificaciones | Pendiente |
 | I7 | Auditoria, dashboard y cierre piloto | Pendiente |
 
@@ -52,18 +52,22 @@ El incremento activo, sus decisiones y validaciones obligatorias deben consultar
 
 ## Gate Actual
 
-**Incremento activo:** I2 - Datos Maestros e Importacion  
-**Estado:** SPEC I2 y plan I2 aprobados; Gate 0 y Tasks 1-3 cerrados  
-**Implementacion:** autorizada desde Task 4 del plan I2, siguiendo TDD  
+**Incremento activo:** I5 - Cursos y acreditaciones
+**Estado:** I4 cerrado tecnicamente; SPEC I5 y plan I5 aprobados; Task 1 cerrada
+**Implementacion:** autorizada desde Task 2 del plan I5, siguiendo TDD
 
 Documentos obligatorios para la revision:
 
-- SPEC I2: `docs/specs/2026-05-21-sg-superapp-spec-i2-datos-maestros-importacion.md`
-- Plan I2: `docs/plans/2026-06-03-sg-superapp-i2-datos-maestros-importacion-plan.md`
+- SPEC I3 cerrada: `docs/specs/2026-05-21-sg-superapp-spec-i3-puestos-servicio-asignaciones.md`
+- Plan I3 cerrado: `docs/plans/2026-06-04-sg-superapp-i3-puestos-servicio-asignaciones-plan.md`
+- SPEC I4 cerrada: `docs/specs/2026-05-21-sg-superapp-spec-i4-certificaciones-laborales.md`
+- Plan I4 cerrado: `docs/plans/2026-06-05-sg-superapp-i4-certificaciones-laborales-plan.md`
+- SPEC I5: `docs/specs/2026-05-21-sg-superapp-spec-i5-cursos-acreditaciones.md`
+- Plan I5: `docs/plans/2026-06-05-sg-superapp-i5-cursos-acreditaciones-plan.md`
 
-La SPEC I2 y el plan I2 fueron aprobados el 2026-06-04. Gate 0 esta cerrado.
+La SPEC I3 y el plan I3 fueron aprobados el 2026-06-04. I3 queda cerrado tecnicamente el 2026-06-05.
 
-La implementacion I2 adelantada fue auditada en Task 1. Se conserva como prototipo parcial sujeto a correcciones; las brechas y prioridades estan registradas en el execution log del plan I2.
+I2 queda cerrado tecnicamente. Sus riesgos residuales y la matriz de aceptacion estan registrados en el execution log del plan I2.
 
 ## Estructura Base
 
@@ -101,19 +105,24 @@ ProyectoS&G/
 - SPEC I4: `docs/specs/2026-05-21-sg-superapp-spec-i4-certificaciones-laborales.md`.
 - Plan I0: `docs/plans/2026-05-21-sg-superapp-i0-descubrimiento-tecnico-plan.md`.
 - Plan I1: `docs/plans/2026-06-03-sg-superapp-i1-portal-base-plan.md`.
+- Plan I3: `docs/plans/2026-06-04-sg-superapp-i3-puestos-servicio-asignaciones-plan.md`.
 - Plan I2 aprobado: `docs/plans/2026-06-03-sg-superapp-i2-datos-maestros-importacion-plan.md`.
 - Servidor de aplicaciones confirmado: Windows Server 2012.
 - I0 cerrado documentalmente con decision de stack: React SPA + backend .NET compatible + PostgreSQL.
 - I1 cerrado tecnicamente como portal base.
-- I2 activo, con Gate 0 y Tasks 1-3 cerrados; siguiente tarea autorizada: Task 4.
+- I2 cerrado tecnicamente.
+- I3 cerrado tecnicamente con suite completa `Verify-SgSuperAppI3*.ps1`, build backend y build frontend correctos.
+- I4 cerrado tecnicamente con suite completa `Verify-SgSuperAppI4*.ps1`, build backend y build frontend correctos.
+- I5 Task 1 cerrada con persistencia, permisos base, contrato SQL y backend build correctos; siguiente retake autorizado en Task 2, contratos backend de tipos.
 - `graphify update .` es obligatorio despues de modificar codigo cuando la herramienta este disponible.
 
 ## Siguiente Paso Metodologico
 
-Ejecutar Task 4 del plan I2: completar consulta y edicion de empleados.
+Ejecutar Task 2 del plan I5: contratos backend de tipos.
 
 Condicion de entrada:
 
-- aplicar TDD para cambios de comportamiento;
-- comenzar por pruebas fallidas de filtros, edicion manual, auditoria y versionado salarial;
-- mantener la autorizacion backend ya establecida en Task 3.
+- API para administrar tipos de curso/acreditacion;
+- permisos ADMIN/TH para gestion y GERENCIA/OPERACIONES solo consulta;
+- validacion de codigo unico y vigencia opcional no negativa;
+- validar `Verify-SgSuperAppI5Types.ps1`, `Verify-SgSuperAppI5Security.ps1` y backend build.

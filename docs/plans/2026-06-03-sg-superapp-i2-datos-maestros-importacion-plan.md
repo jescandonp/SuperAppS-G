@@ -306,13 +306,13 @@ La matriz debe materializarse en permisos backend; ocultar acciones en UI no ree
 
 **Acciones:**
 
-- [ ] Completar filtros por nombre, identificacion, estado, cargo y completitud.
-- [ ] Completar detalle laboral.
-- [ ] Mostrar salario segun permiso.
-- [ ] Mostrar historial basico de cambios.
-- [ ] Implementar edicion manual controlada para TH.
-- [ ] Versionar cambios de salario.
-- [ ] Registrar auditoria por campo.
+- [x] Completar filtros por nombre, identificacion, estado, cargo y completitud.
+- [x] Completar detalle laboral.
+- [x] Mostrar salario segun permiso.
+- [x] Mostrar historial basico de cambios.
+- [x] Implementar edicion manual controlada para TH.
+- [x] Versionar cambios de salario.
+- [x] Registrar auditoria por campo.
 
 **Verificacion:**
 
@@ -332,13 +332,13 @@ La matriz debe materializarse en permisos backend; ocultar acciones en UI no ree
 
 **Acciones:**
 
-- [ ] Seleccionar y registrar libreria `.xlsx` compatible.
-- [ ] Implementar lectura CSV y `.xlsx`.
-- [ ] Validar extension, contenido y limite de archivo.
-- [ ] Detectar encabezados y aliases conocidos.
-- [ ] Persistir mapeo propuesto.
-- [ ] Mostrar previsualizacion del mapeo.
-- [ ] Rechazar archivos sin estructura minima.
+- [x] Seleccionar y registrar libreria `.xlsx` compatible.
+- [x] Implementar lectura CSV y `.xlsx`.
+- [x] Validar extension, contenido y limite de archivo.
+- [x] Detectar encabezados y aliases conocidos.
+- [x] Persistir mapeo propuesto.
+- [x] Mostrar previsualizacion del mapeo.
+- [x] Rechazar archivos sin estructura minima.
 
 **Verificacion:**
 
@@ -360,14 +360,14 @@ La matriz debe materializarse en permisos backend; ocultar acciones en UI no ree
 
 **Acciones:**
 
-- [ ] Normalizar valores.
-- [ ] Aplicar default `CC` y permitir `CE`.
-- [ ] Validar identificacion, nombre, estado, cargo, fechas y salario.
-- [ ] Inferir estado solo bajo reglas aprobadas.
-- [ ] Detectar duplicados internos y contra maestro.
-- [ ] Validar retiro posterior a ingreso.
-- [ ] Persistir filas staging y errores.
-- [ ] Calcular resumen consistente.
+- [x] Normalizar valores.
+- [x] Aplicar default `CC` y permitir `CE`.
+- [x] Validar identificacion, nombre, estado, cargo, fechas y salario.
+- [x] Inferir estado solo bajo reglas aprobadas.
+- [x] Detectar duplicados internos y contra maestro.
+- [x] Validar retiro posterior a ingreso.
+- [x] Persistir filas staging y errores.
+- [x] Calcular resumen consistente.
 
 **Verificacion:** cubrir todos los casos de pruebas esperadas de la SPEC antes de importar.
 
@@ -381,12 +381,12 @@ La matriz debe materializarse en permisos backend; ocultar acciones en UI no ree
 
 **Acciones:**
 
-- [ ] Mostrar resumen y filas por clasificacion.
-- [ ] Consultar errores por fila/campo.
-- [ ] Exportar errores CSV.
-- [ ] Cancelar carga prevalidada.
-- [ ] Impedir confirmar cargas rechazadas, canceladas o importadas.
-- [ ] Auditar cancelacion.
+- [x] Mostrar resumen y filas por clasificacion.
+- [x] Consultar errores por fila/campo.
+- [x] Exportar errores CSV.
+- [x] Cancelar carga prevalidada.
+- [x] Impedir confirmar cargas rechazadas, canceladas o importadas.
+- [x] Auditar cancelacion.
 
 **Verificacion:**
 
@@ -404,13 +404,13 @@ La matriz debe materializarse en permisos backend; ocultar acciones en UI no ree
 
 **Acciones:**
 
-- [ ] Mostrar confirmacion explicita con conteos.
-- [ ] Importar solo staging `VALIDO`.
-- [ ] Crear empleado y salario inicial en transaccion.
-- [ ] No importar incompletos, duplicados ni erroneos.
-- [ ] Marcar lote `IMPORTADA`.
-- [ ] Auditar resultado y conteos.
-- [ ] Evitar doble confirmacion.
+- [x] Mostrar confirmacion explicita con conteos.
+- [x] Importar solo staging `VALIDO`.
+- [x] Crear empleado y salario inicial en transaccion.
+- [x] No importar incompletos, duplicados ni erroneos.
+- [x] Marcar lote `IMPORTADA`.
+- [x] Auditar resultado y conteos.
+- [x] Evitar doble confirmacion.
 
 **Verificacion:**
 
@@ -439,9 +439,9 @@ La matriz debe materializarse en permisos backend; ocultar acciones en UI no ree
 
 **Acciones:**
 
-- [ ] Validar estados de carga, vacios, errores y progreso.
-- [ ] Aplicar acciones y datos segun rol.
-- [ ] Verificar escritorio y movil.
+- [x] Validar estados de carga, vacios, errores y progreso.
+- [x] Aplicar acciones y datos segun rol.
+- [x] Verificar escritorio y movil.
 - [ ] Evitar datos simulados en flujo funcional.
 
 **Verificacion:** build frontend y recorrido funcional por rol.
@@ -456,15 +456,15 @@ La matriz debe materializarse en permisos backend; ocultar acciones en UI no ree
 
 **Acciones:**
 
-- [ ] Ejecutar pruebas backend.
-- [ ] Ejecutar build frontend.
-- [ ] Ejecutar flujo end-to-end con CSV y `.xlsx`.
-- [ ] Ejecutar pruebas de permisos.
-- [ ] Validar auditoria.
-- [ ] Revisar criterios de aceptacion 1-15.
-- [ ] Registrar riesgos residuales.
-- [ ] Actualizar graphify con `graphify update .` cuando la herramienta este disponible.
-- [ ] Definir retake point I3.
+- [x] Ejecutar pruebas backend.
+- [x] Ejecutar build frontend.
+- [x] Ejecutar flujo end-to-end con CSV y `.xlsx`.
+- [x] Ejecutar pruebas de permisos.
+- [x] Validar auditoria.
+- [x] Revisar criterios de aceptacion 1-15.
+- [x] Registrar riesgos residuales.
+- [x] Actualizar graphify con `graphify update .` cuando la herramienta este disponible.
+- [x] Definir retake point I3.
 
 **Verificacion:** matriz final de aceptacion con evidencia ejecutable.
 
@@ -667,3 +667,434 @@ Task 1 cerrada. La implementacion adelantada se acepta como prototipo parcial y 
   - frontend `npm run build`: correcto;
   - migracion y seed de seguridad: reejecutables.
 - Retake point: Task 4, completar consulta y edicion de empleados mediante TDD.
+
+### 2026-06-04 - Task 4 ciclo 1 filtro de completitud
+
+- Se inicio Task 4 con TDD sobre el listado de empleados:
+  - RED valido: `Verify-SgSuperAppI2EmployeeFilters.ps1` demostro que `completeness=INCOMPLETO` era ignorado y devolvia registros completos;
+  - GREEN: el endpoint, repositorio y UI soportan filtro `COMPLETO`/`INCOMPLETO`.
+- El listado muestra el estado de completitud derivado de `record_status`.
+- La verificacion usa un empleado incompleto temporal y limpia el dato al finalizar.
+- Verificaciones:
+  - `Verify-SgSuperAppI2EmployeeFilters.ps1`: correcto;
+  - `Verify-SgSuperAppI2Security.ps1`: correcto;
+  - backend `dotnet build`: correcto, 0 advertencias y 0 errores;
+  - frontend `npm run build`: correcto.
+- Task 4 permanece abierta.
+- Retake point: siguiente ciclo TDD para detalle con historial basico de cambios.
+
+### 2026-06-04 - Task 4 ciclo 2 detalle e historial basico
+
+- Se continuo Task 4 con TDD sobre el detalle de empleado:
+  - la primera ejecucion detecto un defecto preexistente: el detalle cortaba la respuesta porque .NET 6 no serializaba `DateOnly`;
+  - se corrigio el contrato para exponer fechas ISO `yyyy-MM-dd`, compatibles con el frontend;
+  - RED funcional: el detalle no exponia el cambio temporal registrado en `employee_change_log`;
+  - GREEN: el detalle incluye hasta 50 cambios recientes con usuario, fecha, campo, valor anterior y valor nuevo.
+- La UI muestra historial basico y estado vacio cuando no existen cambios.
+- Verificaciones:
+  - `Verify-SgSuperAppI2EmployeeHistory.ps1`: correcto;
+  - `Verify-SgSuperAppI2EmployeeFilters.ps1`: correcto;
+  - `Verify-SgSuperAppI2Security.ps1`: correcto;
+  - backend `dotnet build`: correcto, 0 advertencias y 0 errores;
+  - frontend `npm run build`: correcto.
+- Task 4 permanece abierta.
+- Retake point: siguiente ciclo TDD para edicion manual valida exclusiva de TH y rechazo por otros roles.
+
+### 2026-06-04 - Task 4 ciclo 3 edicion laboral exclusiva de TH
+
+- Se continuo Task 4 con TDD sobre edicion manual y permisos:
+  - RED valido: `PUT /api/portal/employees/{id}` no existia y respondia `405`;
+  - GREEN: TH puede editar nombre, cargo y observaciones; ADMIN, GERENCIA y OPERACIONES reciben `403`.
+- La actualizacion laboral se ejecuta en una transaccion y registra una fila de `employee_change_log` por cada campo modificado, usando el usuario autenticado real.
+- La UI muestra el formulario de edicion exclusivamente para TH.
+- Verificaciones:
+  - `Verify-SgSuperAppI2EmployeeEditing.ps1`: correcto;
+  - `Verify-SgSuperAppI2EmployeeHistory.ps1`: correcto;
+  - `Verify-SgSuperAppI2EmployeeFilters.ps1`: correcto;
+  - `Verify-SgSuperAppI2Security.ps1`: correcto;
+  - backend `dotnet build`: correcto, 0 advertencias y 0 errores;
+  - frontend `npm run build`: correcto.
+- Task 4 permanece abierta.
+- Retake point: siguiente ciclo TDD para completar campos laborales editables y versionado salarial sin solapamiento.
+
+### 2026-06-04 - Task 4 completada
+
+- Se cerro Task 4 con TDD sobre campos laborales completos, rechazo invalido y versionado salarial:
+  - RED: estado laboral, fechas, motivo, contrato y salario eran ignorados por el endpoint;
+  - GREEN: la actualizacion transaccional persiste y audita todos los campos laborales editables aprobados;
+  - RED adicional: retiro anterior al ingreso rompia la respuesta;
+  - GREEN adicional: las reglas laborales y salariales invalidas responden `400` y revierten la transaccion.
+- Los cambios de salario cierran la vigencia abierta el dia anterior a la nueva vigencia y crean una unica vigencia abierta nueva.
+- Se audita `base_salary_amount` con valor anterior y nuevo.
+- La UI TH incluye campos laborales completos y salario con fecha de vigencia.
+- Verificaciones finales Task 4:
+  - `Verify-SgSuperAppI2EmployeeSalaryVersioning.ps1`: correcto, incluyendo rechazo invalido y ausencia de solapamiento;
+  - `Verify-SgSuperAppI2EmployeeEditing.ps1`: correcto;
+  - `Verify-SgSuperAppI2EmployeeHistory.ps1`: correcto;
+  - `Verify-SgSuperAppI2EmployeeFilters.ps1`: correcto;
+  - `Verify-SgSuperAppI2Security.ps1`: correcto;
+  - backend `dotnet build`: correcto, 0 advertencias y 0 errores;
+  - frontend `npm run build`: correcto.
+- Task 4 cerrada.
+- Retake point: Task 5, seleccionar y registrar libreria `.xlsx` compatible antes de implementar lectura y mapeo Excel/CSV.
+
+### 2026-06-04 - Task 5 ciclo 1 seleccion OpenXML y adaptador XLSX
+
+- Se selecciono y fijo `DocumentFormat.OpenXml 3.0.2` para lectura `.xlsx`.
+- Criterios de seleccion:
+  - compatible y compilado correctamente con `net6.0`;
+  - no requiere Microsoft Excel instalado ni automatizacion COM;
+  - permite lectura directa del formato Open XML en el backend.
+- Se agrego un adaptador que lee la primera hoja XLSX y reutiliza el parser/prevalidador tabular existente.
+- El endpoint y la UI aceptan `.csv` y `.xlsx`; `.xls` permanece fuera de alcance.
+- Se corrigio el limite de archivo de 5 MB a los 10 MB aprobados.
+- Ciclo TDD de robustez:
+  - RED: un archivo `.xlsx` corrupto cortaba la respuesta;
+  - GREEN: un archivo `.xlsx` corrupto responde `400` controlado.
+- Verificaciones:
+  - backend `dotnet build`: correcto con OpenXML, 0 advertencias y 0 errores;
+  - frontend `npm run build`: correcto;
+  - `Verify-SgSuperAppI2Security.ps1`: correcto;
+  - rechazo de XLSX corrupto: correcto con HTTP `400`.
+- Task 5 permanece abierta.
+- Retake point: crear fixtures CSV/XLSX validos, extraer encabezados y persistir/previsualizar el mapeo propuesto.
+
+### 2026-06-04 - Task 5 ciclo 2 mapeo persistido y previsualizable
+
+- Se definio el contrato de mapeo por encabezado con:
+  - encabezado fuente;
+  - campo destino;
+  - estado `MAPPED` o `UNMAPPED`;
+  - posicion original.
+- El parser CSV genera el mapeo propuesto a partir de aliases conocidos.
+- `SaveImportPrevalidationAsync` persiste el mapeo dentro de la misma transaccion del lote.
+- Se agrego endpoint protegido para consultar mapeos por lote.
+- La UI muestra la previsualizacion del mapeo en el detalle de carga.
+- Ciclo TDD:
+  - RED: el lote se creaba pero `GET /api/portal/imports/{id}/mappings` respondia `404`;
+  - GREEN: un CSV fixture persiste siete encabezados, seis `MAPPED` y uno `UNMAPPED`, consultables por API.
+- Verificaciones:
+  - `Verify-SgSuperAppI2ImportMappings.ps1`: correcto;
+  - `Verify-SgSuperAppI2Security.ps1`: correcto;
+  - verificaciones acumuladas Task 4: correctas;
+  - backend `dotnet build`: correcto, 0 advertencias y 0 errores;
+  - frontend `npm run build`: correcto.
+- Task 5 permanece abierta.
+- Retake point: verificar fixture `.xlsx` valido y completar matriz de archivo vacio, excedido, encabezados desconocidos y extension no soportada.
+
+### 2026-06-04 - Task 5 completada
+
+- Se cerro Task 5 con una matriz reproducible de formatos y rechazos.
+- Ciclo TDD final:
+  - RED: un CSV con todos los encabezados desconocidos era aceptado y creaba lote;
+  - GREEN: CSV y XLSX sin estructura minima de empleados responden `400` antes de persistir.
+- Se genero un fixture XLSX valido basado en ZIP/XML OpenXML, sin depender de Microsoft Excel instalado.
+- Verificaciones finales Task 5:
+  - CSV con coma: correcto;
+  - CSV con punto y coma: correcto;
+  - XLSX valido: correcto;
+  - archivo vacio: rechazado con `400`;
+  - archivo mayor a 10 MB: rechazado con `400`;
+  - encabezados desconocidos: rechazados con `400`;
+  - extension no soportada: rechazada con `400`;
+  - `Verify-SgSuperAppI2ImportFormats.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportMappings.ps1`: correcto;
+  - `Verify-SgSuperAppI2Security.ps1`: correcto;
+  - verificaciones acumuladas Task 4: correctas;
+  - backend `dotnet build`: correcto, 0 advertencias y 0 errores;
+  - frontend `npm run build`: correcto.
+- Task 5 cerrada.
+- Retake point: Task 6, implementar motor completo de prevalidacion y persistir filas normalizadas en staging.
+
+### 2026-06-04 - Task 6 ciclo 1 filas staging y errores vinculados
+
+- Se inicio Task 6 con TDD sobre un lote mixto:
+  - RED: la prevalidacion creaba lote y errores, pero no persistia filas en `import_batch_rows`;
+  - GREEN: cada fila se persiste con clasificacion unica, identificacion, payload normalizado y payload fuente.
+- Prioridad de clasificacion materializada:
+  - `DUPLICADO`;
+  - `INCOMPLETO`;
+  - `ERRONEO`;
+  - `VALIDO`.
+- Los errores quedan vinculados a su fila staging mediante `import_batch_row_id`.
+- La persistencia de lote, filas, errores y mapeos ocurre en una unica transaccion.
+- La prueba confirma que prevalidar no crea empleados.
+- Verificaciones:
+  - `Verify-SgSuperAppI2PrevalidationStaging.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportFormats.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportMappings.ps1`: correcto;
+  - `Verify-SgSuperAppI2Security.ps1`: correcto;
+  - backend `dotnet build`: correcto, 0 advertencias y 0 errores.
+- Task 6 permanece abierta.
+- Retake point: siguiente ciclo TDD para default `CC`, soporte `CE` y normalizacion completa de valores.
+
+### 2026-06-04 - Task 6 ciclo 2 tipo de identificacion y normalizacion
+
+- Se continuo Task 6 con TDD sobre tipo de identificacion y payloads:
+  - RED: todas las filas staging se persistian como `CC` y un tipo no permitido quedaba `VALIDO`;
+  - GREEN: el alias `tipo_documento`/`tipo_identificacion` se mapea, el tipo ausente usa default `CC`, `CE` se acepta y otros tipos quedan `ERRONEO`.
+- Los valores normalizados recortan espacios y convierten tipo de identificacion y estado laboral a mayusculas.
+- `source_payload` conserva los valores fuente sin recortar para trazabilidad.
+- Se retiro el check `CC`/`CE` exclusivamente de `import_batch_rows`, porque staging debe conservar tipos invalidos; la restriccion permanece en `employees`.
+- Verificaciones:
+  - `Verify-SgSuperAppI2PrevalidationNormalization.ps1`: correcto;
+  - `Verify-SgSuperAppI2PrevalidationStaging.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportFormats.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportMappings.ps1`: correcto;
+  - `Verify-SgSuperAppI2Security.ps1`: correcto;
+  - backend `dotnet build`: correcto, 0 advertencias y 0 errores.
+- Task 6 permanece abierta.
+- Retake point: siguiente ciclo TDD para identificacion vacia/`#N/A` y duplicados internos/contra maestro usando llave funcional `tipo + numero`.
+
+### 2026-06-04 - Task 6 ciclo 3 identificacion y duplicados funcionales
+
+- Se continuo Task 6 con TDD sobre identificacion y duplicados:
+  - RED: la deteccion comparaba solo numero y marcaba como duplicados registros `CC`/`CE` distintos;
+  - GREEN: duplicados internos y contra maestro usan la llave funcional canonica `tipo_identificacion + numero_identificacion`.
+- El default `CC` participa correctamente en la llave funcional.
+- Identificacion vacia y `#N/A` se clasifican `INCOMPLETO`.
+- Un mismo numero con tipos `CC` y `CE` no se considera duplicado.
+- Verificaciones:
+  - `Verify-SgSuperAppI2PrevalidationIdentification.ps1`: correcto;
+  - `Verify-SgSuperAppI2PrevalidationNormalization.ps1`: correcto;
+  - `Verify-SgSuperAppI2PrevalidationStaging.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportFormats.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportMappings.ps1`: correcto;
+  - `Verify-SgSuperAppI2Security.ps1`: correcto;
+  - backend `dotnet build`: correcto, 0 advertencias y 0 errores.
+- Task 6 permanece abierta.
+- Retake point: siguiente ciclo TDD para inferencia aprobada de estado y retiro posterior a ingreso.
+
+### 2026-06-04 - Task 6 ciclo 4 inferencia de estado y coherencia de fechas
+
+- Se continuo Task 6 con TDD sobre estado laboral y fechas:
+  - RED: estados vacios quedaban `INCOMPLETO` y un retiro anterior al ingreso era aceptado;
+  - GREEN: estado vacio sin retiro infiere `ACTIVO`; con fecha de retiro infiere `RETIRADO`.
+- Estados no reconocidos permanecen `ERRONEO`.
+- Una fecha de retiro anterior al ingreso genera error estructurado `FECHA_INCONSISTENTE`.
+- Conforme a la SPEC, retiro igual al ingreso es permitido porque solo se prohibe una fecha anterior.
+- `normalized_payload` conserva el estado efectivo inferido y `source_payload` conserva el valor original vacio.
+- Se amplio idempotentemente el check de `import_batch_errors.error_type` para persistir `FECHA_INCONSISTENTE`.
+- Verificaciones:
+  - `Verify-SgSuperAppI2PrevalidationStatusDates.ps1`: correcto;
+  - `Verify-SgSuperAppI2PrevalidationIdentification.ps1`: correcto;
+  - `Verify-SgSuperAppI2PrevalidationNormalization.ps1`: correcto;
+  - `Verify-SgSuperAppI2PrevalidationStaging.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportFormats.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportMappings.ps1`: correcto;
+  - `Verify-SgSuperAppI2Security.ps1`: correcto;
+  - backend `dotnet build`: correcto, 0 advertencias y 0 errores.
+- Task 6 permanece abierta.
+- Retake point: siguiente ciclo TDD para salario vacio, negativo/no numerico, normalizacion salarial y resumen consistente con staging.
+
+### 2026-06-04 - Task 6 completada
+
+- Se cerro Task 6 con TDD sobre salario y resumen:
+  - RED: salarios validos formateados conservaban texto monetario no canonico en staging;
+  - GREEN: salarios validos se normalizan con cultura invariante y dos decimales.
+- Salario vacio queda `INCOMPLETO`; salario negativo o no numerico queda `ERRONEO`.
+- Los conteos persistidos del lote coinciden con las clasificaciones de `import_batch_rows`.
+- Matriz completa de prevalidacion cubierta:
+  - normalizacion trazable;
+  - default `CC`, soporte `CE` y rechazo de otros tipos;
+  - identificaciones incompletas;
+  - duplicados internos y contra maestro por llave funcional;
+  - inferencia de estado;
+  - fechas parseables y retiro no anterior al ingreso;
+  - salario obligatorio, numerico y no negativo;
+  - filas staging, errores vinculados y resumen consistente.
+- Verificaciones finales Task 6:
+  - `Verify-SgSuperAppI2PrevalidationSalarySummary.ps1`: correcto;
+  - `Verify-SgSuperAppI2PrevalidationStatusDates.ps1`: correcto;
+  - `Verify-SgSuperAppI2PrevalidationIdentification.ps1`: correcto;
+  - `Verify-SgSuperAppI2PrevalidationNormalization.ps1`: correcto;
+  - `Verify-SgSuperAppI2PrevalidationStaging.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportFormats.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportMappings.ps1`: correcto;
+  - `Verify-SgSuperAppI2Security.ps1`: correcto;
+  - backend `dotnet build`: correcto, 0 advertencias y 0 errores.
+- Task 6 cerrada.
+- Retake point: Task 7, implementar revision, exportacion CSV de errores y cancelacion mediante TDD.
+
+### 2026-06-04 - Task 7 ciclo 1 consulta de filas staging
+
+- Se inicio Task 7 con TDD sobre revision de filas:
+  - RED: `GET /api/portal/imports/{batchId}/rows` no existia y respondia `404`;
+  - GREEN: el endpoint devuelve filas staging tipadas y permite filtrar por `VALIDO`, `INCOMPLETO`, `DUPLICADO` o `ERRONEO`.
+- El contrato expone identificacion, clasificacion, `normalizedPayload` y `sourcePayload`.
+- Se reutilizo el permiso detallado `IMPORTS/VIEW_ERRORS`:
+  - ADMIN y TH consultan filas;
+  - GERENCIA y OPERACIONES reciben `403`;
+  - solicitudes anonimas reciben `401`.
+- Clasificaciones no soportadas responden `400`.
+- Verificaciones:
+  - `Verify-SgSuperAppI2ImportRows.ps1`: correcto;
+  - `Verify-SgSuperAppI2Security.ps1`: correcto;
+  - `Verify-SgSuperAppI2PrevalidationSalarySummary.ps1`: correcto;
+  - `Verify-SgSuperAppI2PrevalidationStaging.ps1`: correcto;
+  - backend `dotnet build`: correcto, 0 advertencias y 0 errores.
+- Task 7 permanece abierta.
+- Retake point: siguiente ciclo TDD para exportacion CSV protegida de errores.
+
+### 2026-06-04 - Task 7 ciclo 2 exportacion CSV de errores
+
+- Se continuo Task 7 con TDD sobre exportacion:
+  - RED: `GET /api/portal/imports/{batchId}/errors/export` no existia y respondia `404`;
+  - GREEN: el endpoint descarga CSV UTF-8 con encabezados, fila, campo, tipo, mensaje y valor original.
+- La exportacion usa los errores persistidos como unica fuente de verdad y conserva el mismo orden del endpoint JSON.
+- El generador aplica escape CSV a comas, comillas y saltos de linea.
+- Se reutilizo `IMPORTS/VIEW_ERRORS`: ADMIN y TH exportan; GERENCIA, OPERACIONES y anonimos quedan bloqueados.
+- Verificaciones:
+  - `Verify-SgSuperAppI2ImportErrorExport.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportRows.ps1`: correcto;
+  - `Verify-SgSuperAppI2Security.ps1`: correcto;
+  - `Verify-SgSuperAppI2PrevalidationSalarySummary.ps1`: correcto;
+  - backend `dotnet build`: correcto, 0 advertencias y 0 errores.
+- Task 7 permanece abierta.
+- Retake point: siguiente ciclo TDD para cancelacion de carga prevalidada, bloqueo por estado y auditoria.
+
+### 2026-06-04 - Task 7 ciclo 3 cancelacion y auditoria
+
+- Se continuo Task 7 con TDD sobre cancelacion:
+  - RED: `POST /api/portal/imports/{batchId}/cancel` no existia y respondia `404`;
+  - GREEN: TH puede cancelar lotes `PREVALIDADA` o `CON_ERRORES`.
+- La operacion bloquea la fila del lote, actualiza estado y registra auditoria dentro de una misma transaccion.
+- Cancelacion repetida y estados finales responden `409`; lote inexistente responde `404`.
+- Se materializo la matriz aprobada:
+  - TH cancela mediante `IMPORTS/MANAGE`;
+  - ADMIN, GERENCIA y OPERACIONES reciben `403`;
+  - solicitudes anonimas reciben `401`.
+- Auditoria registra `IMPORT_CANCELLED`, entidad `IMPORT_BATCH`, usuario real y estado anterior.
+- Verificaciones:
+  - `Verify-SgSuperAppI2ImportCancellation.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportErrorExport.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportRows.ps1`: correcto;
+  - `Verify-SgSuperAppI2Security.ps1`: correcto;
+  - backend `dotnet build`: correcto, 0 advertencias y 0 errores.
+- Task 7 permanece abierta solo por el guard de confirmacion sobre estados finales, que se materializara junto al endpoint de confirmacion en Task 8 para evitar logica muerta.
+- Retake point: Task 8 ciclo 1, confirmacion explicita y guard de estados; al cerrarlo, cerrar formalmente Task 7.
+
+### 2026-06-04 - Tasks 7 y 8 completadas
+
+- Se inicio Task 8 con TDD sobre confirmacion/importacion:
+  - RED: `POST /api/portal/imports/{batchId}/confirm` no existia y respondia `404`;
+  - GREEN: TH confirma lotes `PREVALIDADA` o `CON_ERRORES` e importa exclusivamente filas staging `VALIDO`.
+- La confirmacion ejecuta en una unica transaccion:
+  - bloqueo del lote;
+  - lectura de filas validas;
+  - creacion de empleados;
+  - creacion de salario inicial vigente;
+  - cambio del lote a `IMPORTADA`;
+  - auditoria `IMPORT_CONFIRMED` con conteo importado.
+- Filas `INCOMPLETO`, `DUPLICADO` y `ERRONEO` no crean empleados.
+- Salario inicial usa la fecha de ingreso como vigencia inicial y fuente `IMPORT`.
+- Confirmacion repetida, lote cancelado y otros estados finales responden `409`; lote inexistente responde `404`.
+- Solo TH opera confirmacion mediante `IMPORTS/MANAGE`; otros roles quedan bloqueados.
+- El guard de confirmacion pendiente completa formalmente Task 7.
+- Verificaciones:
+  - `Verify-SgSuperAppI2ImportConfirmation.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportCancellation.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportErrorExport.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportRows.ps1`: correcto;
+  - `Verify-SgSuperAppI2Security.ps1`: correcto;
+  - `Verify-SgSuperAppI2PrevalidationSalarySummary.ps1`: correcto;
+  - backend `dotnet build`: correcto, 0 advertencias y 0 errores.
+- Tasks 7 y 8 cerradas.
+- Retake point: Task 9, completar UI I2 para filas, errores, exportacion, confirmacion y cancelacion.
+
+### 2026-06-04 - Task 9 ciclo 1 flujo UI de importaciones
+
+- Se completo la integracion UI del flujo de importaciones con los endpoints verificados:
+  - consulta y filtro de filas staging por clasificacion;
+  - visualizacion de errores y descarga CSV;
+  - confirmacion y cancelacion explicitas con mensajes y refresco del lote;
+  - estados `PREVALIDANDO`, `PREVALIDADA`, `CON_ERRORES`, `IMPORTADA` y `CANCELADA`.
+- La matriz de acciones queda materializada en UI:
+  - ADMIN y TH pueden exportar errores;
+  - solo TH puede confirmar o cancelar lotes prevalidables;
+  - estados finales no muestran acciones de gestion.
+- Verificaciones:
+  - frontend `npm run build`: correcto;
+  - backend `dotnet build`: correcto, 0 advertencias y 0 errores;
+  - `Verify-SgSuperAppI2ImportConfirmation.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportCancellation.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportErrorExport.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportRows.ps1`: correcto;
+  - `Verify-SgSuperAppI2Security.ps1`: correcto.
+- Task 9 permanece abierta por recorrido visual de estados vacios/errores y verificacion escritorio/movil.
+- Retake point: Task 9 ciclo 2, verificar visualmente por rol y ajustar responsive/estados antes de Task 10.
+
+### 2026-06-04 - Task 9 ciclo 2 matriz visual por rol y estados
+
+- Se ajusto la pantalla de importaciones para reflejar la matriz backend:
+  - ADMIN y TH consultan historial, filas, mapeos y errores;
+  - TH conserva prevalidacion, confirmacion y cancelacion;
+  - ADMIN puede exportar errores, pero no gestionar lotes;
+  - GERENCIA consulta historial sin detalle tecnico de filas/errores;
+  - OPERACIONES queda bloqueado visualmente del modulo.
+- Se diferenciaron chips de estado para `PREVALIDANDO`, `PREVALIDADA`, `CON_ERRORES`, `IMPORTADA`, `CANCELADA` y `RECHAZADA`.
+- Se corrigieron estados vacios/texto del detalle de filas prevalidadas.
+- Verificacion HTTP de matriz:
+  - `admin.sg`: imports `200`, rows `200`;
+  - `th.sg`: imports `200`, rows `200`;
+  - `gerencia.sg`: imports `200`, rows `403`;
+  - `operaciones.sg`: imports `403`, rows `403`.
+- Verificaciones:
+  - frontend `npm run build`: correcto;
+  - backend `dotnet build`: correcto, 0 advertencias y 0 errores;
+  - `Verify-SgSuperAppI2ImportConfirmation.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportCancellation.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportErrorExport.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportRows.ps1`: correcto;
+  - `Verify-SgSuperAppI2Security.ps1`: correcto.
+- Limitacion: no se completo recorrido real en navegador desktop/movil porque Playwright no esta instalado y el plugin Node fallo por sandbox Windows; Vite solo arranco fuera del sandbox.
+- Se acepta cierre tecnico de Task 9 con build frontend, inspeccion responsive, matriz HTTP por rol y riesgo residual documentado para recorrido visual manual.
+- Task 9 cerrada tecnicamente.
+- Retake point: Task 10, verificacion integral y cierre I2.
+
+### 2026-06-04 - Task 10 verificacion integral y cierre tecnico I2
+
+- Se ejecuto la suite completa `scripts/dev/Verify-SgSuperAppI2*.ps1` con API activa:
+  - `Verify-SgSuperAppI2EmployeeEditing.ps1`: correcto;
+  - `Verify-SgSuperAppI2EmployeeFilters.ps1`: correcto;
+  - `Verify-SgSuperAppI2EmployeeHistory.ps1`: correcto;
+  - `Verify-SgSuperAppI2EmployeeSalaryVersioning.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportCancellation.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportConfirmation.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportErrorExport.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportFormats.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportMappings.ps1`: correcto;
+  - `Verify-SgSuperAppI2ImportRows.ps1`: correcto;
+  - `Verify-SgSuperAppI2Persistence.ps1`: correcto;
+  - `Verify-SgSuperAppI2PersistenceClean.ps1`: correcto;
+  - `Verify-SgSuperAppI2PrevalidationIdentification.ps1`: correcto;
+  - `Verify-SgSuperAppI2PrevalidationNormalization.ps1`: correcto;
+  - `Verify-SgSuperAppI2PrevalidationSalarySummary.ps1`: correcto;
+  - `Verify-SgSuperAppI2PrevalidationStaging.ps1`: correcto;
+  - `Verify-SgSuperAppI2PrevalidationStatusDates.ps1`: correcto;
+  - `Verify-SgSuperAppI2Security.ps1`: correcto.
+- Builds finales:
+  - frontend `npm run build`: correcto;
+  - backend `dotnet build`: correcto, 0 advertencias y 0 errores.
+- Matriz de aceptacion SPEC I2:
+  - 1 listado de empleados/guardas: cubierto por `Verify-SgSuperAppI2EmployeeFilters.ps1`;
+  - 2 detalle de empleado/guarda: cubierto por `Verify-SgSuperAppI2EmployeeHistory.ps1`;
+  - 3 carga Excel/CSV: cubierto por `Verify-SgSuperAppI2ImportFormats.ps1`;
+  - 4 prevalidacion antes de importar: cubierto por scripts de prevalidacion y confirmacion;
+  - 5 resumen de carga: cubierto por `Verify-SgSuperAppI2PrevalidationSalarySummary.ps1`;
+  - 6 cancelacion de carga prevalidada: cubierto por `Verify-SgSuperAppI2ImportCancellation.ps1`;
+  - 7 importacion de validos: cubierto por `Verify-SgSuperAppI2ImportConfirmation.ps1`;
+  - 8 errores consultables: cubierto por `Verify-SgSuperAppI2ImportRows.ps1` y `Verify-SgSuperAppI2ImportErrorExport.ps1`;
+  - 9 duplicados por identificacion: cubierto por `Verify-SgSuperAppI2PrevalidationIdentification.ps1`;
+  - 10 salario obligatorio y vigencia: cubierto por `Verify-SgSuperAppI2EmployeeSalaryVersioning.ps1` y `Verify-SgSuperAppI2PrevalidationSalarySummary.ps1`;
+  - 11 auditoria de ediciones: cubierto por `Verify-SgSuperAppI2EmployeeEditing.ps1`;
+  - 12 Gerencia consulta detalle salarial: cubierto por `Verify-SgSuperAppI2Security.ps1`;
+  - 13 Operaciones consulta empleados sin detalle salarial: cubierto por `Verify-SgSuperAppI2Security.ps1`;
+  - 14 Gerencia y Operaciones sin edicion: cubierto por `Verify-SgSuperAppI2Security.ps1`;
+  - 15 UI respeta `docs/DESIGN.md`: cubierto por build frontend, dark/gold administrativo, componentes densos, matriz visual por rol y riesgo residual de recorrido manual.
+- Riesgos residuales:
+  - no hay recorrido real desktop/movil automatizado por falta de Playwright y fallo del plugin Node en sandbox Windows;
+  - `graphify update .` no puede ejecutarse porque `graphify` no esta instalado;
+  - hay cambios acumulados sin commit y `AGENTS.md` contiene cambio externo no gestionado en esta ejecucion.
+- Task 10 cerrada tecnicamente.
+- Retake point I3: leer `docs/specs/2026-05-21-sg-superapp-spec-i3-puestos-servicio-asignaciones.md`, validar alcance y crear plan SDD I3 antes de implementar.

@@ -12,65 +12,65 @@ Rules:
 <claude-mem-context>
 # Memory Context
 
-# [ProyectoS&G] recent context, 2026-06-03 9:18pm GMT-5
+# [ProyectoS&G] recent context, 2026-06-05 5:59pm GMT-5
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (16.839t read) | 326.696t work | 95% savings
+Stats: 50 obs (21.047t read) | 480.682t work | 96% savings
 
-### Jun 3, 2026
-842 6:02p 🔵 S&G Superapp i0 Local Stack — Session Handoff Initiated
-843 " 🔵 Git Init Race Condition — Parallel Commands Failed After git init
-844 " 🔵 S&G Superapp Project Root Structure Confirmed
-845 6:03p 🔵 Git .git Directory Permission Denied on Windows — Blocking Branch and Remote Setup
-846 6:04p 🔵 Root Cause Found — Git Dubious Ownership: .git Created by CodexSandboxOffline User
-847 " 🔴 Git Dubious Ownership Fixed — safe.directory Added for S&G Project
-848 " 🔵 Three Codex-Sandboxed Projects Share Same safe.directory Pattern on jmep2 Machine
-849 " 🔴 Git Branch Renamed to Main — S&G Superapp Repo Now on Correct Default Branch
-850 " 🟣 S&G Superapp Git Repo Fully Initialized — Remote Origin Registered
-851 6:05p 🔵 Git State Verified — All Project Files Untracked, No .gitignore, Ignore Config Permission Warning
-852 6:07p 🔵 S&G Superapp I1 Portal Base Plan Loaded — 7-Task Implementation Roadmap
-853 " 🔵 Dev Environment Audit — Node OK, npm Broken, dotnet Unavailable, PostgreSQL 18.4 OK
-854 " 🔵 .NET SDK Not Installed — Critical I1 Backend Blocker Confirmed
-855 " 🔵 S&G Design System — Dark/Gold Theme, Dense Admin UI Principles
-856 6:08p 🟣 I1 Task 1 Complete — Project Scaffolding Created, .gitignore Added, Conventions Registered
-857 6:14p ⚖️ Plan I1 priorizado sin dependencia de dotnet
-858 6:15p 🟣 Capa SQL versionada I1 creada para PostgreSQL
-859 6:16p 🔵 PostgreSQL 18 disponible en localhost:5432
-860 " 🟣 Archivos SQL I1 confirmados en disco por apply_patch
-861 " 🔵 graphify no instalado en el entorno local
-862 " 🔵 Repositorio ProyectoS&G sin commits — todos los archivos untracked
-863 6:18p 🟣 Frontend shell sg-superapp-web creado con Vite + React + TypeScript
-864 " 🟣 Frontend sg-superapp-web confirmado en disco — 11 archivos nuevos
-865 6:20p 🔵 npm install timeout en sg-superapp-web — red o registry inaccesible
-866 6:23p ✅ S&G Superapp i0 Local Stack — Handoff Checkpoint Established
-867 " 🔵 sg-superapp-web Vite Build Fails — TypeScript tsc Path Resolution Error on Windows
-868 " 🔴 sg-superapp-web package.json Scripts Fixed for Windows PATH Resolution
-869 6:24p 🟣 sg-superapp-web React Shell Builds Successfully to dist/
-870 " 🔵 Start-Process ArgumentList Splits Path on Space — dev Server Launch Fails
-871 6:25p 🔵 Vite Dev Server Fails — esbuild Access Denied Traversing to Root When Loading vite.config.ts
-872 " ✅ I1 Plan Doc Updated — Task 4 Frontend Shell Marked Complete with Known Dev Server Limitation
-873 " ✅ S&G Superapp I1 Session Plan — SQL Layer, Shared Config, and Frontend Build All Closed
-874 6:26p 🔵 sg-superapp-web Dependency Manifest — Final Confirmed State
-875 " 🔵 sg-superapp-web Source Tree — Feature-Based Structure with Auth, Shell, and Mock Session
-876 " 🔵 db/ Layer Structure and Local PostgreSQL 18 Workflow Documented
-877 " 🔵 ProyectoS&G Git Repo Has No Initial Commit — All Files Untracked
-878 " ✅ S&G Superapp I1 Local Stack Session — All Four Steps Completed
-879 6:35p 🔵 PostgreSQL Bootstrap Script Execution Timeout
-880 " 🔵 Systemic PowerShell Command Timeouts in ProyectoS&G
-881 6:36p 🔵 apps/sg-superapp-api Directory Is Uninitialized
-882 " 🔵 I1 Portal Base Spec: Full Scope and Requirements Read
-883 " 🟣 sg-superapp-api .NET Backend Scaffold Created for I1
-884 6:37p 🟣 Backend Scaffold Patch Applied Successfully — 20 Files Confirmed Written
-885 " ✅ Backend Downgraded to .NET 6 and Switch Expression Replaced for Compatibility
-886 6:38p 🟣 Frontend API Integration Layer Added with Mock Fallback Pattern
-887 6:43p 🔵 .NET SDK Not Found on Development Machine
-888 " 🔵 .NET Not Installed at Default Windows Path
-889 " 🔵 Recursive Program Files Directory Searches Timing Out
-890 6:44p 🟣 Added PowerShell Dev Wrapper Scripts for DB Init and Frontend Launch
-891 6:45p 🔵 Junction Creation at C:\tmp Fails with Access Denied
+### Jun 5, 2026
+1036 9:33a ✅ Task 7 Cerrada Formalmente en README y Plan I3
+1037 3:49p 🔵 PortalEndpoints.cs — Full API Surface Mapped
+1038 " 🔵 PostgresPortalRepository — Full Data Access Layer Mapped
+1039 " 🔵 Portal Contracts Directory — 19 DTOs Covering Full Domain
+1040 " 🔵 I3 Positions Verification Script — Role-Based Authorization Test Suite
+1041 3:50p 🟣 Certificate Signers CRUD Implemented — Increment I4
+1042 " 🟣 Certificate Signers REST Endpoints Wired into PortalEndpoints.cs
+1043 " 🔴 Missing CertificateSigner Helper Methods Added to PostgresPortalRepository
+1044 3:51p 🟣 I4 Verification Scripts Added — Signers CRUD and Security
+1045 " 🟣 I4 Certificate Signers Backend Compiles Clean
+1046 3:54p 🔵 GERENCIA Role Missing CERTIFICATE_SIGNERS/VIEW Permission in DB
+1047 3:55p 🔴 GERENCIA CERTIFICATE_SIGNERS/VIEW Permission Added to Seed and Contract Test
+1048 " 🔴 Seed 006 Re-Applied and I4 Persistence Contract Passed
+1049 " 🔵 I4 Clean Schema Verification Reveals Full Database Structure Including Labor Certificates Tables
+1050 3:56p 🟣 I4 Certificate Signers Backend Fully Verified — All Tests Pass
+1051 " ✅ I4 Task 2 Closed — Project Docs Advanced to Task 3 Retake Point
+1052 3:57p 🔵 LF/CRLF Line Ending Warnings Across Multiple Files on Windows
+1053 " 🔵 Git Working Tree Has 18 Modified + 55 Untracked Files Across I2/I3/I4 — None Committed
+1054 3:58p 🔵 GetEmployeeByIdAsync and Salary Versioning Available for Task 3 Certificate Preview
+1055 3:59p 🔵 Task 3 Acceptance Criteria and EmployeeDetailResponse Fields Confirmed
+1056 " 🟣 Certificate Preview Contracts and Endpoint Added — I4 Task 3
+1057 " 🟣 BuildActiveCertificatePreviewAsync Implemented in PostgresPortalRepository
+1058 4:00p 🔴 BuildCertificatePreviewError Helper Added to Complete Preview Implementation
+1059 4:01p 🟣 I4 Task 3 TDD Verification Scripts Created — ActivePreview and SalaryVariables
+1060 " 🟣 I4 Task 3 Certificate Preview Backend Compiles Clean
+1061 4:02p 🔵 employees Table Has ck_employees_dates Constraint — RETIRADO INSERT Requires termination_date
+1062 4:33p 🔵 Graphify Knowledge Graph Analysis of ProyectoS&G Corpus
+1063 " 🔵 Labor Certificates API — Endpoints, Repository Methods, and DB Schema
+1064 " 🔵 I4 Labor Certificates Implementation Plan — Tasks 6, 7, 8 Pending
+1065 " 🟣 Labor Certificate Annulment and History Endpoints Implemented (Task 6)
+1066 4:34p 🟣 ReadLaborCertificate Helper Extracts DB-to-Response Mapping in PostgresPortalRepository
+1067 " 🟣 sg-superapp-api Builds Successfully After Task 6 Annulment Implementation
+1068 4:35p 🟣 Verification Scripts for I4 Annulment and Audit Added
+1069 " 🔵 Repository Has Mixed Line Endings (LF files on Windows CRLF environment)
+1070 4:36p 🟣 Task 6 Fully Verified — Annulment, Audit, and Security Scripts All Pass
+1071 " ✅ Task 6 Closed in Docs — Project Advances to Task 7 (TypeScript API Client)
+1072 4:37p 🔵 Large Volume of Uncommitted I2/I3/I4 Work Visible in git status
+1073 4:39p 🔵 Frontend TypeScript Types and API Client Lack All I4 Certificate Types — Task 7 Starting Point
+1074 4:40p 🟣 Task 7 — TypeScript Types and API Client for I4 Labor Certificates Added
+1075 " 🟣 Task 7 Verified — npm run build Passes with 0 TypeScript Errors
+1076 4:41p ✅ Task 7 Closed in Docs — Project Advances to Task 8 (UI de Certificaciones)
+1077 4:44p 🔵 Graphify Knowledge Graph Report for ProyectoS&G
+1078 4:45p 🔵 sg-superapp-web Feature Module Structure
+1079 " 🔵 PositionsPage: Full CRUD UI for Service Positions
+1080 " 🔵 ShellLayout: App Shell with Dynamic Module Nav and Notification Counter
+1081 " 🔵 PortalEndpoints.cs: Full API Surface of sg-superapp-api
+1082 " 🔵 PostgresPortalRepository: Certificate Persistence and PDF Storage
+1083 " 🔵 sg-superapp-web CSS Design System: Dark Theme with Gold Accent
+1084 4:46p 🟣 Added Certificate List and Detail Query Endpoints
+1085 4:47p 🟣 CertificatesPage: Full Certificates Module Added to sg-superapp-web (Increment I4)
 
-Access 327k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 481k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

@@ -7,4 +7,6 @@ public sealed record ImportPrevalidationResult(
     int IncompleteRecords,
     int DuplicateRecords,
     int InvalidRecords,
-    IReadOnlyList<ImportPrevalidationError> Errors);
+    IReadOnlyList<ImportPrevalidationError> Errors,
+    IReadOnlyList<ImportColumnMappingResponse> Mappings,
+    IReadOnlyList<ImportPrevalidationRow> Rows);

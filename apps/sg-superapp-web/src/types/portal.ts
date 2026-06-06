@@ -56,10 +56,22 @@ export interface EmployeeDetail extends EmployeeSummary {
   terminationDate: string | null;
   terminationReason: string | null;
   contractType: string | null;
+  currentServicePositionId: number | null;
+  currentServicePositionName: string | null;
   notes: string | null;
   salaryEffectiveFrom: string | null;
   salaryEffectiveTo: string | null;
   salarySource: string;
+  changeHistory: EmployeeChange[];
+}
+
+export interface EmployeeChange {
+  id: number;
+  actorUsername: string;
+  fieldName: string;
+  previousValue: string | null;
+  newValue: string | null;
+  changedAt: string;
 }
 
 export interface ImportBatchSummary {
@@ -67,7 +79,7 @@ export interface ImportBatchSummary {
   loadType: string;
   fileName: string;
   uploadedBy: string;
-  status: "PREVALIDADA" | "IMPORTADA" | "RECHAZADA" | "CON_ERRORES";
+  status: "PREVALIDANDO" | "PREVALIDADA" | "IMPORTADA" | "RECHAZADA" | "CON_ERRORES" | "CANCELADA";
   totalRecords: number;
   validRecords: number;
   incompleteRecords: number;
@@ -81,9 +93,28 @@ export interface ImportBatchError {
   id: number;
   rowNumber: number;
   fieldName: string;
-  errorType: "INCOMPLETO" | "DUPLICADO" | "FORMATO_INVALIDO" | "VALOR_NO_RECONOCIDO";
+  errorType: "INCOMPLETO" | "DUPLICADO" | "FORMATO_INVALIDO" | "VALOR_NO_RECONOCIDO" | "FECHA_INCONSISTENTE";
   message: string;
   originalValue: string | null;
+}
+
+export interface ImportColumnMapping {
+  sourceHeader: string;
+  targetField: string | null;
+  mappingStatus: "MAPPED" | "UNMAPPED" | "IGNORED";
+  sourcePosition: number;
+}
+
+export type ImportRowClassification = "VALIDO" | "INCOMPLETO" | "DUPLICADO" | "ERRONEO";
+
+export interface ImportBatchRow {
+  id: number;
+  rowNumber: number;
+  classification: ImportRowClassification;
+  identificationType: string;
+  identificationNumber: string | null;
+  normalizedPayload: Record<string, string | null>;
+  sourcePayload: Record<string, string | null>;
 }
 
 export interface ImportPrevalidationResponse {
@@ -95,4 +126,158 @@ export interface ImportPrevalidationResponse {
   incompleteRecords: number;
   duplicateRecords: number;
   invalidRecords: number;
+}
+
+export type ServicePositionStatus = "ACTIVO" | "INACTIVO";
+
+export interface ServicePosition {
+  id: number;
+  code: string | null;
+  name: string;
+  clientText: string | null;
+  locationText: string | null;
+  status: ServicePositionStatus;
+  notes: string | null;
+  activeAssignmentsCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ServicePositionRequest {
+  code: string | null;
+  name: string;
+  clientText: string | null;
+  locationText: string | null;
+  notes: string | null;
+}
+
+export type PositionAssignmentStatus = "VIGENTE" | "FINALIZADA";
+
+export interface PositionAssignment {
+  id: number;
+  employeeId: number;
+  positionId: number;
+  positionName: string;
+  positionCode: string | null;
+  clientText: string | null;
+  startDate: string;
+  endDate: string | null;
+  status: PositionAssignmentStatus;
+  changeReason: string | null;
+  notes: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePositionAssignmentRequest {
+  positionId: number;
+  startDate: string;
+  changeReason: string | null;
+  notes: string | null;
+}
+
+export interface FinalizePositionAssignmentRequest {
+  endDate: string;
+  changeReason: string | null;
+  notes: string | null;
+}
+
+export type CertificateSignerStatus = "ACTIVO" | "INACTIVO";
+
+export interface CertificateSigner {
+  id: number;
+  fullName: string;
+  jobTitle: string;
+  signaturePath: string | null;
+  validFrom: string;
+  validTo: string | null;
+  status: CertificateSignerStatus;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CertificateSignerRequest {
+  fullName: string;
+  jobTitle: string;
+  signaturePath: string | null;
+  validFrom: string;
+  validTo: string | null;
+  notes: string | null;
+}
+
+export type CertificateType = "ACTIVO" | "RETIRADO";
+export type CertificatePurpose = "ENTIDAD_FINANCIERA" | "CESANTIAS" | "CLIENTE" | "TRAMITE_GENERAL" | "INTERESADO";
+export type CertificateStatus = "BORRADOR" | "PREVISUALIZADA" | "APROBADA" | "GENERADA" | "ANULADA";
+
+export interface CertificateVariableRequest {
+  conceptCode: string;
+  conceptLabel: string;
+  amount: number;
+  notes: string | null;
+}
+
+export interface CertificateVariable extends CertificateVariableRequest {}
+
+export interface CertificatePreviewRequest {
+  employeeId: number;
+  purpose: CertificatePurpose;
+  issueDate: string;
+  variables: CertificateVariableRequest[];
+}
+
+export interface CertificatePreview {
+  employeeId: number;
+  certificateType: CertificateType;
+  purpose: CertificatePurpose;
+  issueDate: string;
+  employeeFullName: string;
+  identificationType: string;
+  identificationNumber: string;
+  hireDate: string;
+  terminationDate: string | null;
+  terminationReason: string | null;
+  jobTitle: string;
+  contractType: string | null;
+  baseSalary: number | null;
+  signerId: number;
+  signerFullName: string;
+  signerJobTitle: string;
+  variables: CertificateVariable[];
+  previewContent: string;
+  snapshot: Record<string, unknown>;
+}
+
+export interface LaborCertificate {
+  id: number;
+  certificateNumber: string;
+  employeeId: number;
+  signerId: number;
+  certificateType: CertificateType;
+  purpose: CertificatePurpose;
+  status: CertificateStatus;
+  issueDate: string;
+  employeeFullName: string;
+  signerFullName: string;
+  previewContent: string;
+  pdfFileName: string;
+  templateVersion: string;
+  createdBy: string;
+  approvedBy: string | null;
+  createdAt: string;
+  approvedAt: string | null;
+  generatedAt: string | null;
+  snapshot: Record<string, unknown>;
+}
+
+export interface LaborCertificateHistoryItem {
+  eventType: "LABOR_CERTIFICATE_GENERATED" | "LABOR_CERTIFICATE_ANNULLED" | string;
+  actorUsername: string;
+  createdAt: string;
+  detail: Record<string, unknown>;
+}
+
+export interface AnnulCertificateRequest {
+  reason: string;
 }

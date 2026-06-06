@@ -43,8 +43,18 @@ CREATE TABLE IF NOT EXISTS import_batch_rows (
     UNIQUE (import_batch_id, row_number)
 );
 
+ALTER TABLE import_batch_rows
+    DROP CONSTRAINT IF EXISTS import_batch_rows_identification_type_check;
+
 ALTER TABLE import_batch_errors
     ADD COLUMN IF NOT EXISTS import_batch_row_id BIGINT REFERENCES import_batch_rows(id) ON DELETE CASCADE;
+
+ALTER TABLE import_batch_errors
+    DROP CONSTRAINT IF EXISTS import_batch_errors_error_type_check;
+
+ALTER TABLE import_batch_errors
+    ADD CONSTRAINT import_batch_errors_error_type_check
+    CHECK (error_type IN ('INCOMPLETO', 'DUPLICADO', 'FORMATO_INVALIDO', 'VALOR_NO_RECONOCIDO', 'FECHA_INCONSISTENTE'));
 
 CREATE INDEX IF NOT EXISTS idx_import_column_mappings_batch
     ON import_column_mappings (import_batch_id, source_position);

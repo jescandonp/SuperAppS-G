@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "../config";
-import type { AppModule, CurrentUser, EmployeeDetail, EmployeeSummary, ImportBatchError, ImportBatchSummary, ImportPrevalidationResponse, LoginRequest, LoginResponse, NotificationItem, RoleCode } from "../types/portal";
+import type { AnnulCertificateRequest, AppModule, CertificatePreview, CertificatePreviewRequest, CertificateSigner, CertificateSignerRequest, CertificateSignerStatus, CertificateStatus, CertificateType, CreatePositionAssignmentRequest, CurrentUser, EmployeeDetail, EmployeeSummary, FinalizePositionAssignmentRequest, ImportBatchError, ImportBatchRow, ImportBatchSummary, ImportColumnMapping, ImportPrevalidationResponse, ImportRowClassification, LaborCertificate, LaborCertificateHistoryItem, LoginRequest, LoginResponse, NotificationItem, PositionAssignment, RoleCode, ServicePosition, ServicePositionRequest, ServicePositionStatus } from "../types/portal";
 
 const SESSION_TOKEN_KEY = "sg.superapp.sessionToken";
 
@@ -14,7 +14,40 @@ async function getJson<T>(path: string): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
+    let message: string | undefined;
+    try {
+      const data = (await response.json()) as { message?: string };
+      message = data.message;
+    } catch {
+      message = undefined;
+    }
+
+    throw new Error(message || `API request failed: ${response.status}`);
+  }
+
+  return response.json() as Promise<T>;
+}
+
+async function sendJson<T>(path: string, method: "POST" | "PUT", body?: unknown): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method,
+    headers: {
+      ...getSessionHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    let message: string | undefined;
+    try {
+      const data = (await response.json()) as { message?: string };
+      message = data.message;
+    } catch {
+      message = undefined;
+    }
+
+    throw new Error(message || `API request failed: ${response.status}`);
   }
 
   return response.json() as Promise<T>;
@@ -50,7 +83,7 @@ export async function login(request: LoginRequest): Promise<LoginResponse> {
   return data;
 }
 
-export async function fetchEmployees(filters: { search?: string; status?: string; jobTitle?: string }): Promise<EmployeeSummary[]> {
+export async function fetchEmployees(filters: { search?: string; status?: string; jobTitle?: string; completeness?: string }): Promise<EmployeeSummary[]> {
   const params = new URLSearchParams();
 
   if (filters.search) {
@@ -65,6 +98,10 @@ export async function fetchEmployees(filters: { search?: string; status?: string
     params.set("jobTitle", filters.jobTitle);
   }
 
+  if (filters.completeness) {
+    params.set("completeness", filters.completeness);
+  }
+
   const query = params.toString();
   return getJson<EmployeeSummary[]>(`/portal/employees${query ? `?${query}` : ""}`);
 }
@@ -73,12 +110,199 @@ export async function fetchEmployeeDetail(employeeId: number): Promise<EmployeeD
   return getJson<EmployeeDetail>(`/portal/employees/${employeeId}`);
 }
 
+export async function updateEmployee(employeeId: number, request: {
+  fullName: string;
+  employmentStatus: "ACTIVO" | "RETIRADO";
+  jobTitle: string;
+  hireDate: string;
+  terminationDate: string | null;
+  terminationReason: string | null;
+  contractType: string | null;
+  notes: string | null;
+  currentBaseSalary: number | null;
+  salaryEffectiveFrom: string | null;
+}): Promise<void> {
+  await sendJson<unknown>(`/portal/employees/${employeeId}`, "PUT", request);
+}
+
+export async function fetchServicePositions(filters: { search?: string; status?: ServicePositionStatus }): Promise<ServicePosition[]> {
+  const params = new URLSearchParams();
+
+  if (filters.search) {
+    params.set("search", filters.search);
+  }
+
+  if (filters.status) {
+    params.set("status", filters.status);
+  }
+
+  const query = params.toString();
+  return getJson<ServicePosition[]>(`/portal/positions${query ? `?${query}` : ""}`);
+}
+
+export async function fetchServicePositionDetail(positionId: number): Promise<ServicePosition> {
+  return getJson<ServicePosition>(`/portal/positions/${positionId}`);
+}
+
+export async function fetchServicePositionAssignments(positionId: number): Promise<PositionAssignment[]> {
+  return getJson<PositionAssignment[]>(`/portal/positions/${positionId}/assignments`);
+}
+
+export async function createServicePosition(request: ServicePositionRequest): Promise<ServicePosition> {
+  return sendJson<ServicePosition>("/portal/positions", "POST", request);
+}
+
+export async function updateServicePosition(positionId: number, request: ServicePositionRequest): Promise<ServicePosition> {
+  return sendJson<ServicePosition>(`/portal/positions/${positionId}`, "PUT", request);
+}
+
+export async function inactivateServicePosition(positionId: number): Promise<ServicePosition> {
+  return sendJson<ServicePosition>(`/portal/positions/${positionId}/inactivate`, "POST");
+}
+
+export async function fetchEmployeePositionAssignments(employeeId: number): Promise<PositionAssignment[]> {
+  return getJson<PositionAssignment[]>(`/portal/employees/${employeeId}/position-assignments`);
+}
+
+export async function createPositionAssignment(employeeId: number, request: CreatePositionAssignmentRequest): Promise<PositionAssignment> {
+  return sendJson<PositionAssignment>(`/portal/employees/${employeeId}/position-assignments`, "POST", request);
+}
+
+export async function finalizePositionAssignment(assignmentId: number, request: FinalizePositionAssignmentRequest): Promise<PositionAssignment> {
+  return sendJson<PositionAssignment>(`/portal/position-assignments/${assignmentId}/finalize`, "POST", request);
+}
+
+export async function fetchCertificateSigners(status?: CertificateSignerStatus): Promise<CertificateSigner[]> {
+  return getJson<CertificateSigner[]>(`/portal/certificate-signers${status ? `?status=${status}` : ""}`);
+}
+
+export async function createCertificateSigner(request: CertificateSignerRequest): Promise<CertificateSigner> {
+  return sendJson<CertificateSigner>("/portal/certificate-signers", "POST", request);
+}
+
+export async function updateCertificateSigner(signerId: number, request: CertificateSignerRequest): Promise<CertificateSigner> {
+  return sendJson<CertificateSigner>(`/portal/certificate-signers/${signerId}`, "PUT", request);
+}
+
+export async function inactivateCertificateSigner(signerId: number): Promise<CertificateSigner> {
+  return sendJson<CertificateSigner>(`/portal/certificate-signers/${signerId}/inactivate`, "POST");
+}
+
+export async function fetchCertificates(filters: { employeeId?: number; type?: CertificateType; status?: CertificateStatus; from?: string; to?: string }): Promise<LaborCertificate[]> {
+  const params = new URLSearchParams();
+  if (filters.employeeId) {
+    params.set("employeeId", filters.employeeId.toString());
+  }
+  if (filters.type) {
+    params.set("type", filters.type);
+  }
+  if (filters.status) {
+    params.set("status", filters.status);
+  }
+  if (filters.from) {
+    params.set("from", filters.from);
+  }
+  if (filters.to) {
+    params.set("to", filters.to);
+  }
+
+  const query = params.toString();
+  return getJson<LaborCertificate[]>(`/portal/certificates${query ? `?${query}` : ""}`);
+}
+
+export async function fetchCertificateDetail(certificateId: number): Promise<LaborCertificate> {
+  return getJson<LaborCertificate>(`/portal/certificates/${certificateId}`);
+}
+
+export async function previewCertificate(request: CertificatePreviewRequest): Promise<CertificatePreview> {
+  return sendJson<CertificatePreview>("/portal/certificates/preview", "POST", request);
+}
+
+export async function approveGenerateCertificate(request: CertificatePreviewRequest): Promise<LaborCertificate> {
+  return sendJson<LaborCertificate>("/portal/certificates/approve-generate", "POST", request);
+}
+
+export async function annulCertificate(certificateId: number, request: AnnulCertificateRequest): Promise<LaborCertificate> {
+  return sendJson<LaborCertificate>(`/portal/certificates/${certificateId}/annul`, "POST", request);
+}
+
+export async function fetchCertificateHistory(certificateId: number): Promise<LaborCertificateHistoryItem[]> {
+  return getJson<LaborCertificateHistoryItem[]>(`/portal/certificates/${certificateId}/history`);
+}
+
+export async function downloadCertificatePdf(certificateId: number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/portal/certificates/${certificateId}/download`, {
+    headers: getSessionHeaders()
+  });
+  if (!response.ok) {
+    let message: string | undefined;
+    try {
+      const data = (await response.json()) as { message?: string };
+      message = data.message;
+    } catch {
+      message = undefined;
+    }
+    throw new Error(message || `API request failed: ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `certificado-${certificateId}.pdf`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export async function fetchImportBatches(): Promise<ImportBatchSummary[]> {
   return getJson<ImportBatchSummary[]>("/portal/imports");
 }
 
 export async function fetchImportBatchErrors(batchId: number): Promise<ImportBatchError[]> {
   return getJson<ImportBatchError[]>(`/portal/imports/${batchId}/errors`);
+}
+
+export async function fetchImportColumnMappings(batchId: number): Promise<ImportColumnMapping[]> {
+  return getJson<ImportColumnMapping[]>(`/portal/imports/${batchId}/mappings`);
+}
+
+export async function fetchImportBatchRows(batchId: number, classification?: ImportRowClassification): Promise<ImportBatchRow[]> {
+  return getJson<ImportBatchRow[]>(`/portal/imports/${batchId}/rows${classification ? `?classification=${classification}` : ""}`);
+}
+
+export async function exportImportBatchErrors(batchId: number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/portal/imports/${batchId}/errors/export`, {
+    headers: getSessionHeaders()
+  });
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `import-errors-${batchId}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+async function postImportAction(batchId: number, action: "confirm" | "cancel"): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/portal/imports/${batchId}/${action}`, {
+    method: "POST",
+    headers: getSessionHeaders()
+  });
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status}`);
+  }
+}
+
+export async function confirmImportBatch(batchId: number): Promise<void> {
+  return postImportAction(batchId, "confirm");
+}
+
+export async function cancelImportBatch(batchId: number): Promise<void> {
+  return postImportAction(batchId, "cancel");
 }
 
 export async function prevalidateEmployeeCsv(file: File, uploadedBy: string): Promise<ImportPrevalidationResponse> {

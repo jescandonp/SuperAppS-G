@@ -1,5 +1,8 @@
 using Sg.SuperApp.Api.Domain;
 using Sg.SuperApp.Api.Services;
+using Sg.SuperApp.Api.Contracts.Portal;
+using System.Text;
+using Npgsql;
 
 namespace Sg.SuperApp.Api.Endpoints;
 
@@ -30,7 +33,7 @@ public static class PortalEndpoints
             return Results.Ok(notifications);
         });
 
-        app.MapGet("/api/portal/employees", async (string? search, string? status, string? jobTitle, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        app.MapGet("/api/portal/employees", async (string? search, string? status, string? jobTitle, string? completeness, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
         {
             var denied = await authorization.RequireAsync("EMPLOYEES", "VIEW", cancellationToken);
             if (denied is not null)
@@ -44,7 +47,7 @@ public static class PortalEndpoints
             }
 
             var includeSalary = await repository.HasPermissionAsync(userContext.User!.Id, "EMPLOYEES", "VIEW_SALARY", cancellationToken);
-            var employees = await repository.GetEmployeesAsync(search, status, jobTitle, includeSalary, cancellationToken);
+            var employees = await repository.GetEmployeesAsync(search, status, jobTitle, completeness, includeSalary, cancellationToken);
             return Results.Ok(employees);
         });
 
@@ -64,6 +67,404 @@ public static class PortalEndpoints
             var includeSalary = await repository.HasPermissionAsync(userContext.User!.Id, "EMPLOYEES", "VIEW_SALARY", cancellationToken);
             var employee = await repository.GetEmployeeByIdAsync(employeeId, includeSalary, cancellationToken);
             return employee is null ? Results.NotFound() : Results.Ok(employee);
+        });
+
+        app.MapPut("/api/portal/employees/{employeeId:long}", async (long employeeId, UpdateEmployeeRequest request, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("EMPLOYEES", "EDIT", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (string.IsNullOrWhiteSpace(request.FullName)
+                || string.IsNullOrWhiteSpace(request.JobTitle)
+                || !DateOnly.TryParse(request.HireDate, out _)
+                || request.EmploymentStatus is not ("ACTIVO" or "RETIRADO")
+                || (request.EmploymentStatus == "RETIRADO" && (!DateOnly.TryParse(request.TerminationDate, out _) || string.IsNullOrWhiteSpace(request.TerminationReason)))
+                || (request.CurrentBaseSalary.HasValue && (request.CurrentBaseSalary < 0 || !DateOnly.TryParse(request.SalaryEffectiveFrom, out _))))
+            {
+                return Results.BadRequest(new { message = "Los datos laborales o salariales enviados no son validos." });
+            }
+
+            try
+            {
+                var updated = await repository.UpdateEmployeeAsync(employeeId, request, userContext.User!.Username, cancellationToken);
+                return updated ? Results.Ok() : Results.NotFound();
+            }
+            catch (ArgumentException exception)
+            {
+                return Results.BadRequest(new { message = exception.Message });
+            }
+        });
+
+        app.MapGet("/api/portal/positions", async (string? search, string? status, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("POSITIONS", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!await repository.CanConnectAsync(cancellationToken))
+            {
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+
+            var normalizedStatus = status?.Trim().ToUpperInvariant();
+            if (normalizedStatus is not null && normalizedStatus is not ("ACTIVO" or "INACTIVO"))
+            {
+                return Results.BadRequest(new { message = "El estado de puesto no es valido." });
+            }
+
+            var positions = await repository.GetServicePositionsAsync(search, normalizedStatus, cancellationToken);
+            return Results.Ok(positions);
+        });
+
+        app.MapGet("/api/portal/positions/{positionId:long}", async (long positionId, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("POSITIONS", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var position = await repository.GetServicePositionByIdAsync(positionId, cancellationToken);
+            return position is null ? Results.NotFound() : Results.Ok(position);
+        });
+
+        app.MapGet("/api/portal/positions/{positionId:long}/assignments", async (long positionId, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("POSITION_ASSIGNMENTS", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var assignments = await repository.GetPositionAssignmentsAsync(positionId, cancellationToken);
+            return Results.Ok(assignments);
+        });
+
+        app.MapPost("/api/portal/positions", async (UpsertServicePositionRequest request, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("POSITIONS", "MANAGE", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Name))
+            {
+                return Results.BadRequest(new { message = "El nombre del puesto es obligatorio." });
+            }
+
+            try
+            {
+                var position = await repository.CreateServicePositionAsync(request, userContext.User!.Id, userContext.User.Username, cancellationToken);
+                return Results.Ok(position);
+            }
+            catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
+            {
+                return Results.Conflict(new { message = "Ya existe un puesto con ese codigo." });
+            }
+        });
+
+        app.MapPut("/api/portal/positions/{positionId:long}", async (long positionId, UpsertServicePositionRequest request, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("POSITIONS", "MANAGE", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Name))
+            {
+                return Results.BadRequest(new { message = "El nombre del puesto es obligatorio." });
+            }
+
+            try
+            {
+                var position = await repository.UpdateServicePositionAsync(positionId, request, userContext.User!.Id, userContext.User.Username, cancellationToken);
+                return position is null ? Results.NotFound() : Results.Ok(position);
+            }
+            catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
+            {
+                return Results.Conflict(new { message = "Ya existe un puesto con ese codigo." });
+            }
+        });
+
+        app.MapPost("/api/portal/positions/{positionId:long}/inactivate", async (long positionId, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("POSITIONS", "MANAGE", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var position = await repository.InactivateServicePositionAsync(positionId, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return position is null ? Results.NotFound() : Results.Ok(position);
+        });
+
+        app.MapGet("/api/portal/certificate-signers", async (string? status, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("CERTIFICATE_SIGNERS", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var normalizedStatus = status?.Trim().ToUpperInvariant();
+            if (normalizedStatus is not null && normalizedStatus is not ("ACTIVO" or "INACTIVO"))
+            {
+                return Results.BadRequest(new { message = "El estado del firmante no es valido." });
+            }
+
+            return Results.Ok(await repository.GetCertificateSignersAsync(normalizedStatus, cancellationToken));
+        });
+
+        app.MapGet("/api/portal/certificate-signers/{signerId:long}", async (long signerId, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("CERTIFICATE_SIGNERS", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var signer = await repository.GetCertificateSignerByIdAsync(signerId, cancellationToken);
+            return signer is null ? Results.NotFound() : Results.Ok(signer);
+        });
+
+        app.MapPost("/api/portal/certificate-signers", async (UpsertCertificateSignerRequest request, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("CERTIFICATE_SIGNERS", "MANAGE", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!IsValidSignerRequest(request))
+            {
+                return Results.BadRequest(new { message = "Los datos del firmante no son validos." });
+            }
+
+            var signer = await repository.CreateCertificateSignerAsync(request, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return Results.Ok(signer);
+        });
+
+        app.MapPut("/api/portal/certificate-signers/{signerId:long}", async (long signerId, UpsertCertificateSignerRequest request, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("CERTIFICATE_SIGNERS", "MANAGE", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!IsValidSignerRequest(request))
+            {
+                return Results.BadRequest(new { message = "Los datos del firmante no son validos." });
+            }
+
+            var signer = await repository.UpdateCertificateSignerAsync(signerId, request, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return signer is null ? Results.NotFound() : Results.Ok(signer);
+        });
+
+        app.MapPost("/api/portal/certificate-signers/{signerId:long}/inactivate", async (long signerId, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("CERTIFICATE_SIGNERS", "MANAGE", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var signer = await repository.InactivateCertificateSignerAsync(signerId, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return signer is null ? Results.NotFound() : Results.Ok(signer);
+        });
+
+        app.MapPost("/api/portal/certificates/preview", async (CertificatePreviewRequest request, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("CERTIFICATES", "PREVIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!IsValidCertificatePreviewRequest(request))
+            {
+                return Results.BadRequest(new { message = "La solicitud de previsualizacion no es valida." });
+            }
+
+            var result = await repository.BuildCertificatePreviewAsync(request, cancellationToken);
+            return result switch
+            {
+                null => Results.NotFound(new { message = "Empleado no encontrado." }),
+                { CertificateType: "EMPLOYEE_NOT_ACTIVE" } => Results.Conflict(new { message = "El empleado no esta activo." }),
+                { CertificateType: "MISSING_BASE_SALARY" } => Results.Conflict(new { message = "El empleado activo no tiene salario base vigente." }),
+                { CertificateType: "MISSING_TERMINATION_DATE" } => Results.Conflict(new { message = "El empleado retirado no tiene fecha de retiro." }),
+                { CertificateType: "MISSING_TERMINATION_REASON" } => Results.Conflict(new { message = "El empleado retirado no tiene motivo de retiro." }),
+                { CertificateType: "MISSING_ACTIVE_SIGNER" } => Results.Conflict(new { message = "No existe firmante activo y vigente para la fecha de expedicion." }),
+                _ => Results.Ok(result)
+            };
+        });
+
+        app.MapGet("/api/portal/certificates", async (long? employeeId, string? type, string? status, string? from, string? to, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("CERTIFICATES", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if ((!string.IsNullOrWhiteSpace(type) && type is not ("ACTIVO" or "RETIRADO"))
+                || (!string.IsNullOrWhiteSpace(status) && status is not ("BORRADOR" or "PREVISUALIZADA" or "APROBADA" or "GENERADA" or "ANULADA"))
+                || (!string.IsNullOrWhiteSpace(from) && !DateOnly.TryParse(from, out _))
+                || (!string.IsNullOrWhiteSpace(to) && !DateOnly.TryParse(to, out _)))
+            {
+                return Results.BadRequest(new { message = "Filtros de certificados no validos." });
+            }
+
+            return Results.Ok(await repository.GetCertificatesAsync(employeeId, type, status, from, to, cancellationToken));
+        });
+
+        app.MapGet("/api/portal/certificates/{certificateId:long}", async (long certificateId, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("CERTIFICATES", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var certificate = await repository.GetCertificateByIdAsync(certificateId, cancellationToken);
+            return certificate is null ? Results.NotFound(new { message = "Certificado no encontrado." }) : Results.Ok(certificate);
+        });
+
+        app.MapPost("/api/portal/certificates/approve-generate", async (CertificatePreviewRequest request, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("CERTIFICATES", "GENERATE", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!IsValidCertificatePreviewRequest(request))
+            {
+                return Results.BadRequest(new { message = "La solicitud de generacion no es valida." });
+            }
+
+            var preview = await repository.BuildCertificatePreviewAsync(request, cancellationToken);
+            var previewError = MapCertificatePreviewError(preview);
+            if (previewError is not null)
+            {
+                return previewError;
+            }
+
+            var certificate = await repository.PersistGeneratedCertificateAsync(preview!, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return Results.Ok(certificate);
+        });
+
+        app.MapGet("/api/portal/certificates/{certificateId:long}/download", async (long certificateId, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("CERTIFICATES", "DOWNLOAD", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var download = await repository.GetCertificateDownloadAsync(certificateId, cancellationToken);
+            if (download is null || !File.Exists(download.Value.FilePath))
+            {
+                return Results.NotFound(new { message = "PDF de certificado no encontrado." });
+            }
+
+            return Results.File(await File.ReadAllBytesAsync(download.Value.FilePath, cancellationToken), "application/pdf", download.Value.FileName);
+        });
+
+        app.MapPost("/api/portal/certificates/{certificateId:long}/annul", async (long certificateId, AnnulCertificateRequest request, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("CERTIFICATES", "ANNUL", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Reason))
+            {
+                return Results.BadRequest(new { message = "El motivo de anulacion es obligatorio." });
+            }
+
+            var certificate = await repository.AnnulCertificateAsync(certificateId, request.Reason, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return certificate is null
+                ? Results.NotFound(new { message = "Certificado generado no encontrado." })
+                : Results.Ok(certificate);
+        });
+
+        app.MapGet("/api/portal/certificates/{certificateId:long}/history", async (long certificateId, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("CERTIFICATES", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            return Results.Ok(await repository.GetCertificateHistoryAsync(certificateId, cancellationToken));
+        });
+
+        app.MapGet("/api/portal/employees/{employeeId:long}/position-assignments", async (long employeeId, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("POSITION_ASSIGNMENTS", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var assignments = await repository.GetEmployeePositionAssignmentsAsync(employeeId, cancellationToken);
+            return Results.Ok(assignments);
+        });
+
+        app.MapPost("/api/portal/employees/{employeeId:long}/position-assignments", async (long employeeId, CreatePositionAssignmentRequest request, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("POSITION_ASSIGNMENTS", "MANAGE", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (request.PositionId <= 0 || !DateOnly.TryParse(request.StartDate, out _))
+            {
+                return Results.BadRequest(new { message = "La asignacion enviada no es valida." });
+            }
+
+            var result = await repository.CreatePositionAssignmentAsync(employeeId, request, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return result switch
+            {
+                "EMPLOYEE_NOT_FOUND" => Results.NotFound(new { message = "Empleado no encontrado." }),
+                "POSITION_NOT_FOUND" => Results.NotFound(new { message = "Puesto no encontrado." }),
+                "INACTIVE_POSITION" => Results.Conflict(new { message = "No se puede asignar a un puesto inactivo." }),
+                "ACTIVE_ASSIGNMENT_EXISTS" => Results.Conflict(new { message = "El empleado ya tiene una asignacion vigente." }),
+                _ => Results.Ok(await repository.GetPositionAssignmentByIdAsync(long.Parse(result), cancellationToken))
+            };
+        });
+
+        app.MapPost("/api/portal/position-assignments/{assignmentId:long}/finalize", async (long assignmentId, FinalizePositionAssignmentRequest request, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("POSITION_ASSIGNMENTS", "MANAGE", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!DateOnly.TryParse(request.EndDate, out _))
+            {
+                return Results.BadRequest(new { message = "La fecha fin no es valida." });
+            }
+
+            var result = await repository.FinalizePositionAssignmentAsync(assignmentId, request, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return result switch
+            {
+                "FINALIZED" => Results.Ok(await repository.GetPositionAssignmentByIdAsync(assignmentId, cancellationToken)),
+                "NOT_FOUND" => Results.NotFound(),
+                "INVALID_DATE" => Results.BadRequest(new { message = "La fecha fin no puede ser anterior al inicio." }),
+                _ => Results.Conflict(new { message = "La asignacion no puede finalizarse en su estado actual." })
+            };
         });
 
         app.MapGet("/api/portal/imports", async (PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
@@ -100,10 +501,101 @@ public static class PortalEndpoints
             return Results.Ok(errors);
         });
 
+        app.MapGet("/api/portal/imports/{batchId:long}/errors/export", async (long batchId, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("IMPORTS", "VIEW_ERRORS", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var errors = await repository.GetImportBatchErrorsAsync(batchId, cancellationToken);
+            var csv = new StringBuilder("fila,campo,tipo_error,mensaje,valor_original\r\n");
+            foreach (var error in errors)
+            {
+                csv.Append(error.RowNumber).Append(',')
+                    .Append(EscapeCsv(error.FieldName)).Append(',')
+                    .Append(EscapeCsv(error.ErrorType)).Append(',')
+                    .Append(EscapeCsv(error.Message)).Append(',')
+                    .Append(EscapeCsv(error.OriginalValue))
+                    .Append("\r\n");
+            }
+
+            return Results.File(
+                new UTF8Encoding(encoderShouldEmitUTF8Identifier: true).GetBytes(csv.ToString()),
+                "text/csv; charset=utf-8",
+                $"import-errors-{batchId}.csv");
+        });
+
+        app.MapGet("/api/portal/imports/{batchId:long}/rows", async (long batchId, string? classification, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("IMPORTS", "VIEW_ERRORS", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var normalizedClassification = classification?.Trim().ToUpperInvariant();
+            if (normalizedClassification is not null && normalizedClassification is not ("VALIDO" or "INCOMPLETO" or "DUPLICADO" or "ERRONEO"))
+            {
+                return Results.BadRequest(new { message = "La clasificacion solicitada no es valida." });
+            }
+
+            var rows = await repository.GetImportBatchRowsAsync(batchId, normalizedClassification, cancellationToken);
+            return Results.Ok(rows);
+        });
+
+        app.MapGet("/api/portal/imports/{batchId:long}/mappings", async (long batchId, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("IMPORTS", "VIEW_ERRORS", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var mappings = await repository.GetImportColumnMappingsAsync(batchId, cancellationToken);
+            return Results.Ok(mappings);
+        });
+
+        app.MapPost("/api/portal/imports/{batchId:long}/cancel", async (long batchId, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("IMPORTS", "MANAGE", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var result = await repository.CancelImportBatchAsync(batchId, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return result switch
+            {
+                "CANCELLED" => Results.Ok(new { batchId, status = "CANCELADA" }),
+                "NOT_FOUND" => Results.NotFound(),
+                _ => Results.Conflict(new { message = "El lote no puede cancelarse en su estado actual." })
+            };
+        });
+
+        app.MapPost("/api/portal/imports/{batchId:long}/confirm", async (long batchId, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("IMPORTS", "MANAGE", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var result = await repository.ConfirmImportBatchAsync(batchId, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return result switch
+            {
+                "IMPORTED" => Results.Ok(new { batchId, status = "IMPORTADA" }),
+                "NOT_FOUND" => Results.NotFound(),
+                _ => Results.Conflict(new { message = "El lote no puede confirmarse en su estado actual." })
+            };
+        });
+
         app.MapPost("/api/portal/imports/prevalidate", async (
             HttpRequest request,
             PortalAuthorizationService authorization,
             EmployeeCsvPrevalidationService prevalidationService,
+            EmployeeXlsxPrevalidationService xlsxPrevalidationService,
             PostgresPortalRepository repository,
             RequestUserContext userContext,
             CancellationToken cancellationToken) =>
@@ -132,19 +624,35 @@ public static class PortalEndpoints
                 return Results.BadRequest(new { message = "Debe seleccionar un archivo CSV con contenido." });
             }
 
-            if (!Path.GetExtension(file.FileName).Equals(".csv", StringComparison.OrdinalIgnoreCase))
+            var extension = Path.GetExtension(file.FileName);
+            if (!extension.Equals(".csv", StringComparison.OrdinalIgnoreCase)
+                && !extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
             {
-                return Results.BadRequest(new { message = "La prevalidacion inicial soporta archivos CSV. Excel se habilitara en un bloque posterior." });
+                return Results.BadRequest(new { message = "La prevalidacion soporta archivos CSV y XLSX." });
             }
 
-            if (file.Length > 5 * 1024 * 1024)
+            if (file.Length > 10 * 1024 * 1024)
             {
-                return Results.BadRequest(new { message = "El archivo supera el limite inicial de 5 MB." });
+                return Results.BadRequest(new { message = "El archivo supera el limite de 10 MB." });
             }
 
-            var existingIdentifications = await repository.GetExistingIdentificationNumbersAsync(cancellationToken);
+            var existingIdentificationKeys = await repository.GetExistingIdentificationKeysAsync(cancellationToken);
             await using var stream = file.OpenReadStream();
-            var result = prevalidationService.Prevalidate(stream, Path.GetFileName(file.FileName), existingIdentifications);
+            ImportPrevalidationResult result;
+            try
+            {
+                result = extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase)
+                    ? xlsxPrevalidationService.Prevalidate(stream, Path.GetFileName(file.FileName), existingIdentificationKeys)
+                    : prevalidationService.Prevalidate(stream, Path.GetFileName(file.FileName), existingIdentificationKeys);
+            }
+            catch (InvalidDataException exception)
+            {
+                return Results.BadRequest(new { message = exception.Message });
+            }
+            catch (Exception) when (extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                return Results.BadRequest(new { message = "El archivo XLSX no contiene una estructura valida." });
+            }
 
             if (result.TotalRecords == 0)
             {
@@ -178,5 +686,67 @@ public static class PortalEndpoints
                 parsedRole = default;
                 return false;
         }
+    }
+
+    private static string EscapeCsv(string? value)
+    {
+        var text = value ?? string.Empty;
+        return text.IndexOfAny(new[] { ',', '"', '\r', '\n' }) >= 0
+            ? $"\"{text.Replace("\"", "\"\"")}\""
+            : text;
+    }
+
+    private static bool IsValidSignerRequest(UpsertCertificateSignerRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.FullName)
+            || string.IsNullOrWhiteSpace(request.JobTitle)
+            || !DateOnly.TryParse(request.ValidFrom, out var validFrom))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.ValidTo)
+            && (!DateOnly.TryParse(request.ValidTo, out var validTo) || validTo < validFrom))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool IsValidCertificatePreviewRequest(CertificatePreviewRequest request)
+    {
+        if (request.EmployeeId <= 0
+            || !DateOnly.TryParse(request.IssueDate, out _)
+            || request.Purpose.Trim().ToUpperInvariant() is not ("ENTIDAD_FINANCIERA" or "CESANTIAS" or "CLIENTE" or "TRAMITE_GENERAL" or "INTERESADO"))
+        {
+            return false;
+        }
+
+        foreach (var variable in request.Variables)
+        {
+            if (string.IsNullOrWhiteSpace(variable.ConceptCode)
+                || string.IsNullOrWhiteSpace(variable.ConceptLabel)
+                || variable.Amount < 0)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static IResult? MapCertificatePreviewError(CertificatePreviewResponse? result)
+    {
+        return result switch
+        {
+            null => Results.NotFound(new { message = "Empleado no encontrado." }),
+            { CertificateType: "EMPLOYEE_NOT_ACTIVE" } => Results.Conflict(new { message = "El empleado no esta activo." }),
+            { CertificateType: "MISSING_BASE_SALARY" } => Results.Conflict(new { message = "El empleado activo no tiene salario base vigente." }),
+            { CertificateType: "MISSING_TERMINATION_DATE" } => Results.Conflict(new { message = "El empleado retirado no tiene fecha de retiro." }),
+            { CertificateType: "MISSING_TERMINATION_REASON" } => Results.Conflict(new { message = "El empleado retirado no tiene motivo de retiro." }),
+            { CertificateType: "MISSING_ACTIVE_SIGNER" } => Results.Conflict(new { message = "No existe firmante activo y vigente para la fecha de expedicion." }),
+            _ => null
+        };
     }
 }
