@@ -205,6 +205,170 @@ public static class PortalEndpoints
             return position is null ? Results.NotFound() : Results.Ok(position);
         });
 
+        app.MapGet("/api/portal/training-types", async (string? search, string? status, string? category, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("TRAINING_TYPES", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var normalizedStatus = status?.Trim().ToUpperInvariant();
+            var normalizedCategory = category?.Trim().ToUpperInvariant();
+            if ((normalizedStatus is not null && normalizedStatus is not ("ACTIVO" or "INACTIVO"))
+                || (normalizedCategory is not null && normalizedCategory is not ("CURSO" or "ACREDITACION")))
+            {
+                return Results.BadRequest(new { message = "Filtros de tipos de curso/acreditacion no validos." });
+            }
+
+            return Results.Ok(await repository.GetTrainingRequirementTypesAsync(search, normalizedStatus, normalizedCategory, cancellationToken));
+        });
+
+        app.MapGet("/api/portal/training-types/{typeId:long}", async (long typeId, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("TRAINING_TYPES", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var type = await repository.GetTrainingRequirementTypeByIdAsync(typeId, cancellationToken);
+            return type is null ? Results.NotFound() : Results.Ok(type);
+        });
+
+        app.MapPost("/api/portal/training-types", async (UpsertTrainingRequirementTypeRequest request, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("TRAINING_TYPES", "MANAGE", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!IsValidTrainingRequirementTypeRequest(request))
+            {
+                return Results.BadRequest(new { message = "Los datos del tipo de curso/acreditacion no son validos." });
+            }
+
+            try
+            {
+                var type = await repository.CreateTrainingRequirementTypeAsync(request, userContext.User!.Id, userContext.User.Username, cancellationToken);
+                return Results.Ok(type);
+            }
+            catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
+            {
+                return Results.Conflict(new { message = "Ya existe un tipo de curso/acreditacion con ese codigo." });
+            }
+        });
+
+        app.MapPut("/api/portal/training-types/{typeId:long}", async (long typeId, UpsertTrainingRequirementTypeRequest request, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("TRAINING_TYPES", "MANAGE", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!IsValidTrainingRequirementTypeRequest(request))
+            {
+                return Results.BadRequest(new { message = "Los datos del tipo de curso/acreditacion no son validos." });
+            }
+
+            try
+            {
+                var type = await repository.UpdateTrainingRequirementTypeAsync(typeId, request, userContext.User!.Id, userContext.User.Username, cancellationToken);
+                return type is null ? Results.NotFound() : Results.Ok(type);
+            }
+            catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
+            {
+                return Results.Conflict(new { message = "Ya existe un tipo de curso/acreditacion con ese codigo." });
+            }
+        });
+
+        app.MapPost("/api/portal/training-types/{typeId:long}/inactivate", async (long typeId, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("TRAINING_TYPES", "MANAGE", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var type = await repository.InactivateTrainingRequirementTypeAsync(typeId, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return type is null ? Results.NotFound() : Results.Ok(type);
+        });
+
+        app.MapGet("/api/portal/training-compliance", async (string? search, long? typeId, string? complianceStatus, string? enablementStatus, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("TRAINING_RECORDS", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            return Results.Ok(await repository.GetTrainingComplianceSummariesAsync(search, typeId, complianceStatus, enablementStatus, cancellationToken));
+        });
+
+        app.MapGet("/api/portal/employees/{employeeId:long}/training/enablement", async (long employeeId, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("TRAINING_SERVICE_ENABLEMENT", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var enablement = await repository.GetTrainingServiceEnablementAsync(employeeId, cancellationToken);
+            return enablement is null ? Results.NotFound(new { message = "Empleado no encontrado." }) : Results.Ok(enablement);
+        });
+
+        app.MapGet("/api/portal/employees/{employeeId:long}/training-compliance", async (long employeeId, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("TRAINING_RECORDS", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var detail = await repository.GetTrainingComplianceDetailAsync(employeeId, cancellationToken);
+            return detail is null ? Results.NotFound(new { message = "Empleado no encontrado." }) : Results.Ok(detail);
+        });
+
+        app.MapPost("/api/portal/employees/{employeeId:long}/training", async (long employeeId, CreateTrainingRecordRequest request, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("TRAINING_RECORDS", "MANAGE", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (request.RequirementTypeId <= 0 || !DateOnly.TryParse(request.CompletedAt, out _))
+            {
+                return Results.BadRequest(new { message = "La renovacion enviada no es valida." });
+            }
+
+            var result = await repository.CreateEmployeeTrainingRecordAsync(employeeId, request, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return result.Code switch
+            {
+                "CREATED" => Results.Ok(result.Record),
+                "EMPLOYEE_NOT_FOUND" => Results.NotFound(new { message = "Empleado no encontrado." }),
+                "TYPE_NOT_FOUND" => Results.NotFound(new { message = "Tipo de curso/acreditacion no encontrado." }),
+                "INACTIVE_TYPE" => Results.Conflict(new { message = "No se puede registrar renovacion sobre un tipo inactivo." }),
+                "MISSING_EXPIRY" => Results.BadRequest(new { message = "La fecha de vencimiento es obligatoria para tipos sin vigencia." }),
+                "INVALID_DATE" => Results.BadRequest(new { message = "La fecha de vencimiento no puede ser anterior a la realizacion." }),
+                _ => Results.BadRequest(new { message = "La renovacion enviada no es valida." })
+            };
+        });
+
+        app.MapPost("/api/portal/training/{recordId:long}/inactivate", async (long recordId, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("TRAINING_RECORDS", "MANAGE", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var record = await repository.InactivateEmployeeTrainingRecordAsync(recordId, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return record is null ? Results.NotFound() : Results.Ok(record);
+        });
+
         app.MapGet("/api/portal/certificate-signers", async (string? status, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
         {
             var denied = await authorization.RequireAsync("CERTIFICATE_SIGNERS", "VIEW", cancellationToken);
@@ -712,6 +876,13 @@ public static class PortalEndpoints
         }
 
         return true;
+    }
+
+    private static bool IsValidTrainingRequirementTypeRequest(UpsertTrainingRequirementTypeRequest request)
+    {
+        return !string.IsNullOrWhiteSpace(request.Name)
+            && request.Category.Trim().ToUpperInvariant() is ("CURSO" or "ACREDITACION")
+            && (!request.ValidityDays.HasValue || request.ValidityDays > 0);
     }
 
     private static bool IsValidCertificatePreviewRequest(CertificatePreviewRequest request)

@@ -44,7 +44,7 @@ Cuando exista contradiccion, prevalece el orden definido en `docs/CONSTITUTION.m
 | I2 | Datos maestros e importacion | Cerrado tecnicamente: pendiente solo recorrido visual manual desktop/movil |
 | I3 | Puestos de servicio y asignaciones | Cerrado tecnicamente |
 | I4 | Certificaciones laborales | Cerrado tecnicamente |
-| I5 | Cursos y acreditaciones | Activo: Task 1 cerrada; retake Task 2 |
+| I5 | Cursos y acreditaciones | Activo: Task 9 cerrada; retake Task 10 |
 | I6 | Alertas y notificaciones | Pendiente |
 | I7 | Auditoria, dashboard y cierre piloto | Pendiente |
 
@@ -53,8 +53,8 @@ El incremento activo, sus decisiones y validaciones obligatorias deben consultar
 ## Gate Actual
 
 **Incremento activo:** I5 - Cursos y acreditaciones
-**Estado:** I4 cerrado tecnicamente; SPEC I5 y plan I5 aprobados; Task 1 cerrada
-**Implementacion:** autorizada desde Task 2 del plan I5, siguiendo TDD
+**Estado:** I4 cerrado tecnicamente; SPEC I5 y plan I5 aprobados; Task 9 cerrada
+**Implementacion:** autorizada desde Task 10 del plan I5, siguiendo TDD
 
 Documentos obligatorios para la revision:
 
@@ -113,16 +113,18 @@ ProyectoS&G/
 - I2 cerrado tecnicamente.
 - I3 cerrado tecnicamente con suite completa `Verify-SgSuperAppI3*.ps1`, build backend y build frontend correctos.
 - I4 cerrado tecnicamente con suite completa `Verify-SgSuperAppI4*.ps1`, build backend y build frontend correctos.
-- I5 Task 1 cerrada con persistencia, permisos base, contrato SQL y backend build correctos; siguiente retake autorizado en Task 2, contratos backend de tipos.
+- I5 Task 9 cerrada con persistencia, permisos base, contratos backend de tipos, renovaciones, reglas de fecha, auditoria, estados calculados, habilitacion de servicio, listado/detalle backend, cliente API/tipos frontend, UI de cumplimiento, UI de gestion TH/ADMIN y builds correctos; siguiente retake autorizado en Task 10, verificacion integral y cierre I5.
 - `graphify update .` es obligatorio despues de modificar codigo cuando la herramienta este disponible.
 
 ## Siguiente Paso Metodologico
 
-Ejecutar Task 2 del plan I5: contratos backend de tipos.
+Ejecutar Task 10 del plan I5: verificacion integral y cierre I5.
 
 Condicion de entrada:
 
-- API para administrar tipos de curso/acreditacion;
-- permisos ADMIN/TH para gestion y GERENCIA/OPERACIONES solo consulta;
-- validacion de codigo unico y vigencia opcional no negativa;
-- validar `Verify-SgSuperAppI5Types.ps1`, `Verify-SgSuperAppI5Security.ps1` y backend build.
+- suite `Verify-SgSuperAppI5*.ps1` completa;
+- backend build limpio;
+- frontend build limpio;
+- matriz final 1-20 registrada;
+- riesgos residuales documentados;
+- retake point I6 definido.

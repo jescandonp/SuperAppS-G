@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "../config";
-import type { AnnulCertificateRequest, AppModule, CertificatePreview, CertificatePreviewRequest, CertificateSigner, CertificateSignerRequest, CertificateSignerStatus, CertificateStatus, CertificateType, CreatePositionAssignmentRequest, CurrentUser, EmployeeDetail, EmployeeSummary, FinalizePositionAssignmentRequest, ImportBatchError, ImportBatchRow, ImportBatchSummary, ImportColumnMapping, ImportPrevalidationResponse, ImportRowClassification, LaborCertificate, LaborCertificateHistoryItem, LoginRequest, LoginResponse, NotificationItem, PositionAssignment, RoleCode, ServicePosition, ServicePositionRequest, ServicePositionStatus } from "../types/portal";
+import type { AnnulCertificateRequest, AppModule, CertificatePreview, CertificatePreviewRequest, CertificateSigner, CertificateSignerRequest, CertificateSignerStatus, CertificateStatus, CertificateType, CreatePositionAssignmentRequest, CreateTrainingRecordRequest, CurrentUser, EmployeeDetail, EmployeeSummary, FinalizePositionAssignmentRequest, ImportBatchError, ImportBatchRow, ImportBatchSummary, ImportColumnMapping, ImportPrevalidationResponse, ImportRowClassification, LaborCertificate, LaborCertificateHistoryItem, LoginRequest, LoginResponse, NotificationItem, PositionAssignment, RoleCode, ServicePosition, ServicePositionRequest, ServicePositionStatus, TrainingComplianceDetail, TrainingComplianceStatus, TrainingComplianceSummary, TrainingRecord, TrainingRequirementCategory, TrainingRequirementStatus, TrainingRequirementType, TrainingServiceEnablement, TrainingServiceEnablementStatus, UpsertTrainingRequirementTypeRequest } from "../types/portal";
 
 const SESSION_TOKEN_KEY = "sg.superapp.sessionToken";
 
@@ -228,6 +228,73 @@ export async function annulCertificate(certificateId: number, request: AnnulCert
 
 export async function fetchCertificateHistory(certificateId: number): Promise<LaborCertificateHistoryItem[]> {
   return getJson<LaborCertificateHistoryItem[]>(`/portal/certificates/${certificateId}/history`);
+}
+
+export async function fetchTrainingRequirementTypes(filters: { search?: string; status?: TrainingRequirementStatus; category?: TrainingRequirementCategory }): Promise<TrainingRequirementType[]> {
+  const params = new URLSearchParams();
+  if (filters.search) {
+    params.set("search", filters.search);
+  }
+  if (filters.status) {
+    params.set("status", filters.status);
+  }
+  if (filters.category) {
+    params.set("category", filters.category);
+  }
+
+  const query = params.toString();
+  return getJson<TrainingRequirementType[]>(`/portal/training-types${query ? `?${query}` : ""}`);
+}
+
+export async function fetchTrainingRequirementTypeDetail(typeId: number): Promise<TrainingRequirementType> {
+  return getJson<TrainingRequirementType>(`/portal/training-types/${typeId}`);
+}
+
+export async function createTrainingRequirementType(request: UpsertTrainingRequirementTypeRequest): Promise<TrainingRequirementType> {
+  return sendJson<TrainingRequirementType>("/portal/training-types", "POST", request);
+}
+
+export async function updateTrainingRequirementType(typeId: number, request: UpsertTrainingRequirementTypeRequest): Promise<TrainingRequirementType> {
+  return sendJson<TrainingRequirementType>(`/portal/training-types/${typeId}`, "PUT", request);
+}
+
+export async function inactivateTrainingRequirementType(typeId: number): Promise<TrainingRequirementType> {
+  return sendJson<TrainingRequirementType>(`/portal/training-types/${typeId}/inactivate`, "POST");
+}
+
+export async function createTrainingRecord(employeeId: number, request: CreateTrainingRecordRequest): Promise<TrainingRecord> {
+  return sendJson<TrainingRecord>(`/portal/employees/${employeeId}/training`, "POST", request);
+}
+
+export async function inactivateTrainingRecord(recordId: number): Promise<TrainingRecord> {
+  return sendJson<TrainingRecord>(`/portal/training/${recordId}/inactivate`, "POST");
+}
+
+export async function fetchTrainingServiceEnablement(employeeId: number): Promise<TrainingServiceEnablement> {
+  return getJson<TrainingServiceEnablement>(`/portal/employees/${employeeId}/training/enablement`);
+}
+
+export async function fetchTrainingCompliance(filters: { search?: string; typeId?: number; complianceStatus?: TrainingComplianceStatus; enablementStatus?: TrainingServiceEnablementStatus }): Promise<TrainingComplianceSummary[]> {
+  const params = new URLSearchParams();
+  if (filters.search) {
+    params.set("search", filters.search);
+  }
+  if (filters.typeId) {
+    params.set("typeId", filters.typeId.toString());
+  }
+  if (filters.complianceStatus) {
+    params.set("complianceStatus", filters.complianceStatus);
+  }
+  if (filters.enablementStatus) {
+    params.set("enablementStatus", filters.enablementStatus);
+  }
+
+  const query = params.toString();
+  return getJson<TrainingComplianceSummary[]>(`/portal/training-compliance${query ? `?${query}` : ""}`);
+}
+
+export async function fetchTrainingComplianceDetail(employeeId: number): Promise<TrainingComplianceDetail> {
+  return getJson<TrainingComplianceDetail>(`/portal/employees/${employeeId}/training-compliance`);
 }
 
 export async function downloadCertificatePdf(certificateId: number): Promise<void> {

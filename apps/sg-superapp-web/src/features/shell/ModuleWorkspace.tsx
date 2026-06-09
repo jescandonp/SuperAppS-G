@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import type { CurrentUser } from "../../types/portal";
 import { CertificatesPage } from "../certificates/CertificatesPage";
+import { CoursesPage } from "../courses/CoursesPage";
 import { EmployeesPage } from "../employees/EmployeesPage";
 import { ImportsPage } from "../imports/ImportsPage";
 import { PositionsPage } from "../positions/PositionsPage";
@@ -26,6 +27,10 @@ export function ModuleWorkspace({ user }: ModuleWorkspaceProps) {
 
   if (moduleCode === "certificates") {
     return <CertificatesPage user={user} />;
+  }
+
+  if (moduleCode === "courses") {
+    return <CoursesPage user={user} />;
   }
 
   return <div className="panel-empty">Modulo pendiente del siguiente incremento.</div>;

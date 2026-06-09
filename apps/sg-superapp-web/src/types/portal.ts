@@ -281,3 +281,103 @@ export interface LaborCertificateHistoryItem {
 export interface AnnulCertificateRequest {
   reason: string;
 }
+
+export type TrainingRequirementCategory = "CURSO" | "ACREDITACION";
+export type TrainingRequirementStatus = "ACTIVO" | "INACTIVO";
+export type TrainingComplianceStatus = "VENCIDO" | "CRITICO" | "PREVENTIVO" | "INFORMATIVO" | "AL_DIA";
+export type TrainingServiceEnablementStatus = "HABILITADO" | "NO_HABILITADO";
+export type TrainingRecordStatus = "ACTIVO" | "INACTIVO";
+
+export interface TrainingRequirementType {
+  id: number;
+  code: string | null;
+  name: string;
+  category: TrainingRequirementCategory;
+  validityDays: number | null;
+  isServiceRequired: boolean;
+  status: TrainingRequirementStatus;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpsertTrainingRequirementTypeRequest {
+  code: string | null;
+  name: string;
+  category: TrainingRequirementCategory;
+  validityDays: number | null;
+  isServiceRequired: boolean;
+  notes: string | null;
+}
+
+export interface CreateTrainingRecordRequest {
+  requirementTypeId: number;
+  completedAt: string;
+  expiresAt: string | null;
+  supportPath: string | null;
+  notes: string | null;
+}
+
+export interface TrainingRecord {
+  id: number;
+  employeeId: number;
+  requirementTypeId: number;
+  requirementTypeName: string;
+  requirementCategory: TrainingRequirementCategory;
+  completedAt: string;
+  expiresAt: string;
+  complianceStatus: TrainingComplianceStatus;
+  daysUntilExpiry: number;
+  supportPath: string | null;
+  notes: string | null;
+  status: TrainingRecordStatus;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TrainingServiceEnablement {
+  employeeId: number;
+  serviceEnablementStatus: TrainingServiceEnablementStatus;
+  blockingExpiredRequirementsCount: number;
+  calculatedAt: string;
+}
+
+export interface TrainingComplianceSummary {
+  employeeId: number;
+  identificationNumber: string;
+  fullName: string;
+  employmentStatus: "ACTIVO" | "RETIRADO";
+  jobTitle: string;
+  currentPositionName: string | null;
+  serviceEnablementStatus: TrainingServiceEnablementStatus;
+  blockingExpiredRequirementsCount: number;
+  worstComplianceStatus: TrainingComplianceStatus;
+  activeRequirementsCount: number;
+  calculatedAt: string;
+}
+
+export interface TrainingComplianceEmployee {
+  employeeId: number;
+  identificationType: "CC" | "CE";
+  identificationNumber: string;
+  fullName: string;
+  employmentStatus: "ACTIVO" | "RETIRADO";
+  jobTitle: string;
+}
+
+export interface TrainingCurrentPosition {
+  id: number;
+  name: string;
+  code: string | null;
+  clientText: string | null;
+  startDate: string;
+}
+
+export interface TrainingComplianceDetail {
+  employee: TrainingComplianceEmployee;
+  currentPosition: TrainingCurrentPosition | null;
+  serviceEnablement: TrainingServiceEnablement;
+  currentRequirements: TrainingRecord[];
+  trainingHistory: TrainingRecord[];
+}

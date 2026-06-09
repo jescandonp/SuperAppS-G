@@ -256,6 +256,11 @@ textarea {
   width: min(100%, 760px);
 }
 
+.courses-filters {
+  grid-template-columns: minmax(210px, 1.1fr) minmax(180px, 1fr) minmax(150px, 0.8fr) minmax(160px, 0.8fr);
+  width: min(100%, 900px);
+}
+
 .positions-filters button {
   min-height: 42px;
   border: 1px solid var(--border);
@@ -505,6 +510,119 @@ textarea {
   align-content: start;
 }
 
+.courses-workspace {
+  align-content: start;
+}
+
+.courses-grid {
+  grid-template-columns: minmax(0, 1.05fr) minmax(380px, 0.95fr);
+}
+
+.courses-detail-panel {
+  min-width: 0;
+}
+
+.course-detail-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.85rem;
+  align-items: flex-start;
+}
+
+.course-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.course-kpi-grid div {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 0.85rem;
+}
+
+.course-kpi-grid span {
+  display: block;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.course-kpi-grid p {
+  margin: 0.25rem 0 0;
+}
+
+.course-record-card {
+  align-items: center;
+}
+
+.training-management-panel {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.training-management-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(360px, 1.1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.training-type-list {
+  display: grid;
+  gap: 0.65rem;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.training-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.training-form label {
+  min-width: 0;
+}
+
+.training-form textarea,
+.training-form .position-form-actions {
+  grid-column: 1 / -1;
+}
+
+.inline-check {
+  align-content: center;
+  grid-template-columns: auto 1fr;
+  text-transform: none;
+  color: #f3f1ea;
+}
+
+.inline-check input {
+  width: auto;
+  min-height: auto;
+}
+
+.course-record-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.danger-action {
+  min-height: 32px;
+  border: 1px solid #ba5454;
+  border-radius: 6px;
+  background: rgba(186, 84, 84, 0.18);
+  color: #ffb3b3;
+  font-weight: 700;
+  padding: 0 0.65rem;
+  cursor: pointer;
+}
+
+.danger-action:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
 .certificates-grid {
   grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr);
 }
@@ -716,7 +834,12 @@ textarea {
   .toolbar-filters,
   .positions-filters,
   .certificates-filters,
-  .signers-grid,
+    .courses-filters,
+    .courses-grid,
+    .course-kpi-grid,
+    .training-management-grid,
+    .training-form,
+    .signers-grid,
   .certificate-form-grid,
   .import-summary-grid,
   .import-upload-controls {

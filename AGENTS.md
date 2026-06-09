@@ -12,49 +12,16 @@ Rules:
 <claude-mem-context>
 # Memory Context
 
-# [ProyectoS&G] recent context, 2026-06-05 5:59pm GMT-5
+# [ProyectoS&G] recent context, 2026-06-09 7:06am GMT-5
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (21.047t read) | 480.682t work | 96% savings
+Stats: 50 obs (20.047t read) | 503.161t work | 96% savings
 
 ### Jun 5, 2026
-1036 9:33a ✅ Task 7 Cerrada Formalmente en README y Plan I3
-1037 3:49p 🔵 PortalEndpoints.cs — Full API Surface Mapped
-1038 " 🔵 PostgresPortalRepository — Full Data Access Layer Mapped
-1039 " 🔵 Portal Contracts Directory — 19 DTOs Covering Full Domain
-1040 " 🔵 I3 Positions Verification Script — Role-Based Authorization Test Suite
-1041 3:50p 🟣 Certificate Signers CRUD Implemented — Increment I4
-1042 " 🟣 Certificate Signers REST Endpoints Wired into PortalEndpoints.cs
-1043 " 🔴 Missing CertificateSigner Helper Methods Added to PostgresPortalRepository
-1044 3:51p 🟣 I4 Verification Scripts Added — Signers CRUD and Security
-1045 " 🟣 I4 Certificate Signers Backend Compiles Clean
-1046 3:54p 🔵 GERENCIA Role Missing CERTIFICATE_SIGNERS/VIEW Permission in DB
-1047 3:55p 🔴 GERENCIA CERTIFICATE_SIGNERS/VIEW Permission Added to Seed and Contract Test
-1048 " 🔴 Seed 006 Re-Applied and I4 Persistence Contract Passed
-1049 " 🔵 I4 Clean Schema Verification Reveals Full Database Structure Including Labor Certificates Tables
-1050 3:56p 🟣 I4 Certificate Signers Backend Fully Verified — All Tests Pass
-1051 " ✅ I4 Task 2 Closed — Project Docs Advanced to Task 3 Retake Point
-1052 3:57p 🔵 LF/CRLF Line Ending Warnings Across Multiple Files on Windows
-1053 " 🔵 Git Working Tree Has 18 Modified + 55 Untracked Files Across I2/I3/I4 — None Committed
-1054 3:58p 🔵 GetEmployeeByIdAsync and Salary Versioning Available for Task 3 Certificate Preview
-1055 3:59p 🔵 Task 3 Acceptance Criteria and EmployeeDetailResponse Fields Confirmed
-1056 " 🟣 Certificate Preview Contracts and Endpoint Added — I4 Task 3
-1057 " 🟣 BuildActiveCertificatePreviewAsync Implemented in PostgresPortalRepository
-1058 4:00p 🔴 BuildCertificatePreviewError Helper Added to Complete Preview Implementation
-1059 4:01p 🟣 I4 Task 3 TDD Verification Scripts Created — ActivePreview and SalaryVariables
-1060 " 🟣 I4 Task 3 Certificate Preview Backend Compiles Clean
-1061 4:02p 🔵 employees Table Has ck_employees_dates Constraint — RETIRADO INSERT Requires termination_date
-1062 4:33p 🔵 Graphify Knowledge Graph Analysis of ProyectoS&G Corpus
-1063 " 🔵 Labor Certificates API — Endpoints, Repository Methods, and DB Schema
-1064 " 🔵 I4 Labor Certificates Implementation Plan — Tasks 6, 7, 8 Pending
-1065 " 🟣 Labor Certificate Annulment and History Endpoints Implemented (Task 6)
-1066 4:34p 🟣 ReadLaborCertificate Helper Extracts DB-to-Response Mapping in PostgresPortalRepository
-1067 " 🟣 sg-superapp-api Builds Successfully After Task 6 Annulment Implementation
-1068 4:35p 🟣 Verification Scripts for I4 Annulment and Audit Added
-1069 " 🔵 Repository Has Mixed Line Endings (LF files on Windows CRLF environment)
+1069 4:35p 🔵 Repository Has Mixed Line Endings (LF files on Windows CRLF environment)
 1070 4:36p 🟣 Task 6 Fully Verified — Annulment, Audit, and Security Scripts All Pass
 1071 " ✅ Task 6 Closed in Docs — Project Advances to Task 7 (TypeScript API Client)
 1072 4:37p 🔵 Large Volume of Uncommitted I2/I3/I4 Work Visible in git status
@@ -71,6 +38,40 @@ Stats: 50 obs (21.047t read) | 480.682t work | 96% savings
 1083 " 🔵 sg-superapp-web CSS Design System: Dark Theme with Gold Accent
 1084 4:46p 🟣 Added Certificate List and Detail Query Endpoints
 1085 4:47p 🟣 CertificatesPage: Full Certificates Module Added to sg-superapp-web (Increment I4)
+### Jun 6, 2026
+1086 9:38a 🔵 TDD Skill Configuration Available in ProyectoS&G
+1087 " 🔵 S&G Super App Knowledge Graph: 9 Communities, 183 Nodes
+1088 " 🔵 I5 Task 2 Closed — Task 3 (Renewals &amp; Date Rules) Now Active
+1089 9:39a 🟣 TDD RED Scripts Created for I5 Task 3: Renewals and Audit Verification
+1090 " 🔴 RED Phase Script Bug: Invoke-Postgres Returns Object[] Not Scalar
+1091 " 🔴 Fixed Invoke-Postgres Scalar Parsing in Both I5 Verification Scripts
+1092 9:40a 🔴 Second Invoke-Postgres Fix Needed: "INSERT 0 1" Tag Returned Instead of ID
+1093 " 🔴 Final Invoke-Postgres Fix: Numeric-First Line Selection for psql Output
+1094 " 🔵 TRUE RED Confirmed: POST /api/portal/employees/{id}/training Returns HTTP 404
+1095 9:41a 🟣 GREEN Phase: Employee Training Renewal Endpoints Implemented
+1096 9:42a 🟣 I5 Task 3 GREEN: dotnet Build Passes Clean After Training Renewal Implementation
+1097 " 🟣 I5 Task 3 GREEN Verified: All Renewals and Audit Scenarios Pass
+1098 9:43a ✅ I5 Task 3 Formally Closed in Plan, README, and Handoff Documents
+1099 9:44a 🔵 graphify Not in PATH on This Machine — Knowledge Graph Cannot Auto-Update
+1100 " 🔵 I5 Task 3 Changes Are Uncommitted — All Files in Working Tree Only
+1101 9:46a 🔵 I5 Task 4 Expiry State Thresholds Confirmed from SPEC
+1102 " 🟣 TDD RED Script Created for I5 Task 4: Expiry Status Threshold Verification
+1103 " 🔵 TRUE RED Confirmed for Task 4: complianceStatus Field Missing from TrainingRecordResponse
+1104 9:47a 🔵 ReadTrainingRecord at Line 2659 and Domain Folder Are the Implementation Targets for Task 4
+1105 " 🟣 Task 4 GREEN: TrainingComplianceStatusCalculator Implemented with Centralized Threshold Logic
+1106 " 🟣 Task 4 Build Passes: 0 Warnings, 0 Errors After Compliance Status Fields Added
+1107 " 🟣 I5 Task 4 GREEN: All 8 Expiry State Boundary Cases Pass Verification
+1108 9:48a ✅ I5 Task 4 Formally Closed — Gate Advanced to Task 5 (Service Enablement)
+1109 10:26a 🔵 I5 Task 7 Closed, Task 8 (Compliance UI) Authorized
+1110 " 🔵 ProyectoS&G Knowledge Graph: 9 Communities, 183 Nodes
+1111 " 🔵 S&G Super App Module Routing Pattern: ModuleWorkspace Switch
+1112 " 🔵 Feature Page Pattern: List+Detail Panel with Role-Based Access
+1113 " 🟣 TDD Red File Created: i5-courses-ui.red.ts
+1114 10:27a 🔵 TDD RED Confirmed: CoursesPage Build Fails as Expected
+1115 " 🔵 Training API Functions Confirmed in portalApi.ts (Lines 233–298)
+1116 " 🔵 "courses" Module Already Registered in Mock Data; No Sidebar Change Needed
+1117 10:28a 🟣 CoursesPage (I5 Task 8) Implemented and Wired into ModuleWorkspace
+1118 10:29a 🔵 Build: TypeScript Passed (GREEN), Vite Bundling Fails in Sandbox (Known Issue)
 
-Access 481k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 503k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

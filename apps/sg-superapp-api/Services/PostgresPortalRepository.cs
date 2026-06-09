@@ -11,6 +11,45 @@ namespace Sg.SuperApp.Api.Services;
 
 public sealed class PostgresPortalRepository
 {
+    private sealed class TrainingComplianceSummaryAccumulator
+    {
+        public TrainingComplianceSummaryAccumulator(long employeeId, string identificationNumber, string fullName, string employmentStatus, string jobTitle, string? currentPositionName)
+        {
+            EmployeeId = employeeId;
+            IdentificationNumber = identificationNumber;
+            FullName = fullName;
+            EmploymentStatus = employmentStatus;
+            JobTitle = jobTitle;
+            CurrentPositionName = currentPositionName;
+        }
+
+        public long EmployeeId { get; }
+        public string IdentificationNumber { get; }
+        public string FullName { get; }
+        public string EmploymentStatus { get; }
+        public string JobTitle { get; }
+        public string? CurrentPositionName { get; }
+        public int BlockingExpiredRequirementsCount { get; set; }
+        public string WorstComplianceStatus { get; set; } = "AL_DIA";
+        public int ActiveRequirementsCount { get; set; }
+
+        public TrainingComplianceSummaryResponse ToResponse(DateTimeOffset calculatedAt)
+        {
+            return new TrainingComplianceSummaryResponse(
+                EmployeeId,
+                IdentificationNumber,
+                FullName,
+                EmploymentStatus,
+                JobTitle,
+                CurrentPositionName,
+                BlockingExpiredRequirementsCount > 0 ? "NO_HABILITADO" : "HABILITADO",
+                BlockingExpiredRequirementsCount,
+                WorstComplianceStatus,
+                ActiveRequirementsCount,
+                calculatedAt);
+        }
+    }
+
     private static readonly IReadOnlyDictionary<string, (string Label, string Description, string Status)> ModuleCatalog =
         new Dictionary<string, (string Label, string Description, string Status)>(StringComparer.OrdinalIgnoreCase)
         {
@@ -436,6 +475,543 @@ public sealed class PostgresPortalRepository
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken) ? ReadCertificateSigner(reader) : null;
+    }
+
+    public async Task<IReadOnlyList<TrainingRequirementTypeResponse>> GetTrainingRequirementTypesAsync(string? search, string? status, string? category, CancellationToken cancellationToken = default)
+    {
+        const string sql = @"
+            select id, code, name, category, validity_days, is_service_required, status, notes, created_at, updated_at
+            from training_requirement_types
+            where (@search is null
+                or name ilike '%' || @search || '%'
+                or code ilike '%' || @search || '%')
+              and (@status is null or status = @status)
+              and (@category is null or category = @category)
+            order by status, category, name;";
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.Add("search", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(search) ? DBNull.Value : search.Trim();
+        command.Parameters.Add("status", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(status) ? DBNull.Value : status.Trim().ToUpperInvariant();
+        command.Parameters.Add("category", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(category) ? DBNull.Value : category.Trim().ToUpperInvariant();
+
+        var types = new List<TrainingRequirementTypeResponse>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            types.Add(ReadTrainingRequirementType(reader));
+        }
+
+        return types;
+    }
+
+    public async Task<TrainingRequirementTypeResponse?> GetTrainingRequirementTypeByIdAsync(long typeId, CancellationToken cancellationToken = default)
+    {
+        const string sql = @"
+            select id, code, name, category, validity_days, is_service_required, status, notes, created_at, updated_at
+            from training_requirement_types
+            where id = @typeId
+            limit 1;";
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("typeId", typeId);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadTrainingRequirementType(reader) : null;
+    }
+
+    public async Task<TrainingRequirementTypeResponse> CreateTrainingRequirementTypeAsync(UpsertTrainingRequirementTypeRequest request, long actorUserId, string actorUsername, CancellationToken cancellationToken = default)
+    {
+        const string insertSql = @"
+            insert into training_requirement_types (code, name, category, validity_days, is_service_required, notes)
+            values (@code, @name, @category, @validityDays, @isServiceRequired, @notes)
+            returning id;";
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(insertSql, connection, transaction);
+        AddTrainingRequirementTypeParameters(command, request);
+        var id = (long)(await command.ExecuteScalarAsync(cancellationToken)
+            ?? throw new InvalidOperationException("No fue posible crear el tipo de curso/acreditacion."));
+        await InsertAuditLogAsync(connection, transaction, actorUserId, actorUsername, "TRAINING_TYPE_CREATED", "TRAINING_TYPE", id.ToString(), "jsonb_build_object('code', @code, 'name', @name, 'category', @category, 'validityDays', @validityDays, 'isServiceRequired', @isServiceRequired)", AddTrainingRequirementTypeAuditParameters(request), cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return (await GetTrainingRequirementTypeByIdAsync(id, cancellationToken))!;
+    }
+
+    public async Task<TrainingRequirementTypeResponse?> UpdateTrainingRequirementTypeAsync(long typeId, UpsertTrainingRequirementTypeRequest request, long actorUserId, string actorUsername, CancellationToken cancellationToken = default)
+    {
+        const string updateSql = @"
+            update training_requirement_types
+            set code = @code,
+                name = @name,
+                category = @category,
+                validity_days = @validityDays,
+                is_service_required = @isServiceRequired,
+                notes = @notes,
+                updated_at = now()
+            where id = @typeId
+            returning id;";
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(updateSql, connection, transaction);
+        command.Parameters.AddWithValue("typeId", typeId);
+        AddTrainingRequirementTypeParameters(command, request);
+        var updatedId = await command.ExecuteScalarAsync(cancellationToken);
+        if (updatedId is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
+        await InsertAuditLogAsync(connection, transaction, actorUserId, actorUsername, "TRAINING_TYPE_UPDATED", "TRAINING_TYPE", typeId.ToString(), "jsonb_build_object('code', @code, 'name', @name, 'category', @category, 'validityDays', @validityDays, 'isServiceRequired', @isServiceRequired)", AddTrainingRequirementTypeAuditParameters(request), cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return await GetTrainingRequirementTypeByIdAsync(typeId, cancellationToken);
+    }
+
+    public async Task<TrainingRequirementTypeResponse?> InactivateTrainingRequirementTypeAsync(long typeId, long actorUserId, string actorUsername, CancellationToken cancellationToken = default)
+    {
+        const string sql = @"
+            update training_requirement_types
+            set status = 'INACTIVO',
+                updated_at = now()
+            where id = @typeId
+            returning id;";
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("typeId", typeId);
+        var updatedId = await command.ExecuteScalarAsync(cancellationToken);
+        if (updatedId is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
+        await InsertAuditLogAsync(connection, transaction, actorUserId, actorUsername, "TRAINING_TYPE_INACTIVATED", "TRAINING_TYPE", typeId.ToString(), "'{}'::jsonb", null, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return await GetTrainingRequirementTypeByIdAsync(typeId, cancellationToken);
+    }
+
+    public async Task<(string Code, TrainingRecordResponse? Record)> CreateEmployeeTrainingRecordAsync(long employeeId, CreateTrainingRecordRequest request, long actorUserId, string actorUsername, CancellationToken cancellationToken = default)
+    {
+        const string employeeExistsSql = "select exists (select 1 from employees where id = @employeeId);";
+        const string typeSql = @"
+            select id, name, category, validity_days, status
+            from training_requirement_types
+            where id = @typeId
+            limit 1;";
+        const string insertSql = @"
+            insert into employee_training_records (
+                employee_id,
+                requirement_type_id,
+                completed_at,
+                expires_at,
+                support_path,
+                notes,
+                created_by
+            )
+            values (
+                @employeeId,
+                @typeId,
+                @completedAt,
+                @expiresAt,
+                @supportPath,
+                @notes,
+                @createdBy
+            )
+            returning id;";
+
+        var completedAt = DateOnly.Parse(request.CompletedAt);
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        await using (var employeeCommand = new NpgsqlCommand(employeeExistsSql, connection, transaction))
+        {
+            employeeCommand.Parameters.AddWithValue("employeeId", employeeId);
+            var employeeExists = (bool)(await employeeCommand.ExecuteScalarAsync(cancellationToken) ?? false);
+            if (!employeeExists)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return ("EMPLOYEE_NOT_FOUND", null);
+            }
+        }
+
+        string typeName;
+        string typeCategory;
+        int? validityDays;
+        string typeStatus;
+        await using (var typeCommand = new NpgsqlCommand(typeSql, connection, transaction))
+        {
+            typeCommand.Parameters.AddWithValue("typeId", request.RequirementTypeId);
+            await using var reader = await typeCommand.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return ("TYPE_NOT_FOUND", null);
+            }
+
+            typeName = reader.GetString(reader.GetOrdinal("name"));
+            typeCategory = reader.GetString(reader.GetOrdinal("category"));
+            validityDays = reader.IsDBNull(reader.GetOrdinal("validity_days")) ? null : reader.GetInt32(reader.GetOrdinal("validity_days"));
+            typeStatus = reader.GetString(reader.GetOrdinal("status"));
+        }
+
+        if (typeStatus != "ACTIVO")
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return ("INACTIVE_TYPE", null);
+        }
+
+        DateOnly expiresAt;
+        if (validityDays.HasValue)
+        {
+            expiresAt = completedAt.AddDays(validityDays.Value);
+        }
+        else if (string.IsNullOrWhiteSpace(request.ExpiresAt) || !DateOnly.TryParse(request.ExpiresAt, out expiresAt))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return ("MISSING_EXPIRY", null);
+        }
+
+        if (expiresAt < completedAt)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return ("INVALID_DATE", null);
+        }
+
+        await using var insertCommand = new NpgsqlCommand(insertSql, connection, transaction);
+        insertCommand.Parameters.AddWithValue("employeeId", employeeId);
+        insertCommand.Parameters.AddWithValue("typeId", request.RequirementTypeId);
+        insertCommand.Parameters.AddWithValue("completedAt", completedAt.ToDateTime(TimeOnly.MinValue));
+        insertCommand.Parameters.AddWithValue("expiresAt", expiresAt.ToDateTime(TimeOnly.MinValue));
+        insertCommand.Parameters.Add("supportPath", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(request.SupportPath) ? DBNull.Value : request.SupportPath.Trim();
+        insertCommand.Parameters.Add("notes", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(request.Notes) ? DBNull.Value : request.Notes.Trim();
+        insertCommand.Parameters.AddWithValue("createdBy", actorUsername);
+        var recordId = (long)(await insertCommand.ExecuteScalarAsync(cancellationToken)
+            ?? throw new InvalidOperationException("No fue posible crear la renovacion."));
+
+        await InsertAuditLogAsync(
+            connection,
+            transaction,
+            actorUserId,
+            actorUsername,
+            "TRAINING_RECORD_CREATED",
+            "EMPLOYEE_TRAINING_RECORD",
+            recordId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            "jsonb_build_object('employeeId', @employeeId, 'requirementTypeId', @typeId, 'completedAt', @completedAtText, 'expiresAt', @expiresAtText, 'typeName', @typeName, 'typeCategory', @typeCategory, 'notes', @notes)",
+            command =>
+            {
+                command.Parameters.AddWithValue("employeeId", employeeId);
+                command.Parameters.AddWithValue("typeId", request.RequirementTypeId);
+                command.Parameters.AddWithValue("completedAtText", completedAt.ToString("yyyy-MM-dd"));
+                command.Parameters.AddWithValue("expiresAtText", expiresAt.ToString("yyyy-MM-dd"));
+                command.Parameters.AddWithValue("typeName", typeName);
+                command.Parameters.AddWithValue("typeCategory", typeCategory);
+                command.Parameters.Add("notes", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(request.Notes) ? DBNull.Value : request.Notes.Trim();
+            },
+            cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return ("CREATED", await GetEmployeeTrainingRecordByIdAsync(recordId, cancellationToken));
+    }
+
+    public async Task<TrainingRecordResponse?> InactivateEmployeeTrainingRecordAsync(long recordId, long actorUserId, string actorUsername, CancellationToken cancellationToken = default)
+    {
+        const string sql = @"
+            update employee_training_records
+            set status = 'INACTIVO',
+                updated_at = now()
+            where id = @recordId
+            returning id;";
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("recordId", recordId);
+        var updatedId = await command.ExecuteScalarAsync(cancellationToken);
+        if (updatedId is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
+        await InsertAuditLogAsync(connection, transaction, actorUserId, actorUsername, "TRAINING_RECORD_INACTIVATED", "EMPLOYEE_TRAINING_RECORD", recordId.ToString(System.Globalization.CultureInfo.InvariantCulture), "'{}'::jsonb", null, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return await GetEmployeeTrainingRecordByIdAsync(recordId, cancellationToken);
+    }
+
+    public async Task<TrainingRecordResponse?> GetEmployeeTrainingRecordByIdAsync(long recordId, CancellationToken cancellationToken = default)
+    {
+        const string sql = @"
+            select
+                etr.id,
+                etr.employee_id,
+                etr.requirement_type_id,
+                trt.name as requirement_type_name,
+                trt.category as requirement_category,
+                etr.completed_at,
+                etr.expires_at,
+                etr.support_path,
+                etr.notes,
+                etr.status,
+                etr.created_by,
+                etr.created_at,
+                etr.updated_at
+            from employee_training_records etr
+            join training_requirement_types trt on trt.id = etr.requirement_type_id
+            where etr.id = @recordId
+            limit 1;";
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("recordId", recordId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadTrainingRecord(reader) : null;
+    }
+
+    public async Task<TrainingServiceEnablementResponse?> GetTrainingServiceEnablementAsync(long employeeId, CancellationToken cancellationToken = default)
+    {
+        const string employeeExistsSql = "select exists (select 1 from employees where id = @employeeId);";
+        const string requiredRecordsSql = @"
+            select etr.expires_at
+            from employee_training_records etr
+            join training_requirement_types trt on trt.id = etr.requirement_type_id
+            where etr.employee_id = @employeeId
+              and etr.status = 'ACTIVO'
+              and trt.status = 'ACTIVO'
+              and trt.is_service_required = true;";
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using (var employeeCommand = new NpgsqlCommand(employeeExistsSql, connection))
+        {
+            employeeCommand.Parameters.AddWithValue("employeeId", employeeId);
+            var employeeExists = (bool)(await employeeCommand.ExecuteScalarAsync(cancellationToken) ?? false);
+            if (!employeeExists)
+            {
+                return null;
+            }
+        }
+
+        var blockingExpiredRequirementsCount = 0;
+        await using (var recordsCommand = new NpgsqlCommand(requiredRecordsSql, connection))
+        {
+            recordsCommand.Parameters.AddWithValue("employeeId", employeeId);
+            await using var reader = await recordsCommand.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var expiresAt = DateOnly.FromDateTime(reader.GetDateTime(reader.GetOrdinal("expires_at")));
+                var compliance = TrainingComplianceStatusCalculator.Calculate(expiresAt, DateOnly.FromDateTime(DateTime.Today));
+                if (compliance.Status == "VENCIDO")
+                {
+                    blockingExpiredRequirementsCount++;
+                }
+            }
+        }
+
+        return new TrainingServiceEnablementResponse(
+            employeeId,
+            blockingExpiredRequirementsCount > 0 ? "NO_HABILITADO" : "HABILITADO",
+            blockingExpiredRequirementsCount,
+            DateTimeOffset.UtcNow);
+    }
+
+    public async Task<IReadOnlyList<TrainingComplianceSummaryResponse>> GetTrainingComplianceSummariesAsync(string? search, long? typeId, string? complianceStatus, string? enablementStatus, CancellationToken cancellationToken = default)
+    {
+        const string sql = @"
+            select
+                e.id as employee_id,
+                e.identification_number,
+                e.full_name,
+                e.employment_status,
+                e.job_title,
+                current_position.position_name as current_position_name,
+                etr.expires_at,
+                trt.is_service_required
+            from employees e
+            join employee_training_records etr on etr.employee_id = e.id
+            join training_requirement_types trt on trt.id = etr.requirement_type_id
+            left join lateral (
+                select sp.name as position_name
+                from employee_position_assignments epa
+                join service_positions sp on sp.id = epa.position_id
+                where epa.employee_id = e.id
+                  and epa.status = 'VIGENTE'
+                order by epa.start_date desc, epa.id desc
+                limit 1
+            ) current_position on true
+            where etr.status = 'ACTIVO'
+              and trt.status = 'ACTIVO'
+              and (@search is null
+                or e.identification_number ilike '%' || @search || '%'
+                or e.full_name ilike '%' || @search || '%')
+              and (@typeId is null or trt.id = @typeId)
+            order by e.full_name, e.id;";
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.Add("search", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(search) ? DBNull.Value : search.Trim();
+        command.Parameters.Add("typeId", NpgsqlDbType.Bigint).Value = typeId.HasValue ? typeId.Value : DBNull.Value;
+
+        var summaries = new Dictionary<long, TrainingComplianceSummaryAccumulator>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var employeeId = reader.GetInt64(reader.GetOrdinal("employee_id"));
+            if (!summaries.TryGetValue(employeeId, out var summary))
+            {
+                summary = new TrainingComplianceSummaryAccumulator(
+                    employeeId,
+                    reader.GetString(reader.GetOrdinal("identification_number")),
+                    reader.GetString(reader.GetOrdinal("full_name")),
+                    reader.GetString(reader.GetOrdinal("employment_status")),
+                    reader.GetString(reader.GetOrdinal("job_title")),
+                    reader.IsDBNull(reader.GetOrdinal("current_position_name")) ? null : reader.GetString(reader.GetOrdinal("current_position_name")));
+                summaries.Add(employeeId, summary);
+            }
+
+            var expiresAt = DateOnly.FromDateTime(reader.GetDateTime(reader.GetOrdinal("expires_at")));
+            var compliance = TrainingComplianceStatusCalculator.Calculate(expiresAt, DateOnly.FromDateTime(DateTime.Today));
+            summary.ActiveRequirementsCount++;
+            if (GetComplianceSeverity(compliance.Status) > GetComplianceSeverity(summary.WorstComplianceStatus))
+            {
+                summary.WorstComplianceStatus = compliance.Status;
+            }
+
+            if (reader.GetBoolean(reader.GetOrdinal("is_service_required")) && compliance.Status == "VENCIDO")
+            {
+                summary.BlockingExpiredRequirementsCount++;
+            }
+        }
+
+        var normalizedComplianceStatus = string.IsNullOrWhiteSpace(complianceStatus) ? null : complianceStatus.Trim().ToUpperInvariant();
+        var normalizedEnablementStatus = string.IsNullOrWhiteSpace(enablementStatus) ? null : enablementStatus.Trim().ToUpperInvariant();
+        var calculatedAt = DateTimeOffset.UtcNow;
+
+        return summaries.Values
+            .Select(summary => summary.ToResponse(calculatedAt))
+            .Where(summary => normalizedComplianceStatus is null || summary.WorstComplianceStatus == normalizedComplianceStatus)
+            .Where(summary => normalizedEnablementStatus is null || summary.ServiceEnablementStatus == normalizedEnablementStatus)
+            .OrderBy(summary => summary.FullName)
+            .ToList();
+    }
+
+    public async Task<TrainingComplianceDetailResponse?> GetTrainingComplianceDetailAsync(long employeeId, CancellationToken cancellationToken = default)
+    {
+        const string employeeSql = @"
+            select
+                e.id,
+                e.identification_type,
+                e.identification_number,
+                e.full_name,
+                e.employment_status,
+                e.job_title,
+                current_position.position_id,
+                current_position.position_name,
+                current_position.position_code,
+                current_position.client_text,
+                current_position.start_date
+            from employees e
+            left join lateral (
+                select epa.position_id, sp.name as position_name, sp.code as position_code, sp.client_text, epa.start_date
+                from employee_position_assignments epa
+                join service_positions sp on sp.id = epa.position_id
+                where epa.employee_id = e.id
+                  and epa.status = 'VIGENTE'
+                order by epa.start_date desc, epa.id desc
+                limit 1
+            ) current_position on true
+            where e.id = @employeeId
+            limit 1;";
+        const string recordsSql = @"
+            select
+                etr.id,
+                etr.employee_id,
+                etr.requirement_type_id,
+                trt.name as requirement_type_name,
+                trt.category as requirement_category,
+                etr.completed_at,
+                etr.expires_at,
+                etr.support_path,
+                etr.notes,
+                etr.status,
+                etr.created_by,
+                etr.created_at,
+                etr.updated_at
+            from employee_training_records etr
+            join training_requirement_types trt on trt.id = etr.requirement_type_id
+            where etr.employee_id = @employeeId
+            order by
+                case when etr.status = 'ACTIVO' then 0 else 1 end,
+                etr.expires_at desc,
+                etr.id desc;";
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        TrainingComplianceEmployeeResponse employee;
+        TrainingCurrentPositionResponse? currentPosition = null;
+        await using (var employeeCommand = new NpgsqlCommand(employeeSql, connection))
+        {
+            employeeCommand.Parameters.AddWithValue("employeeId", employeeId);
+            await using var employeeReader = await employeeCommand.ExecuteReaderAsync(cancellationToken);
+            if (!await employeeReader.ReadAsync(cancellationToken))
+            {
+                return null;
+            }
+
+            employee = new TrainingComplianceEmployeeResponse(
+                employeeReader.GetInt64(employeeReader.GetOrdinal("id")),
+                employeeReader.GetString(employeeReader.GetOrdinal("identification_type")),
+                employeeReader.GetString(employeeReader.GetOrdinal("identification_number")),
+                employeeReader.GetString(employeeReader.GetOrdinal("full_name")),
+                employeeReader.GetString(employeeReader.GetOrdinal("employment_status")),
+                employeeReader.GetString(employeeReader.GetOrdinal("job_title")));
+
+            if (!employeeReader.IsDBNull(employeeReader.GetOrdinal("position_id")))
+            {
+                currentPosition = new TrainingCurrentPositionResponse(
+                    employeeReader.GetInt64(employeeReader.GetOrdinal("position_id")),
+                    employeeReader.GetString(employeeReader.GetOrdinal("position_name")),
+                    employeeReader.IsDBNull(employeeReader.GetOrdinal("position_code")) ? null : employeeReader.GetString(employeeReader.GetOrdinal("position_code")),
+                    employeeReader.IsDBNull(employeeReader.GetOrdinal("client_text")) ? null : employeeReader.GetString(employeeReader.GetOrdinal("client_text")),
+                    employeeReader.GetDateTime(employeeReader.GetOrdinal("start_date")).ToString("yyyy-MM-dd"));
+            }
+        }
+
+        var history = new List<TrainingRecordResponse>();
+        await using (var recordsCommand = new NpgsqlCommand(recordsSql, connection))
+        {
+            recordsCommand.Parameters.AddWithValue("employeeId", employeeId);
+            await using var recordsReader = await recordsCommand.ExecuteReaderAsync(cancellationToken);
+            while (await recordsReader.ReadAsync(cancellationToken))
+            {
+                history.Add(ReadTrainingRecord(recordsReader));
+            }
+        }
+
+        var enablement = await GetTrainingServiceEnablementAsync(employeeId, cancellationToken)
+            ?? new TrainingServiceEnablementResponse(employeeId, "HABILITADO", 0, DateTimeOffset.UtcNow);
+        return new TrainingComplianceDetailResponse(
+            employee,
+            currentPosition,
+            enablement,
+            history.Where(record => record.Status == "ACTIVO").ToList(),
+            history);
     }
 
     public async Task<CertificateSignerResponse> CreateCertificateSignerAsync(UpsertCertificateSignerRequest request, long actorUserId, string actorUsername, CancellationToken cancellationToken = default)
@@ -2259,6 +2835,28 @@ public sealed class PostgresPortalRepository
         };
     }
 
+    private static void AddTrainingRequirementTypeParameters(NpgsqlCommand command, UpsertTrainingRequirementTypeRequest request)
+    {
+        command.Parameters.Add("code", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(request.Code) ? DBNull.Value : request.Code.Trim();
+        command.Parameters.AddWithValue("name", request.Name.Trim());
+        command.Parameters.AddWithValue("category", request.Category.Trim().ToUpperInvariant());
+        command.Parameters.Add("validityDays", NpgsqlDbType.Integer).Value = request.ValidityDays.HasValue ? request.ValidityDays.Value : DBNull.Value;
+        command.Parameters.AddWithValue("isServiceRequired", request.IsServiceRequired);
+        command.Parameters.Add("notes", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(request.Notes) ? DBNull.Value : request.Notes.Trim();
+    }
+
+    private static Action<NpgsqlCommand> AddTrainingRequirementTypeAuditParameters(UpsertTrainingRequirementTypeRequest request)
+    {
+        return command =>
+        {
+            command.Parameters.Add("code", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(request.Code) ? DBNull.Value : request.Code.Trim();
+            command.Parameters.AddWithValue("name", request.Name.Trim());
+            command.Parameters.AddWithValue("category", request.Category.Trim().ToUpperInvariant());
+            command.Parameters.Add("validityDays", NpgsqlDbType.Integer).Value = request.ValidityDays.HasValue ? request.ValidityDays.Value : DBNull.Value;
+            command.Parameters.AddWithValue("isServiceRequired", request.IsServiceRequired);
+        };
+    }
+
     private static async Task InsertAuditLogAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
@@ -2313,6 +2911,57 @@ public sealed class PostgresPortalRepository
             reader.IsDBNull(reader.GetOrdinal("notes")) ? null : reader.GetString(reader.GetOrdinal("notes")),
             new DateTimeOffset(reader.GetFieldValue<DateTime>(reader.GetOrdinal("created_at"))),
             new DateTimeOffset(reader.GetFieldValue<DateTime>(reader.GetOrdinal("updated_at"))));
+    }
+
+    private static TrainingRequirementTypeResponse ReadTrainingRequirementType(NpgsqlDataReader reader)
+    {
+        return new TrainingRequirementTypeResponse(
+            reader.GetInt64(reader.GetOrdinal("id")),
+            reader.IsDBNull(reader.GetOrdinal("code")) ? null : reader.GetString(reader.GetOrdinal("code")),
+            reader.GetString(reader.GetOrdinal("name")),
+            reader.GetString(reader.GetOrdinal("category")),
+            reader.IsDBNull(reader.GetOrdinal("validity_days")) ? null : reader.GetInt32(reader.GetOrdinal("validity_days")),
+            reader.GetBoolean(reader.GetOrdinal("is_service_required")),
+            reader.GetString(reader.GetOrdinal("status")),
+            reader.IsDBNull(reader.GetOrdinal("notes")) ? null : reader.GetString(reader.GetOrdinal("notes")),
+            new DateTimeOffset(reader.GetFieldValue<DateTime>(reader.GetOrdinal("created_at"))),
+            new DateTimeOffset(reader.GetFieldValue<DateTime>(reader.GetOrdinal("updated_at"))));
+    }
+
+    private static TrainingRecordResponse ReadTrainingRecord(NpgsqlDataReader reader)
+    {
+        var expiresAt = DateOnly.FromDateTime(reader.GetDateTime(reader.GetOrdinal("expires_at")));
+        var compliance = TrainingComplianceStatusCalculator.Calculate(expiresAt, DateOnly.FromDateTime(DateTime.Today));
+
+        return new TrainingRecordResponse(
+            reader.GetInt64(reader.GetOrdinal("id")),
+            reader.GetInt64(reader.GetOrdinal("employee_id")),
+            reader.GetInt64(reader.GetOrdinal("requirement_type_id")),
+            reader.GetString(reader.GetOrdinal("requirement_type_name")),
+            reader.GetString(reader.GetOrdinal("requirement_category")),
+            reader.GetDateTime(reader.GetOrdinal("completed_at")).ToString("yyyy-MM-dd"),
+            expiresAt.ToString("yyyy-MM-dd"),
+            compliance.Status,
+            compliance.DaysUntilExpiry,
+            reader.IsDBNull(reader.GetOrdinal("support_path")) ? null : reader.GetString(reader.GetOrdinal("support_path")),
+            reader.IsDBNull(reader.GetOrdinal("notes")) ? null : reader.GetString(reader.GetOrdinal("notes")),
+            reader.GetString(reader.GetOrdinal("status")),
+            reader.GetString(reader.GetOrdinal("created_by")),
+            new DateTimeOffset(reader.GetFieldValue<DateTime>(reader.GetOrdinal("created_at"))),
+            new DateTimeOffset(reader.GetFieldValue<DateTime>(reader.GetOrdinal("updated_at"))));
+    }
+
+    private static int GetComplianceSeverity(string status)
+    {
+        return status switch
+        {
+            "VENCIDO" => 5,
+            "CRITICO" => 4,
+            "PREVENTIVO" => 3,
+            "INFORMATIVO" => 2,
+            "AL_DIA" => 1,
+            _ => 0
+        };
     }
 
     private static CertificatePreviewResponse BuildCertificatePreviewError(string code)

@@ -6,7 +6,7 @@
 **Metodo:** SDD - Spec-Driven Development, nivel Spec-Anchored  
 **Estado del plan:** Revisado y aprobado  
 **Fecha de aprobacion:** 2026-06-05  
-**Gate actual:** Task 1 cerrada; implementacion autorizada desde Task 2  
+**Gate actual:** Task 9 cerrada; implementacion autorizada desde Task 10  
 
 ## 1. Objetivo
 
@@ -187,16 +187,16 @@ Modulo `TRAINING`:
 
 **Aceptacion:**
 
-- [ ] ADMIN/TH crean, editan e inactivan tipos.
-- [ ] GERENCIA/OPERACIONES consultan sin editar.
-- [ ] Codigo unico se valida si se define.
-- [ ] Vigencia en dias es opcional y no negativa.
+- [x] ADMIN/TH crean, editan e inactivan tipos.
+- [x] GERENCIA/OPERACIONES consultan sin editar.
+- [x] Codigo unico se valida si se define.
+- [x] Vigencia en dias es opcional y no negativa.
 
 **Verificacion:**
 
-- [ ] `scripts/dev/Verify-SgSuperAppI5Types.ps1`
-- [ ] `scripts/dev/Verify-SgSuperAppI5Security.ps1`
-- [ ] `dotnet build`
+- [x] `scripts/dev/Verify-SgSuperAppI5Types.ps1`
+- [x] `scripts/dev/Verify-SgSuperAppI5Security.ps1`
+- [x] `dotnet build`
 
 ### Task 3 - Renovaciones y reglas de fecha
 
@@ -206,19 +206,19 @@ Modulo `TRAINING`:
 
 **Aceptacion:**
 
-- [ ] TH registra renovacion para empleado existente.
-- [ ] Tipo activo es obligatorio.
-- [ ] Vencimiento se calcula desde vigencia cuando aplica.
-- [ ] Vencimiento manual se exige cuando no hay vigencia.
-- [ ] Vencimiento anterior a realizacion se rechaza.
-- [ ] Historico no se borra.
-- [ ] Auditoria registra cambios.
+- [x] TH registra renovacion para empleado existente.
+- [x] Tipo activo es obligatorio.
+- [x] Vencimiento se calcula desde vigencia cuando aplica.
+- [x] Vencimiento manual se exige cuando no hay vigencia.
+- [x] Vencimiento anterior a realizacion se rechaza.
+- [x] Historico no se borra.
+- [x] Auditoria registra cambios.
 
 **Verificacion:**
 
-- [ ] `scripts/dev/Verify-SgSuperAppI5Renewals.ps1`
-- [ ] `scripts/dev/Verify-SgSuperAppI5Audit.ps1`
-- [ ] `dotnet build`
+- [x] `scripts/dev/Verify-SgSuperAppI5Renewals.ps1`
+- [x] `scripts/dev/Verify-SgSuperAppI5Audit.ps1`
+- [x] `dotnet build`
 
 ### Task 4 - Estados calculados
 
@@ -228,17 +228,17 @@ Modulo `TRAINING`:
 
 **Aceptacion:**
 
-- [ ] `VENCIDO` se calcula correctamente.
-- [ ] `CRITICO` se calcula correctamente.
-- [ ] `PREVENTIVO` se calcula correctamente.
-- [ ] `INFORMATIVO` se calcula correctamente.
-- [ ] `AL_DIA` se calcula correctamente.
-- [ ] Reglas quedan reutilizables por I6.
+- [x] `VENCIDO` se calcula correctamente.
+- [x] `CRITICO` se calcula correctamente.
+- [x] `PREVENTIVO` se calcula correctamente.
+- [x] `INFORMATIVO` se calcula correctamente.
+- [x] `AL_DIA` se calcula correctamente.
+- [x] Reglas quedan reutilizables por I6.
 
 **Verificacion:**
 
-- [ ] `scripts/dev/Verify-SgSuperAppI5StatusRules.ps1`
-- [ ] `dotnet build`
+- [x] `scripts/dev/Verify-SgSuperAppI5StatusRules.ps1`
+- [x] `dotnet build`
 
 ### Task 5 - Habilitacion de servicio
 
@@ -248,17 +248,17 @@ Modulo `TRAINING`:
 
 **Aceptacion:**
 
-- [ ] Obligatorio vencido marca `NO_HABILITADO`.
-- [ ] Obligatorio no vencido mantiene `HABILITADO`.
-- [ ] No obligatorio vencido no bloquea habilitacion.
-- [ ] Operaciones consulta habilitacion sin editar.
-- [ ] Gerencia consulta cumplimiento sin editar.
+- [x] Obligatorio vencido marca `NO_HABILITADO`.
+- [x] Obligatorio no vencido mantiene `HABILITADO`.
+- [x] No obligatorio vencido no bloquea habilitacion.
+- [x] Operaciones consulta habilitacion sin editar.
+- [x] Gerencia consulta cumplimiento sin editar.
 
 **Verificacion:**
 
-- [ ] `scripts/dev/Verify-SgSuperAppI5ServiceEnablement.ps1`
-- [ ] `scripts/dev/Verify-SgSuperAppI5Security.ps1`
-- [ ] `dotnet build`
+- [x] `scripts/dev/Verify-SgSuperAppI5ServiceEnablement.ps1`
+- [x] `scripts/dev/Verify-SgSuperAppI5Security.ps1`
+- [x] `dotnet build`
 
 ### Task 6 - Listado y detalle backend
 
@@ -268,15 +268,15 @@ Modulo `TRAINING`:
 
 **Aceptacion:**
 
-- [ ] Listado filtra por empleado, tipo, estado y habilitacion.
-- [ ] Detalle muestra requisitos actuales.
-- [ ] Detalle muestra historico de renovaciones.
-- [ ] Puesto actual se expone si existe.
+- [x] Listado filtra por empleado, tipo, estado y habilitacion.
+- [x] Detalle muestra requisitos actuales.
+- [x] Detalle muestra historico de renovaciones.
+- [x] Puesto actual se expone si existe.
 
 **Verificacion:**
 
-- [ ] `scripts/dev/Verify-SgSuperAppI5Queries.ps1`
-- [ ] `dotnet build`
+- [x] `scripts/dev/Verify-SgSuperAppI5Queries.ps1`
+- [x] `dotnet build`
 
 ### Task 7 - Cliente API y tipos frontend
 
@@ -286,13 +286,13 @@ Modulo `TRAINING`:
 
 **Aceptacion:**
 
-- [ ] Tipos cubren tipo, renovacion, estado y habilitacion.
-- [ ] Cliente API cubre tipos, cumplimiento, detalle y renovaciones.
-- [ ] Errores HTTP propagan mensajes backend.
+- [x] Tipos cubren tipo, renovacion, estado y habilitacion.
+- [x] Cliente API cubre tipos, cumplimiento, detalle y renovaciones.
+- [x] Errores HTTP propagan mensajes backend.
 
 **Verificacion:**
 
-- [ ] `npm run build`
+- [x] `npm run build`
 
 ### Task 8 - UI de cumplimiento
 
@@ -302,15 +302,15 @@ Modulo `TRAINING`:
 
 **Aceptacion:**
 
-- [ ] Listado filtra por empleado, tipo, estado y habilitacion.
-- [ ] Detalle muestra actuales e historico.
-- [ ] Operaciones/Gerencia consultan sin acciones.
-- [ ] UI respeta estilo dark/gold administrativo.
+- [x] Listado filtra por empleado, tipo, estado y habilitacion.
+- [x] Detalle muestra actuales e historico.
+- [x] Operaciones/Gerencia consultan sin acciones.
+- [x] UI respeta estilo dark/gold administrativo.
 
 **Verificacion:**
 
-- [ ] `npm run build`
-- [ ] `scripts/dev/Verify-SgSuperAppI5Security.ps1`
+- [x] `npm run build`
+- [x] `scripts/dev/Verify-SgSuperAppI5Security.ps1`
 
 ### Task 9 - UI de gestion TH/ADMIN
 
@@ -320,16 +320,17 @@ Modulo `TRAINING`:
 
 **Aceptacion:**
 
-- [ ] ADMIN/TH gestionan tipos.
-- [ ] ADMIN/TH registran renovaciones.
-- [ ] GERENCIA/OPERACIONES no ven acciones de edicion.
-- [ ] Errores de fechas y permisos se muestran desde backend.
+- [x] ADMIN/TH gestionan tipos.
+- [x] ADMIN/TH registran renovaciones.
+- [x] GERENCIA/OPERACIONES no ven acciones de edicion.
+- [x] Errores de fechas y permisos se muestran desde backend.
 
 **Verificacion:**
 
-- [ ] `npm run build`
-- [ ] `scripts/dev/Verify-SgSuperAppI5Types.ps1`
-- [ ] `scripts/dev/Verify-SgSuperAppI5Renewals.ps1`
+- [x] `scripts/dev/Verify-SgSuperAppI5ManagementUi.ps1`
+- [x] `npm run build`
+- [x] `scripts/dev/Verify-SgSuperAppI5Types.ps1`
+- [x] `scripts/dev/Verify-SgSuperAppI5Renewals.ps1`
 
 ### Task 10 - Verificacion integral y cierre I5
 
@@ -360,24 +361,25 @@ Modulo `TRAINING`:
 Despues de Tasks 1-2:
 
 - [x] persistencia I5 creada;
-- [ ] permisos I5 registrados;
-- [ ] tipos configurables;
-- [ ] backend build limpio.
+- [x] permisos I5 registrados;
+- [x] tipos configurables;
+- [x] backend build limpio.
 
 ### Checkpoint B - Reglas backend completas
 
 Despues de Tasks 3-6:
 
-- [ ] renovaciones funcionan;
-- [ ] estados calculados;
-- [ ] habilitacion calculada;
-- [ ] consultas por rol disponibles.
+- [x] renovaciones funcionan;
+- [x] estados calculados;
+- [x] habilitacion calculada;
+- [x] consultas por rol disponibles.
 
 ### Checkpoint C - UI y cierre
 
 Despues de Tasks 7-10:
 
-- [ ] UI operativa por rol;
+- [x] UI operativa por rol;
+- [x] UI de gestion TH/ADMIN;
 - [ ] suite completa I5 pasa;
 - [ ] matriz 1-20 registrada;
 - [ ] retake I6 definido.
@@ -450,3 +452,119 @@ Decisiones tecnicas de Gate 0:
 - Verificacion dev: migracion 007 + seed 007 aplicados sobre `sg_superapp_dev`; `scripts/dev/Verify-SgSuperAppI5Persistence.ps1` correcto.
 - Backend build: `C:\tmp\dotnet6\dotnet.exe build apps\sg-superapp-api\sg-superapp-api.csproj` correcto, 0 advertencias y 0 errores.
 - Retake point: Task 2, contratos backend de tipos.
+
+### 2026-06-06 - Task 2 contratos backend de tipos cerrada
+
+- Se crearon contratos `TrainingRequirementTypeResponse` y `UpsertTrainingRequirementTypeRequest`.
+- Se agregaron endpoints:
+  - `GET /api/portal/training-types`
+  - `GET /api/portal/training-types/{typeId}`
+  - `POST /api/portal/training-types`
+  - `PUT /api/portal/training-types/{typeId}`
+  - `POST /api/portal/training-types/{typeId}/inactivate`
+- Se agregaron metodos de repositorio para listar, consultar, crear, actualizar e inactivar tipos I5 con auditoria.
+- Se validan nombre obligatorio, categoria `CURSO`/`ACREDITACION`, vigencia positiva u opcional y codigo unico.
+- Seguridad backend: ADMIN/TH gestionan; GERENCIA/OPERACIONES consultan sin editar.
+- TDD RED: `scripts/dev/Verify-SgSuperAppI5Types.ps1` fallo inicialmente con HTTP 404 por endpoint inexistente.
+- Verificacion GREEN: `scripts/dev/Verify-SgSuperAppI5Types.ps1` correcto.
+- Verificacion GREEN: `scripts/dev/Verify-SgSuperAppI5Security.ps1` correcto.
+- Backend build: `C:\tmp\dotnet6\dotnet.exe build apps\sg-superapp-api\sg-superapp-api.csproj` correcto, 0 advertencias y 0 errores.
+- Retake point: Task 3, renovaciones y reglas de fecha.
+
+### 2026-06-06 - Task 3 renovaciones y reglas de fecha cerrada
+
+- Se crearon contratos `CreateTrainingRecordRequest` y `TrainingRecordResponse`.
+- Se agrego `POST /api/portal/employees/{employeeId}/training` para registrar renovaciones por empleado.
+- Se agrego `POST /api/portal/training/{recordId}/inactivate` para inactivar renovaciones sin borrar historico.
+- Se validan empleado existente, tipo existente y activo, fecha de realizacion valida, vencimiento manual requerido si el tipo no tiene vigencia y vencimiento no anterior a realizacion.
+- El vencimiento se calcula desde `validity_days` cuando el tipo lo define.
+- Se registra auditoria `TRAINING_RECORD_CREATED` y `TRAINING_RECORD_INACTIVATED`.
+- TDD RED: `scripts/dev/Verify-SgSuperAppI5Renewals.ps1` fallo inicialmente con HTTP 404 por endpoint inexistente.
+- Verificacion GREEN: `scripts/dev/Verify-SgSuperAppI5Renewals.ps1` correcto.
+- Verificacion GREEN: `scripts/dev/Verify-SgSuperAppI5Audit.ps1` correcto.
+- Backend build: `C:\tmp\dotnet6\dotnet.exe build apps\sg-superapp-api\sg-superapp-api.csproj` correcto, 0 advertencias y 0 errores.
+- Retake point: Task 4, estados calculados.
+
+### 2026-06-06 - Task 4 estados calculados cerrada
+
+- Se creo `TrainingComplianceStatusCalculator` para centralizar la regla de estados y reutilizarla en I6.
+- `TrainingRecordResponse` expone `complianceStatus` y `daysUntilExpiry`.
+- Los estados se calculan por dias restantes contra la fecha actual:
+  - `VENCIDO`: menor a 0 dias.
+  - `CRITICO`: 0 a 15 dias.
+  - `PREVENTIVO`: 16 a 30 dias.
+  - `INFORMATIVO`: 31 a 60 dias.
+  - `AL_DIA`: 61 dias o mas.
+- TDD RED: `scripts/dev/Verify-SgSuperAppI5StatusRules.ps1` fallo inicialmente porque `complianceStatus` no estaba expuesto.
+- Verificacion GREEN: `scripts/dev/Verify-SgSuperAppI5StatusRules.ps1` correcto.
+- Backend build: `C:\tmp\dotnet6\dotnet.exe build apps\sg-superapp-api\sg-superapp-api.csproj` correcto, 0 advertencias y 0 errores.
+- Retake point: Task 5, habilitacion de servicio.
+
+### 2026-06-06 - Task 5 habilitacion de servicio cerrada
+
+- Se creo contrato `TrainingServiceEnablementResponse`.
+- Se agrego endpoint `GET /api/portal/employees/{employeeId}/training/enablement` protegido por `TRAINING_SERVICE_ENABLEMENT/VIEW`.
+- Se implemento `GetTrainingServiceEnablementAsync` con indicador calculado, no persistido manualmente.
+- La regla bloquea servicio solo cuando existe requisito obligatorio, activo, de servicio, vencido y asociado al empleado.
+- Se reutiliza `TrainingComplianceStatusCalculator` para determinar vencimiento.
+- TDD RED: `scripts/dev/Verify-SgSuperAppI5ServiceEnablement.ps1` fallo inicialmente con HTTP 404 por endpoint inexistente.
+- Verificacion GREEN: `scripts/dev/Verify-SgSuperAppI5ServiceEnablement.ps1` correcto.
+- Verificacion GREEN: `scripts/dev/Verify-SgSuperAppI5Security.ps1` correcto.
+- Backend build: `C:\tmp\dotnet6\dotnet.exe build apps\sg-superapp-api\sg-superapp-api.csproj` correcto, 0 advertencias y 0 errores.
+- Retake point: Task 6, listado y detalle backend.
+
+### 2026-06-06 - Task 6 listado y detalle backend cerrada
+
+- Se crearon contratos `TrainingComplianceSummaryResponse`, `TrainingComplianceDetailResponse`, `TrainingComplianceEmployeeResponse` y `TrainingCurrentPositionResponse`.
+- Se agrego `GET /api/portal/training-compliance` con filtros por empleado, tipo, estado calculado y habilitacion.
+- Se agrego `GET /api/portal/employees/{employeeId}/training-compliance` con empleado, puesto actual, habilitacion, requisitos actuales e historico.
+- Se implementaron consultas por rol bajo `TRAINING_RECORDS/VIEW`; GERENCIA y OPERACIONES consultan sin acciones de edicion.
+- Se conserva la regla de estados mediante `TrainingComplianceStatusCalculator`.
+- TDD RED: `scripts/dev/Verify-SgSuperAppI5Queries.ps1` fallo inicialmente con HTTP 404 por endpoint inexistente.
+- Verificacion GREEN: `scripts/dev/Verify-SgSuperAppI5Queries.ps1` correcto.
+- Verificacion GREEN: `scripts/dev/Verify-SgSuperAppI5Security.ps1` correcto.
+- Backend build: `C:\tmp\dotnet6\dotnet.exe build apps\sg-superapp-api\sg-superapp-api.csproj` correcto, 0 advertencias y 0 errores.
+- Retake point: Task 7, cliente API y tipos frontend.
+
+### 2026-06-06 - Task 7 cliente API y tipos frontend cerrada
+
+- Se agregaron tipos TypeScript I5 en `apps/sg-superapp-web/src/types/portal.ts`.
+- Los tipos cubren tipos de requisito, renovaciones, estados calculados, habilitacion, listado de cumplimiento y detalle de cumplimiento.
+- Se agregaron funciones cliente I5 en `apps/sg-superapp-web/src/services/portalApi.ts`.
+- El cliente cubre tipos, creacion/inactivacion de renovaciones, habilitacion, listado de cumplimiento y detalle por empleado.
+- Los errores HTTP siguen propagando `message` backend mediante `getJson`/`sendJson`.
+- TDD RED: `npm run build` fallo inicialmente con exports faltantes desde un contrato temporal `src/i5-api-contract.red.ts`.
+- GREEN: `npm run build` correcto fuera del sandbox; dentro del sandbox Vite/esbuild falla con `Access is denied` al resolver `vite.config.ts`.
+- Retake point: Task 8, UI de cumplimiento.
+
+### 2026-06-06 - Task 8 UI de cumplimiento cerrada
+
+- Se agrego `CoursesPage` en `apps/sg-superapp-web/src/features/courses/CoursesPage.tsx`.
+- Se cableo el modulo `courses` en `ModuleWorkspace`.
+- La UI incluye filtros por empleado/identificacion, tipo, estado calculado y habilitacion.
+- La vista de detalle muestra empleado, puesto actual, habilitacion, KPIs, requisitos actuales e historico.
+- OPERACIONES/GERENCIA quedan como roles de consulta sin acciones de edicion.
+- Se agregaron estilos responsive dark/gold para la vista I5 sin crear un sistema visual paralelo.
+- TDD RED: `npm run build` fallo inicialmente por `CoursesPage` inexistente desde `src/i5-courses-ui.red.ts`.
+- GREEN: `npm run build` correcto fuera del sandbox; dentro del sandbox Vite/esbuild falla con `Access is denied` al resolver `vite.config.ts`.
+- Verificacion GREEN: `scripts/dev/Verify-SgSuperAppI5Security.ps1` correcto.
+- Retake point: Task 9, UI de gestion TH/ADMIN.
+
+### 2026-06-09 - Task 9 UI de gestion TH/ADMIN cerrada
+
+- Se agrego verificacion TDD `scripts/dev/Verify-SgSuperAppI5ManagementUi.ps1` para exigir marcadores de gestion visual de tipos y renovaciones en `CoursesPage`.
+- Se extendio `apps/sg-superapp-web/src/features/courses/CoursesPage.tsx` sin crear sistema visual nuevo:
+  - ADMIN/TH pueden crear/editar/inactivar tipos de curso/acreditacion.
+  - ADMIN/TH pueden registrar renovaciones por empleado.
+  - ADMIN/TH pueden inactivar renovaciones activas desde requisitos actuales.
+  - GERENCIA/OPERACIONES conservan vista de consulta sin acciones de edicion visibles.
+  - Errores de validacion/permiso se muestran desde mensajes backend propagados por el cliente API.
+- Se ajusto `CreateTrainingRecordRequest.expiresAt` en TypeScript a `string | null`, alineado con el backend para vencimiento calculado por vigencia.
+- Se agregaron estilos responsive compactos para gestion I5 en `apps/sg-superapp-web/src/styles.css`.
+- TDD RED: `scripts/dev/Verify-SgSuperAppI5ManagementUi.ps1` fallo inicialmente por marcador faltante `createTrainingRequirementType`.
+- GREEN: `scripts/dev/Verify-SgSuperAppI5ManagementUi.ps1` correcto.
+- GREEN: `npm run build` correcto en `apps/sg-superapp-web`.
+- GREEN: con API temporal en `http://localhost:5080`, `scripts/dev/Verify-SgSuperAppI5Types.ps1` correcto.
+- GREEN: con API temporal en `http://localhost:5080`, `scripts/dev/Verify-SgSuperAppI5Renewals.ps1` correcto.
+- `graphify update .` intentado y fallido porque `graphify` no esta disponible en PATH.
+- Retake point: Task 10, verificacion integral y cierre I5.
