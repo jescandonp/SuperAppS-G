@@ -6,9 +6,13 @@
 > Fuentes: Constitucion, Arquitectura, Tecnologia, Design y diseño funcional del 2026-07-19.
 > Plan tecnico: `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`
 
-El plan tecnico esta aprobado solo como hoja de ruta documental; su ejecucion
-tecnica permanece bloqueada hasta aprobar esta SPEC, el catalogo operativo y
-Gate 0.
+Estado del plan tecnico: **APROBADO COMO HOJA DE RUTA DOCUMENTAL** por decision
+del usuario. Estado de aplicacion: **EJECUCION NO AUTORIZADA**.
+
+Los pendientes de Gate 0 son exactamente: aprobacion humana de la SPEC;
+aprobacion y firma del catalogo juridico-operativo; y acto explicito de cierre de
+Gate 0. Task 2 solo puede autorizarse despues de satisfacer estas tres
+condiciones.
 
 ## 1. Objetivo
 
@@ -127,5 +131,4 @@ devuelven codigo, mensaje y razones de negocio.
 ## 11. Gate Humano Pendiente
 
 La SPEC permanece **En revision**. Task 2 y todas las tareas tecnicas estan
-bloqueadas hasta que Operaciones, Talento Humano y Juridico firmen el catalogo,
-y la autoridad del proyecto apruebe formalmente SPEC y plan.
+bloqueadas hasta cumplir las tres condiciones de Gate 0 definidas en esta SPEC.

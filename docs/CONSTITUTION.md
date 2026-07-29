@@ -104,10 +104,14 @@ catalogo juridico-operativo y Gate 0. Mientras cualquiera permanezca en revision
 o `BORRADOR_NO_EJECUTABLE`, solo se permite trabajo documental de Gate 0.
 
 Para I9, `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`
-esta aprobado solo como hoja de ruta documental; su ejecucion tecnica esta
-bloqueada hasta la aprobacion de la SPEC, el catalogo operativo y Gate 0. El
-execution log en `docs/plans/` registra evidencia y estado, pero no autoriza
-implementacion.
+tiene estado **APROBADO COMO HOJA DE RUTA DOCUMENTAL** por decision del usuario.
+El estado de su aplicacion es **EJECUCION NO AUTORIZADA**. El execution log en
+`docs/plans/` registra evidencia y estado, pero no autoriza implementacion.
+
+Los pendientes de Gate 0 son exactamente: aprobacion humana de la SPEC;
+aprobacion y firma del catalogo juridico-operativo; y acto explicito de cierre de
+Gate 0. Task 2 solo puede autorizarse despues de satisfacer estas tres
+condiciones.
 
 ## 5. Stack Y Restricciones
 

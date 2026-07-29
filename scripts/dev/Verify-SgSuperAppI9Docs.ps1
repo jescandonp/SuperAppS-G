@@ -52,6 +52,25 @@ function Assert-DocumentDoesNotContain {
     }
 }
 
+function Assert-PatternCount {
+    param(
+        [Parameter(Mandatory = $true)][string]$RelativePath,
+        [Parameter(Mandatory = $true)][string]$Pattern,
+        [Parameter(Mandatory = $true)][int]$ExpectedCount
+    )
+
+    $path = Join-Path $repoRoot $RelativePath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        return
+    }
+
+    $content = Get-Content -Raw -LiteralPath $path
+    $actualCount = [regex]::Matches($content, $Pattern).Count
+    if ($actualCount -ne $ExpectedCount) {
+        $failures.Add("$RelativePath pattern count expected $ExpectedCount but was $actualCount`: $Pattern")
+    }
+}
+
 Assert-DocumentContains 'docs/CONSTITUTION.md' @(
     '(?im)\|\s*I9\s*\|\s*Programacion asistida de turnos',
     '(?i)control humano',
@@ -61,7 +80,19 @@ Assert-DocumentContains 'docs/CONSTITUTION.md' @(
     '(?i)fuente ejecutable.*parametros operativos',
     '(?is)no\s+puede\s+contradecir.*autoridades\s+superiores',
     'docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan\.md',
-    '(?is)hoja\s+de\s+ruta\s+documental.*ejecucion\s+tecnica.*bloqueada'
+    '(?i)APROBADO COMO HOJA DE RUTA DOCUMENTAL',
+    '(?i)EJECUCION NO AUTORIZADA',
+    '(?is)aprobacion\s+humana\s+de\s+la\s+SPEC.*aprobacion\s+y\s+firma\s+del\s+catalogo.*acto\s+explicito\s+de\s+cierre\s+de\s+Gate\s+0',
+    '(?is)Task 2.*solo.*despues.*tres'
+)
+Assert-DocumentDoesNotContain 'docs/CONSTITUTION.md' @(
+    '(?i)Aprobacion humana de SPEC y plan',
+    '(?i)SPEC,\s*plan\s*y\s*catalogo.*(?:aprobad|firmad)',
+    '(?im)^>?\s*Gate 0\s*:\s*\*?\*?(Aprobad[oa]|Cerrado|Completado)',
+    '(?im)^\s*(El\s+)?Gate 0\s+(esta|queda|fue|se encuentra)\s+(aprobado|cerrado|completado)',
+    '(?im)^\s*Task 2\s*:\s*\*?\*?(Autorizada|Iniciada|En ejecucion)',
+    '(?im)^\s*Task 2\s+(esta|queda|fue|se encuentra)\s+(autorizada|iniciada|en ejecucion)',
+    '(?im)^\s*(La\s+)?ejecucion tecnica\s+(esta|queda|fue|se encuentra)\s+autorizada'
 )
 
 Assert-DocumentContains 'docs/ARCHITECTURE.md' @(
@@ -110,7 +141,10 @@ Assert-DocumentContains $specPath @(
     '(?i)exclusiones',
     '(?i)no publica.*autonom',
     'docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan\.md',
-    '(?is)aprobado.*hoja\s+de\s+ruta\s+documental.*ejecucion\s+tecnica.*bloqueada',
+    '(?i)APROBADO COMO HOJA DE RUTA DOCUMENTAL',
+    '(?i)EJECUCION NO AUTORIZADA',
+    '(?is)aprobacion\s+humana\s+de\s+la\s+SPEC.*aprobacion\s+y\s+firma\s+del\s+catalogo.*acto\s+explicito\s+de\s+cierre\s+de\s+Gate\s+0',
+    '(?is)Task 2.*solo.*despues.*tres',
     'POST\s+/api/portal/scheduling/projects/\{id\}/versions',
     'GET\s+/api/portal/scheduling/versions/\{versionId\}',
     'PUT\s+/api/portal/scheduling/versions/\{versionId\}/assignments/\{id\}',
@@ -122,8 +156,17 @@ Assert-DocumentDoesNotContain $specPath @(
     '/api/portal/scheduling/proposals/\{versionId\}',
     '(?im)^(?!.*\bno\b).*autoriza(?:r|da|do)?\s+(?:la\s+)?implementacion',
     '(?im)^\s*Implementacion\s*:\s*(autorizada|autorizado)\b',
-    '(?im)^\s*(La\s+)?implementacion\s+(queda|esta)\s+autorizad[ao]\b'
+    '(?im)^\s*(La\s+)?implementacion\s+(queda|esta)\s+autorizad[ao]\b',
+    '(?i)Aprobacion humana de SPEC y plan',
+    '(?i)SPEC,\s*plan\s*y\s*catalogo.*(?:aprobad|firmad)',
+    '(?im)^>?\s*Gate 0\s*:\s*\*?\*?(Aprobad[oa]|Cerrado|Completado)',
+    '(?im)^\s*(El\s+)?Gate 0\s+(esta|queda|fue|se encuentra)\s+(aprobado|cerrado|completado)',
+    '(?im)^\s*Task 2\s*:\s*\*?\*?(Autorizada|Iniciada|En ejecucion)',
+    '(?im)^\s*Task 2\s+(esta|queda|fue|se encuentra)\s+(autorizada|iniciada|en ejecucion)',
+    '(?im)^\s*(La\s+)?ejecucion tecnica\s+(esta|queda|fue|se encuentra)\s+autorizada'
 )
+Assert-PatternCount $specPath '(?m)^> Estado:' 1
+Assert-PatternCount $specPath '(?m)^> Estado: \*\*En revision\*\*\s*$' 1
 
 $planPath = 'docs/plans/2026-07-29-sg-superapp-i9-programacion-turnos-plan.md'
 Assert-DocumentContains $planPath @(
@@ -136,15 +179,29 @@ Assert-DocumentContains $planPath @(
     '(?i)Task 2.*bloqueada',
     '(?i)no iniciar',
     'docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan\.md',
-    '(?is)aprobado.*hoja\s+de\s+ruta\s+documental.*ejecucion\s+tecnica.*bloqueada'
+    '(?i)APROBADO COMO HOJA DE RUTA DOCUMENTAL',
+    '(?i)EJECUCION NO AUTORIZADA',
+    '(?is)aprobacion\s+humana\s+de\s+la\s+SPEC.*aprobacion\s+y\s+firma\s+del\s+catalogo.*acto\s+explicito\s+de\s+cierre\s+de\s+Gate\s+0',
+    '(?is)Task 2.*solo.*despues.*tres'
 )
 Assert-DocumentDoesNotContain $planPath @(
     '(?m)^> Estado general: \*\*(Aprobada|Aprobado|Cerrado|APROBADO_EJECUTABLE)\*\*\s*$',
     '(?m)^> Gate 0: \*\*(Aprobada|Aprobado|Cerrado|APROBADO_EJECUTABLE)\*\*\s*$',
     '(?im)^(?!.*\b(no|bloquead)\b).*autoriza(?:r|da|do)?\s+(?:la\s+)?implementacion',
     '(?im)^\s*Implementacion\s*:\s*(autorizada|autorizado)\b',
-    '(?im)^\s*(La\s+)?implementacion\s+(queda|esta)\s+autorizad[ao]\b'
+    '(?im)^\s*(La\s+)?implementacion\s+(queda|esta)\s+autorizad[ao]\b',
+    '(?i)Aprobacion humana de SPEC y plan',
+    '(?i)SPEC,\s*plan\s*y\s*catalogo.*(?:aprobad|firmad)',
+    '(?im)^>?\s*Gate 0\s*:\s*\*?\*?(Aprobad[oa]|Cerrado|Completado)',
+    '(?im)^\s*(El\s+)?Gate 0\s+(esta|queda|fue|se encuentra)\s+(aprobado|cerrado|completado)',
+    '(?im)^\s*Task 2\s*:\s*\*?\*?(Autorizada|Iniciada|En ejecucion)',
+    '(?im)^\s*Task 2\s+(esta|queda|fue|se encuentra)\s+(autorizada|iniciada|en ejecucion)',
+    '(?im)^\s*(La\s+)?ejecucion tecnica\s+(esta|queda|fue|se encuentra)\s+autorizada'
 )
+Assert-PatternCount $planPath '(?m)^> Estado general:' 1
+Assert-PatternCount $planPath '(?m)^> Estado general: \*\*En revision\*\*\s*$' 1
+Assert-PatternCount $planPath '(?m)^> Gate 0:' 1
+Assert-PatternCount $planPath '(?m)^> Gate 0: \*\*En revision\*\*\s*$' 1
 
 $catalogPath = 'docs/operations/2026-07-29-i9-catalogo-reglas-programacion.md'
 Assert-DocumentContains $catalogPath @(
@@ -159,16 +216,62 @@ Assert-DocumentContains $catalogPath @(
     '(?i)Operaciones',
     '(?i)Talento Humano',
     '(?i)Juridico',
-    '(?m)^\| Operaciones \| Pendiente \| Pendiente \| Pendiente \| Pendiente \|\s*$',
-    '(?m)^\| Talento Humano \| Pendiente \| Pendiente \| Pendiente \| Pendiente \|\s*$',
-    '(?m)^\| Juridico \| Pendiente \| Pendiente \| Pendiente \| Pendiente \|\s*$'
+    '(?m)^\| Operaciones \| Pendiente \|',
+    '(?m)^\| Talento Humano \| Pendiente \|',
+    '(?m)^\| Juridico \| Pendiente \|'
 )
 Assert-DocumentDoesNotContain $catalogPath @(
     '(?m)^> Estado: \*\*(Aprobada|Aprobado|Cerrado|APROBADO_EJECUTABLE)\*\*\s*$',
     '(?im)^(?!.*\bno\b).*autoriza(?:r|da|do)?\s+(?:la\s+)?implementacion',
     '(?im)^\s*Implementacion\s*:\s*(autorizada|autorizado)\b',
-    '(?im)^\s*(La\s+)?implementacion\s+(queda|esta)\s+autorizad[ao]\b'
+    '(?im)^\s*(La\s+)?implementacion\s+(queda|esta)\s+autorizad[ao]\b',
+    '(?im)^>?\s*Gate 0\s*:\s*\*?\*?(Aprobad[oa]|Cerrado|Completado)',
+    '(?im)^\s*(El\s+)?Gate 0\s+(esta|queda|fue|se encuentra)\s+(aprobado|cerrado|completado)',
+    '(?im)^\s*Task 2\s*:\s*\*?\*?(Autorizada|Iniciada|En ejecucion)',
+    '(?im)^\s*Task 2\s+(esta|queda|fue|se encuentra)\s+(autorizada|iniciada|en ejecucion)',
+    '(?im)^\s*(La\s+)?ejecucion tecnica\s+(esta|queda|fue|se encuentra)\s+autorizada'
 )
+Assert-PatternCount $catalogPath '(?m)^> Estado:' 1
+Assert-PatternCount $catalogPath '(?m)^> Estado: \*\*BORRADOR_NO_EJECUTABLE\*\*\s*$' 1
+
+$catalogFullPath = Join-Path $repoRoot $catalogPath
+if (Test-Path -LiteralPath $catalogFullPath -PathType Leaf) {
+    $catalogContent = Get-Content -Raw -LiteralPath $catalogFullPath
+    $signatureMatches = [regex]::Matches(
+        $catalogContent,
+        '(?m)^\|\s*(Operaciones|Talento Humano|TH|Juridico(?:/laboral)?|Juridico laboral)\s*\|\s*([^|]+)\|'
+    )
+    if ($signatureMatches.Count -ne 3) {
+        $failures.Add("$catalogPath signature row count expected 3 but was $($signatureMatches.Count)")
+    }
+
+    foreach ($expectedRole in @('Operaciones', 'TH', 'Juridico')) {
+        $roleCount = 0
+        foreach ($signatureMatch in $signatureMatches) {
+            $rawRole = $signatureMatch.Groups[1].Value
+            $normalizedRole = if ($rawRole -eq 'Operaciones') {
+                'Operaciones'
+            }
+            elseif ($rawRole -eq 'Talento Humano' -or $rawRole -eq 'TH') {
+                'TH'
+            }
+            else {
+                'Juridico'
+            }
+
+            if ($normalizedRole -eq $expectedRole) {
+                $roleCount++
+                $signatureStatus = $signatureMatch.Groups[2].Value.Trim()
+                if ($signatureStatus -ne 'Pendiente') {
+                    $failures.Add("$catalogPath signature $expectedRole status must be Pendiente but was $signatureStatus")
+                }
+            }
+        }
+        if ($roleCount -ne 1) {
+            $failures.Add("$catalogPath signature $expectedRole row count expected 1 but was $roleCount")
+        }
+    }
+}
 
 if ($failures.Count -gt 0) {
     Write-Host 'I9 DOCS FAIL'

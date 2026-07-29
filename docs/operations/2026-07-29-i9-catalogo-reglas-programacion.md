@@ -35,7 +35,7 @@ pendiente invalida la regla como entrada del motor.
 
 ## Firmas De Validacion
 
-| Area | Nombre y cargo | Decision | Fecha | Firma/evidencia |
+| Area | Estado | Nombre y cargo | Fecha | Firma/evidencia |
 |---|---|---|---|---|
 | Operaciones | Pendiente | Pendiente | Pendiente | Pendiente |
 | Talento Humano | Pendiente | Pendiente | Pendiente | Pendiente |

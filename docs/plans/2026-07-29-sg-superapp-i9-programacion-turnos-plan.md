@@ -12,14 +12,19 @@
 Este artefacto registra la apertura documental de I9. No sustituye el plan
 tecnico exacto
 `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`.
-Ese plan tecnico esta aprobado solo como hoja de ruta documental; su ejecucion
-tecnica esta bloqueada hasta aprobar la SPEC, el catalogo operativo y Gate 0.
+Estado del plan tecnico: **APROBADO COMO HOJA DE RUTA DOCUMENTAL** por decision
+del usuario. Estado de aplicacion: **EJECUCION NO AUTORIZADA**.
+
+Los pendientes de Gate 0 son exactamente: aprobacion humana de la SPEC;
+aprobacion y firma del catalogo juridico-operativo; y acto explicito de cierre de
+Gate 0. Task 2 solo puede autorizarse despues de satisfacer estas tres
+condiciones.
 
 ## Estado De Gates
 
 | Gate | Estado | Condicion pendiente |
 |---|---|---|
-| Gate 0 - autoridad documental | En revision | SPEC, plan y catalogo firmados/aprobados |
+| Gate 0 - autoridad documental | En revision | SPEC aprobada; catalogo aprobado y firmado; acto explicito de cierre |
 | Gate 1 - persistencia/configuracion | Bloqueado | Gate 0 cerrado |
 | Gate 2 - reglas/motor | Bloqueado | Catalogo ejecutable y Gate 1 |
 | Gate 3 - workflow/seguridad | Bloqueado | Gate 2 |
@@ -37,7 +42,9 @@ Estado: **En revision**.
 - [ ] Revision de Operaciones.
 - [ ] Revision de Talento Humano.
 - [ ] Revision de Juridico.
-- [ ] Aprobacion humana de SPEC y plan.
+- [ ] Aprobacion humana de la SPEC.
+- [ ] Aprobacion y firma del catalogo juridico-operativo.
+- [ ] Acto explicito de cierre de Gate 0.
 
 ## Tasks Tecnicas Bloqueadas
 
@@ -68,7 +75,7 @@ Expand-Archive -LiteralPath $archivePath -DestinationPath $redRoot
 powershell -ExecutionPolicy Bypass -File scripts/dev/Verify-SgSuperAppI9Docs.ps1 -RepositoryRoot $redRoot
 ```
 
-Resultado observado el 2026-07-29: `I9 DOCS FAIL`, exit code `1`, **35
+Resultado observado el 2026-07-29: `I9 DOCS FAIL`, exit code `1`, **38
 faltantes exactos**:
 
 1. `CONSTITUTION`: tabla I9.
@@ -79,36 +86,58 @@ faltantes exactos**:
 6. `CONSTITUTION`: catalogo como fuente ejecutable de parametros operativos.
 7. `CONSTITUTION`: prohibicion de contradecir autoridades superiores.
 8. `CONSTITUTION`: enlace al plan tecnico exacto.
-9. `CONSTITUTION`: plan como hoja de ruta con ejecucion tecnica bloqueada.
-10. `ARCHITECTURE`: modulo Programacion asistida de turnos.
-11. `ARCHITECTURE`: `PlantillaDeTurno`.
-12. `ARCHITECTURE`: `VersionDeProgramacion`.
-13. `ARCHITECTURE`: `ExcepcionDeProgramacion`.
-14. `ARCHITECTURE`: integracion I2-I3-I5-I6-I7.
-15. `TECNOLOGIA`: motor heuristico deterministico.
-16. `TECNOLOGIA`: `.NET 6`.
-17. `TECNOLOGIA`: MVP sin dependencia externa.
-18. `DESIGN`: Enterprise Sentinel.
-19. `DESIGN`: referencia `Prototipos/stitch_ecosistema_digital_unificado/sentinel_enterprise/DESIGN.md`.
-20. `DESIGN`: `#003366`.
-21. `DESIGN`: `#FFC700`.
-22. `DESIGN`: `#F8F9FA`.
-23. `DESIGN`: `#FFFFFF`.
-24. `DESIGN`: `#E1E4E8`.
-25. `DESIGN`: radios 4px-8px.
-26. `DESIGN`: Montserrat/sans para jerarquia.
-27. `DESIGN`: Arial/Inter-compatible para datos.
-28. `DESIGN`: prohibicion de landing/decoracion sin valor operativo.
-29. `DESIGN`: matriz mensual.
-30. `DESIGN`: plantillas.
-31. `DESIGN`: comparacion.
-32. `DESIGN`: excepciones.
-33. SPEC I9 ausente.
-34. Execution log I9 ausente.
-35. Catalogo de reglas I9 ausente.
+9. `CONSTITUTION`: plan aprobado como hoja de ruta documental.
+10. `CONSTITUTION`: ejecucion no autorizada.
+11. `CONSTITUTION`: tres pendientes exactos de Gate 0.
+12. `CONSTITUTION`: Task 2 solo despues de las tres condiciones.
+13. `ARCHITECTURE`: modulo Programacion asistida de turnos.
+14. `ARCHITECTURE`: `PlantillaDeTurno`.
+15. `ARCHITECTURE`: `VersionDeProgramacion`.
+16. `ARCHITECTURE`: `ExcepcionDeProgramacion`.
+17. `ARCHITECTURE`: integracion I2-I3-I5-I6-I7.
+18. `TECNOLOGIA`: motor heuristico deterministico.
+19. `TECNOLOGIA`: `.NET 6`.
+20. `TECNOLOGIA`: MVP sin dependencia externa.
+21. `DESIGN`: Enterprise Sentinel.
+22. `DESIGN`: referencia `Prototipos/stitch_ecosistema_digital_unificado/sentinel_enterprise/DESIGN.md`.
+23. `DESIGN`: `#003366`.
+24. `DESIGN`: `#FFC700`.
+25. `DESIGN`: `#F8F9FA`.
+26. `DESIGN`: `#FFFFFF`.
+27. `DESIGN`: `#E1E4E8`.
+28. `DESIGN`: radios 4px-8px.
+29. `DESIGN`: Montserrat/sans para jerarquia.
+30. `DESIGN`: Arial/Inter-compatible para datos.
+31. `DESIGN`: prohibicion de landing/decoracion sin valor operativo.
+32. `DESIGN`: matriz mensual.
+33. `DESIGN`: plantillas.
+34. `DESIGN`: comparacion.
+35. `DESIGN`: excepciones.
+36. SPEC I9 ausente.
+37. Execution log I9 ausente.
+38. Catalogo de reglas I9 ausente.
 
 La copia usada para esta observacion fue
 `C:\Users\jmep2\AppData\Local\Temp\sg-i9-red-baaf482-ba354d86c487418c992c1186b721c7e0`.
+
+### Pruebas negativas del estado GREEN
+
+Se crearon tres copias temporales independientes del estado GREEN y se ejecuto
+el verificador final con `-RepositoryRoot` despues de una mutacion por caso:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/dev/Verify-SgSuperAppI9Docs.ps1 -RepositoryRoot <raiz-caso>
+```
+
+Resultados reales observados el 2026-07-29:
+
+| Caso mutado | Raiz temporal | Resultado | Exit | Controles activados |
+|---|---|---|---:|---:|
+| `Gate 0: **Aprobado**` | `C:\Users\jmep2\AppData\Local\Temp\sg-i9-negative-green-fc73fe9bc13140c78f9b601d47b6f973-gate` | `I9 DOCS FAIL` | 1 | 4 |
+| `Task 2: Autorizada` | `C:\Users\jmep2\AppData\Local\Temp\sg-i9-negative-green-fc73fe9bc13140c78f9b601d47b6f973-task` | `I9 DOCS FAIL` | 1 | 1 |
+| Operaciones `Aprobada` y fila duplicada | `C:\Users\jmep2\AppData\Local\Temp\sg-i9-negative-green-fc73fe9bc13140c78f9b601d47b6f973-sign` | `I9 DOCS FAIL` | 1 | 5 |
+
+Las mutaciones no tocaron el repositorio ni crearon worktrees registrados.
 
 ## Retake
 
