@@ -134,6 +134,7 @@ Assert-DocumentContains $specPath @(
     '(?m)^> Estado: \*\*Aprobada\*\*\s*$',
     '(?is)aprobada.*2026-07-29.*usuario.*patrocinador funcional',
     '(?m)^> Gate: 0 cerrado; Task 2 autorizada no iniciada\s*$',
+    '(?m)^Estado de aplicacion: \*\*TASK_2_AUTORIZADA_NO_INICIADA\*\*\s*$',
     '(?i)alcance',
     '(?i)contratos funcionales',
     '(?i)estados',
@@ -164,6 +165,7 @@ Assert-DocumentDoesNotContain $specPath @(
     '(?im)^>?\s*Gate 0\s*:\s*\*?\*?(Aprobad[oa]|Cerrado|Completado)',
     '(?im)^\s*(El\s+)?Gate 0\s+(esta|queda|fue|se encuentra)\s+(aprobado|cerrado|completado)',
     '(?i)BORRADOR_NO_EJECUTABLE',
+    '(?i)EJECUCION NO AUTORIZADA',
     '(?im)^\s*Task 2\s*:\s*\*?\*?(Iniciada|En ejecucion)',
     '(?im)^\s*Task 2\s+(esta|queda|fue|se encuentra)\s+(iniciada|en ejecucion)'
 )
@@ -204,6 +206,8 @@ Assert-DocumentDoesNotContain $planPath @(
     '(?m)^\| Gate 0 - autoridad documental \| En revision \|.*SPEC aprobada.*\|\s*$',
     '(?i)SPEC,\s*plan\s*y\s*catalogo.*(?:aprobad|firmad)',
     '(?i)BORRADOR_NO_EJECUTABLE',
+    '(?is)Permanecen\s+pendientes.*catalogo.*cierre\s+de\s+Gate\s+0',
+    '(?i)EJECUCION NO AUTORIZADA',
     '(?im)^\s*Task 2\s*:\s*\*?\*?(Iniciada|En ejecucion)',
     '(?im)^\s*Task 2\s+(esta|queda|fue|se encuentra)\s+(iniciada|en ejecucion)'
 )

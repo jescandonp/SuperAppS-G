@@ -16,11 +16,8 @@ tecnico exacto
 Estado del plan tecnico: **APROBADO COMO HOJA DE RUTA DOCUMENTAL**.
 Estado de retake: **TASK 2 AUTORIZADA - NO INICIADA**.
 
-De las tres condiciones de Gate 0, la aprobacion humana de la SPEC esta
-satisfecha desde el 2026-07-29 por decision del usuario/patrocinador funcional.
-Permanecen pendientes la aprobacion y firma del catalogo juridico-operativo y el
-acto explicito de cierre de Gate 0. Task 2 solo puede autorizarse despues de
-satisfacer las tres condiciones.
+Las tres condiciones de Gate 0 estan satisfechas desde el 2026-07-29: SPEC
+aprobada, catalogo aprobado/ejecutable y cierre ejecutivo explicito.
 
 El catalogo conserva estado `APROBADO_EJECUTABLE`; las decisiones constan como
 `Aprobada`. Gate 0 queda cerrado y Task 2 autorizada, pero no iniciada.
@@ -99,9 +96,9 @@ faltantes exactos**:
 7. `CONSTITUTION`: prohibicion de contradecir autoridades superiores.
 8. `CONSTITUTION`: enlace al plan tecnico exacto.
 9. `CONSTITUTION`: plan aprobado como hoja de ruta documental.
-10. `CONSTITUTION`: ejecucion no autorizada.
-11. `CONSTITUTION`: tres pendientes exactos de Gate 0.
-12. `CONSTITUTION`: Task 2 solo despues de las tres condiciones.
+10. `CONSTITUTION`: separacion entre autorizacion y comienzo de Task 2.
+11. `CONSTITUTION`: trazabilidad de las tres condiciones de Gate 0.
+12. `CONSTITUTION`: retake tecnico autorizado y no iniciado.
 13. `ARCHITECTURE`: modulo Programacion asistida de turnos.
 14. `ARCHITECTURE`: `PlantillaDeTurno`.
 15. `ARCHITECTURE`: `VersionDeProgramacion`.

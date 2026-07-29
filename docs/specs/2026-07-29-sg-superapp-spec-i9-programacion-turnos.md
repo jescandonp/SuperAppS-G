@@ -8,7 +8,8 @@
 > Aprobacion: aprobada el 2026-07-29 por el usuario, en calidad de patrocinador funcional.
 
 Estado del plan tecnico: **APROBADO COMO HOJA DE RUTA DOCUMENTAL** por decision
-del usuario. Estado de aplicacion: **EJECUCION NO AUTORIZADA**.
+del usuario.
+Estado de aplicacion: **TASK_2_AUTORIZADA_NO_INICIADA**
 
 Las tres condiciones estan satisfechas. El catalogo queda
 `APROBADO_EJECUTABLE`; Gate 0 queda cerrado por Camilo Piedrahita, Gerente
