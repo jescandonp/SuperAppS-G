@@ -26,6 +26,17 @@ El catalogo conserva estado `BORRADOR_NO_EJECUTABLE`; las firmas de Operaciones,
 Talento Humano y Juridico/Laboral conservan estado `Pendiente`; Gate 0 conserva
 estado **En revision**.
 
+## Ruta De Validacion Del Catalogo
+
+La fuente aportada por el usuario es el organigrama S&G codigo `GH-DE-01`, fecha
+`24/07/2025`, version 4. El organigrama identifica como roles relevantes al
+Director de Operaciones, Director de Talento Humano y Asesor Juridico, pero no
+constituye aprobacion ni firma y no soporta inferir nombres o decisiones.
+
+El diligenciamiento se registra en
+`docs/operations/2026-07-29-i9-acta-validacion-gate0.md`. Los tres roles siguen
+`Pendiente`; por tanto, no cambia el estado del catalogo, Gate 0 ni Task 2.
+
 ## Estado De Gates
 
 | Gate | Estado | Condicion pendiente |

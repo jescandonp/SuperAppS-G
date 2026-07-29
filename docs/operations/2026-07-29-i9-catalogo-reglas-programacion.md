@@ -4,6 +4,17 @@
 > Fecha: 2026-07-29
 > Uso: levantamiento y validacion conjunta; no autoriza codigo ni ejecucion
 
+## Evidencia De Roles Validadores
+
+Fuente aportada por el usuario: organigrama S&G, codigo `GH-DE-01`, fecha
+`24/07/2025`, version 4. En este artefacto son visibles los roles Director de
+Operaciones, Director de Talento Humano y Asesor Juridico.
+
+El organigrama identifica los roles responsables de la ruta de validacion, pero
+no constituye aprobacion ni firma, no identifica aqui a las personas titulares
+y no permite inferir ninguna decision. Los tres roles conservan estado
+`Pendiente`.
+
 ## Regla De Uso
 
 Cada fila requiere fuente, version, severidad, parametros y firmas. Los valores
@@ -33,13 +44,16 @@ pendiente invalida la regla como entrada del motor.
 - evidencia de pruebas de borde;
 - firmas de Operaciones, Talento Humano y Juridico.
 
-## Firmas De Validacion
+## Ruta Y Firmas De Validacion
 
-| Area | Estado | Nombre y cargo | Fecha | Firma/evidencia |
-|---|---|---|---|---|
-| Operaciones | Pendiente | Pendiente | Pendiente | Pendiente |
-| Talento Humano | Pendiente | Pendiente | Pendiente | Pendiente |
-| Juridico | Pendiente | Pendiente | Pendiente | Pendiente |
+| Rol validador | Estado | Nombre | Cargo | Decision | Observaciones | Fecha | Evidencia/firma |
+|---|---|---|---|---|---|---|---|
+| Director de Operaciones | Pendiente | Pendiente | Director de Operaciones | Pendiente | Pendiente | Pendiente | Pendiente |
+| Director de Talento Humano | Pendiente | Pendiente | Director de Talento Humano | Pendiente | Pendiente | Pendiente | Pendiente |
+| Asesor Juridico | Pendiente | Pendiente | Asesor Juridico | Pendiente | Pendiente | Pendiente | Pendiente |
 
 Hasta completar estas firmas, el catalogo conserva estado
 `BORRADOR_NO_EJECUTABLE`; el Gate 0 permanece En revision.
+
+Acta para diligenciamiento:
+`docs/operations/2026-07-29-i9-acta-validacion-gate0.md`.

@@ -186,7 +186,12 @@ Assert-DocumentContains $planPath @(
     '(?is)SPEC.*aprobada.*2026-07-29.*usuario.*patrocinador funcional',
     '(?is)catalogo.*BORRADOR_NO_EJECUTABLE.*firmas.*Pendiente.*Gate 0.*En revision',
     '(?m)^\| Gate 0 - autoridad documental \| En revision \| Catalogo aprobado y firmado; acto explicito de cierre \|\s*$',
-    '(?is)Task 2.*solo.*despues.*tres'
+    '(?is)Task 2.*solo.*despues.*tres',
+    '(?i)GH-DE-01',
+    '24/07/2025',
+    '(?i)version 4',
+    '(?is)organigrama.*identifica.*roles.*no.*aprobacion.*firma',
+    'docs/operations/2026-07-29-i9-acta-validacion-gate0\.md'
 )
 Assert-DocumentDoesNotContain $planPath @(
     '(?m)^> Estado general: \*\*(Aprobada|Aprobado|Cerrado|APROBADO_EJECUTABLE)\*\*\s*$',
@@ -221,9 +226,13 @@ Assert-DocumentContains $catalogPath @(
     '(?i)Operaciones',
     '(?i)Talento Humano',
     '(?i)Juridico',
-    '(?m)^\| Operaciones \| Pendiente \|',
-    '(?m)^\| Talento Humano \| Pendiente \|',
-    '(?m)^\| Juridico \| Pendiente \|'
+    '(?i)GH-DE-01',
+    '24/07/2025',
+    '(?i)version 4',
+    '(?is)organigrama.*identifica.*roles.*no.*aprobacion.*firma',
+    '(?m)^\| Director de Operaciones \| Pendiente \|',
+    '(?m)^\| Director de Talento Humano \| Pendiente \|',
+    '(?m)^\| Asesor Juridico \| Pendiente \|'
 )
 Assert-DocumentDoesNotContain $catalogPath @(
     '(?m)^> Estado: \*\*(Aprobada|Aprobado|Cerrado|APROBADO_EJECUTABLE)\*\*\s*$',
@@ -244,27 +253,17 @@ if (Test-Path -LiteralPath $catalogFullPath -PathType Leaf) {
     $catalogContent = Get-Content -Raw -LiteralPath $catalogFullPath
     $signatureMatches = [regex]::Matches(
         $catalogContent,
-        '(?m)^\|\s*(Operaciones|Talento Humano|TH|Juridico(?:/laboral)?|Juridico laboral)\s*\|\s*([^|]+)\|'
+        '(?m)^\|\s*(Director de Operaciones|Director de Talento Humano|Asesor Juridico)\s*\|\s*([^|]+)\|'
     )
     if ($signatureMatches.Count -ne 3) {
         $failures.Add("$catalogPath signature row count expected 3 but was $($signatureMatches.Count)")
     }
 
-    foreach ($expectedRole in @('Operaciones', 'TH', 'Juridico')) {
+    foreach ($expectedRole in @('Director de Operaciones', 'Director de Talento Humano', 'Asesor Juridico')) {
         $roleCount = 0
         foreach ($signatureMatch in $signatureMatches) {
             $rawRole = $signatureMatch.Groups[1].Value
-            $normalizedRole = if ($rawRole -eq 'Operaciones') {
-                'Operaciones'
-            }
-            elseif ($rawRole -eq 'Talento Humano' -or $rawRole -eq 'TH') {
-                'TH'
-            }
-            else {
-                'Juridico'
-            }
-
-            if ($normalizedRole -eq $expectedRole) {
+            if ($rawRole -eq $expectedRole) {
                 $roleCount++
                 $signatureStatus = $signatureMatch.Groups[2].Value.Trim()
                 if ($signatureStatus -ne 'Pendiente') {
@@ -274,6 +273,54 @@ if (Test-Path -LiteralPath $catalogFullPath -PathType Leaf) {
         }
         if ($roleCount -ne 1) {
             $failures.Add("$catalogPath signature $expectedRole row count expected 1 but was $roleCount")
+        }
+    }
+}
+
+$validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
+Assert-DocumentContains $validationActPath @(
+    '(?m)^> Estado: \*\*PENDIENTE_DE_FIRMAS\*\*\s*$',
+    '(?i)GH-DE-01',
+    '24/07/2025',
+    '(?i)version 4',
+    '(?m)^El organigrama identifica roles, pero no constituye aprobacion ni firma\.',
+    '(?m)^\| Director de Operaciones \| Pendiente \|',
+    '(?m)^\| Director de Talento Humano \| Pendiente \|',
+    '(?m)^\| Asesor Juridico \| Pendiente \|',
+    '(?i)nombre',
+    '(?i)cargo',
+    '(?i)decision',
+    '(?i)observaciones',
+    '(?i)fecha',
+    '(?i)evidencia/firma',
+    'BORRADOR_NO_EJECUTABLE',
+    '(?i)Gate 0.*En revision',
+    '(?i)Task 2.*no autorizada'
+)
+Assert-DocumentDoesNotContain $validationActPath @(
+    '(?m)^> Estado: \*\*(APROBADA|FIRMADA|CERRADA)\*\*\s*$'
+)
+Assert-PatternCount $validationActPath '(?m)^> Estado:' 1
+Assert-PatternCount $validationActPath '(?m)^> Estado: \*\*PENDIENTE_DE_FIRMAS\*\*\s*$' 1
+
+$validationActFullPath = Join-Path $repoRoot $validationActPath
+if (Test-Path -LiteralPath $validationActFullPath -PathType Leaf) {
+    $validationActContent = Get-Content -Raw -LiteralPath $validationActFullPath
+    $validationRoleMatches = [regex]::Matches(
+        $validationActContent,
+        '(?m)^\|\s*(Director de Operaciones|Director de Talento Humano|Asesor Juridico)\s*\|\s*([^|]+)\|'
+    )
+    if ($validationRoleMatches.Count -ne 3) {
+        $failures.Add("$validationActPath role row count expected 3 but was $($validationRoleMatches.Count)")
+    }
+
+    foreach ($expectedRole in @('Director de Operaciones', 'Director de Talento Humano', 'Asesor Juridico')) {
+        $roleMatches = @($validationRoleMatches | Where-Object { $_.Groups[1].Value -eq $expectedRole })
+        if ($roleMatches.Count -ne 1) {
+            $failures.Add("$validationActPath role $expectedRole row count expected 1 but was $($roleMatches.Count)")
+        }
+        elseif ($roleMatches[0].Groups[2].Value.Trim() -ne 'Pendiente') {
+            $failures.Add("$validationActPath role $expectedRole status must be Pendiente")
         }
     }
 }
