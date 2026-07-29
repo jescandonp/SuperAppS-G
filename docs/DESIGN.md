@@ -23,11 +23,17 @@ La interfaz no debe sentirse como landing page comercial. Debe sentirse como una
 ### 2.1 Variante Enterprise Sentinel
 
 Para pantallas administrativas densas, incluida la programacion de turnos, se
-preserva la variante **Enterprise Sentinel** adoptada en I8.
+preserva la variante **Enterprise Sentinel** adoptada en I8 y definida en
+`Prototipos/stitch_ecosistema_digital_unificado/sentinel_enterprise/DESIGN.md`.
 
 - `#003366` es el azul institucional para navegacion, encabezados y contexto;
 - `#FFC700` se reserva para accion primaria, foco y atencion operativa;
-- superficies claras y bordes sobrios priorizan legibilidad de tablas;
+- las superficies `#F8F9FA` y `#FFFFFF`, junto con el borde `#E1E4E8`,
+  priorizan la legibilidad de tablas y reducen la fatiga visual;
+- usar radios sobrios de 4px a 8px;
+- usar Montserrat o una alternativa sans para jerarquia y
+  Arial/Inter-compatible para datos;
+- no convertir el portal en landing page ni introducir decoracion sin valor operativo;
 - el color nunca es el unico medio para comunicar estado.
 
 ## 3. Principios UX/UI

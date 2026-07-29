@@ -1,8 +1,16 @@
 [CmdletBinding()]
-param()
+param(
+    [string]$RepositoryRoot
+)
 
 $ErrorActionPreference = 'Stop'
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$defaultRepositoryRoot = Join-Path $PSScriptRoot '..\..'
+$repoRoot = if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) {
+    (Resolve-Path -LiteralPath $defaultRepositoryRoot).Path
+}
+else {
+    (Resolve-Path -LiteralPath $RepositoryRoot).Path
+}
 $failures = [System.Collections.Generic.List[string]]::new()
 
 function Assert-DocumentContains {
@@ -48,8 +56,16 @@ Assert-DocumentContains 'docs/TECNOLOGIA.md' @(
 
 Assert-DocumentContains 'docs/DESIGN.md' @(
     '(?i)Enterprise Sentinel',
+    'Prototipos/stitch_ecosistema_digital_unificado/sentinel_enterprise/DESIGN\.md',
     '#003366',
     '#FFC700',
+    '#F8F9FA',
+    '#FFFFFF',
+    '#E1E4E8',
+    '(?i)4px.*8px',
+    '(?i)Montserrat.*sans.*jerarquia',
+    '(?i)Arial/Inter-compatible.*datos',
+    '(?i)landing page.*decoracion.*valor operativo',
     '(?i)matriz mensual',
     '(?i)plantillas',
     '(?i)comparacion',
