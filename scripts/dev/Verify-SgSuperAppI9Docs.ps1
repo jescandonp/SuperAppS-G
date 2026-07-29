@@ -82,11 +82,12 @@ Assert-DocumentContains 'docs/CONSTITUTION.md' @(
     'docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan\.md',
     '(?i)APROBADO COMO HOJA DE RUTA DOCUMENTAL',
     '(?i)EJECUCION NO AUTORIZADA',
-    '(?is)aprobacion\s+humana\s+de\s+la\s+SPEC.*aprobacion\s+y\s+firma\s+del\s+catalogo.*acto\s+explicito\s+de\s+cierre\s+de\s+Gate\s+0',
+    '(?is)SPEC.*condicion\s+satisfecha.*pendientes.*aprobacion\s+y\s+firma\s+del\s+catalogo.*acto\s+explicito\s+de\s+cierre\s+de\s+Gate\s+0',
     '(?is)Task 2.*solo.*despues.*tres'
 )
 Assert-DocumentDoesNotContain 'docs/CONSTITUTION.md' @(
     '(?i)Aprobacion humana de SPEC y plan',
+    '(?is)pendientes\s+de\s+Gate\s+0.*aprobacion\s+humana\s+de\s+la\s+SPEC',
     '(?i)SPEC,\s*plan\s*y\s*catalogo.*(?:aprobad|firmad)',
     '(?im)^>?\s*Gate 0\s*:\s*\*?\*?(Aprobad[oa]|Cerrado|Completado)',
     '(?im)^\s*(El\s+)?Gate 0\s+(esta|queda|fue|se encuentra)\s+(aprobado|cerrado|completado)',
@@ -184,6 +185,7 @@ Assert-DocumentContains $planPath @(
     '(?i)EJECUCION NO AUTORIZADA',
     '(?is)SPEC.*aprobada.*2026-07-29.*usuario.*patrocinador funcional',
     '(?is)catalogo.*BORRADOR_NO_EJECUTABLE.*firmas.*Pendiente.*Gate 0.*En revision',
+    '(?m)^\| Gate 0 - autoridad documental \| En revision \| Catalogo aprobado y firmado; acto explicito de cierre \|\s*$',
     '(?is)Task 2.*solo.*despues.*tres'
 )
 Assert-DocumentDoesNotContain $planPath @(
@@ -193,6 +195,7 @@ Assert-DocumentDoesNotContain $planPath @(
     '(?im)^\s*Implementacion\s*:\s*(autorizada|autorizado)\b',
     '(?im)^\s*(La\s+)?implementacion\s+(queda|esta)\s+autorizad[ao]\b',
     '(?i)Aprobacion humana de SPEC y plan',
+    '(?m)^\| Gate 0 - autoridad documental \| En revision \|.*SPEC aprobada.*\|\s*$',
     '(?i)SPEC,\s*plan\s*y\s*catalogo.*(?:aprobad|firmad)',
     '(?im)^>?\s*Gate 0\s*:\s*\*?\*?(Aprobad[oa]|Cerrado|Completado)',
     '(?im)^\s*(El\s+)?Gate 0\s+(esta|queda|fue|se encuentra)\s+(aprobado|cerrado|completado)',

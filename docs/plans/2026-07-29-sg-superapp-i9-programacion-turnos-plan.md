@@ -30,7 +30,7 @@ estado **En revision**.
 
 | Gate | Estado | Condicion pendiente |
 |---|---|---|
-| Gate 0 - autoridad documental | En revision | SPEC aprobada; catalogo aprobado y firmado; acto explicito de cierre |
+| Gate 0 - autoridad documental | En revision | Catalogo aprobado y firmado; acto explicito de cierre |
 | Gate 1 - persistencia/configuracion | Bloqueado | Gate 0 cerrado |
 | Gate 2 - reglas/motor | Bloqueado | Catalogo ejecutable y Gate 1 |
 | Gate 3 - workflow/seguridad | Bloqueado | Gate 2 |

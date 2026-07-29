@@ -99,19 +99,21 @@ comparar alternativas y explicar excepciones. Toda aprobacion y publicacion qued
 bajo control humano y requiere una accion explicita, autorizada y auditada. El
 motor no aprueba ni publica de forma autonoma o automatica.
 
-La entrada a tareas tecnicas de I9 exige aprobacion humana de la SPEC, el
-catalogo juridico-operativo y Gate 0. Mientras cualquiera permanezca en revision
-o `BORRADOR_NO_EJECUTABLE`, solo se permite trabajo documental de Gate 0.
+La aprobacion humana de la SPEC I9 es una condicion satisfecha desde el
+2026-07-29. Para entrar a tareas tecnicas permanecen pendientes la aprobacion y
+firma del catalogo juridico-operativo y el acto explicito de cierre de Gate 0.
+Mientras el catalogo permanezca `BORRADOR_NO_EJECUTABLE` o Gate 0 permanezca en
+revision, solo se permite trabajo documental.
 
 Para I9, `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`
 tiene estado **APROBADO COMO HOJA DE RUTA DOCUMENTAL** por decision del usuario.
 El estado de su aplicacion es **EJECUCION NO AUTORIZADA**. El execution log en
 `docs/plans/` registra evidencia y estado, pero no autoriza implementacion.
 
-Los pendientes de Gate 0 son exactamente: aprobacion humana de la SPEC;
-aprobacion y firma del catalogo juridico-operativo; y acto explicito de cierre de
-Gate 0. Task 2 solo puede autorizarse despues de satisfacer estas tres
-condiciones.
+De las tres condiciones de Gate 0, la SPEC es condicion satisfecha. Los
+pendientes son exactamente la aprobacion y firma del catalogo
+juridico-operativo y el acto explicito de cierre de Gate 0. Task 2 solo puede
+autorizarse despues de satisfacer las tres condiciones.
 
 ## 5. Stack Y Restricciones
 
