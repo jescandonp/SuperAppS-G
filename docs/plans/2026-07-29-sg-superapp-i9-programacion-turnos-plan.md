@@ -17,7 +17,9 @@ Estado del plan tecnico: **APROBADO COMO HOJA DE RUTA DOCUMENTAL**.
 Estado de retake: **TASK 2 AUTORIZADA - NO INICIADA**.
 
 Las tres condiciones de Gate 0 estan satisfechas desde el 2026-07-29: SPEC
-aprobada, catalogo aprobado/ejecutable y cierre ejecutivo explicito.
+aprobada, catalogo aprobado para parametrizacion y cierre ejecutivo explicito.
+El catalogo no es ejecutable por el motor mientras sus campos obligatorios
+permanezcan incompletos o sin validar.
 
 El catalogo conserva estado `APROBADO_PARA_PARAMETRIZACION`; las decisiones constan como
 `Aprobada`. Gate 0 queda cerrado y Task 2 autorizada, pero no iniciada.
@@ -38,7 +40,7 @@ Piedrahita, Gerente General, realiza el cierre ejecutivo.
 
 | Gate / Retake | Estado | Condiciones cumplidas / proxima condicion |
 |---|---|---|
-| Gate 0 - autoridad documental | Cerrado | Catalogo aprobado y firmado; cierre ejecutivo registrado |
+| Gate 0 - autoridad documental | Cerrado | Catalogo aprobado para parametrizacion y firmado; no ejecutable; cierre ejecutivo registrado |
 | Gate 1 / Task 2 - persistencia/configuracion | Autorizada_no_iniciada | Proxima condicion: ejecutar Task 2 bajo TDD; sin ejecucion registrada |
 | Gate 2 - reglas/motor | Bloqueado | Proxima condicion: completar y validar parametros de las 7 reglas |
 | Gate 3 - workflow/seguridad | Bloqueado | Proxima condicion: cerrar Gate 2 |
@@ -92,7 +94,8 @@ faltantes exactos**:
 3. `CONSTITUTION`: prohibicion de aprobacion/publicacion autonoma.
 4. `CONSTITUTION`: jerarquia de `docs/operations/`.
 5. `CONSTITUTION`: subordinacion del catalogo a las autoridades SDD.
-6. `CONSTITUTION`: catalogo como fuente ejecutable de parametros operativos.
+6. `CONSTITUTION`: catalogo como fuente de parametros operativos, no ejecutable
+   hasta completar y validar sus campos obligatorios.
 7. `CONSTITUTION`: prohibicion de contradecir autoridades superiores.
 8. `CONSTITUTION`: enlace al plan tecnico exacto.
 9. `CONSTITUTION`: plan aprobado como hoja de ruta documental.

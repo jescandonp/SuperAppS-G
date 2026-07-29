@@ -49,8 +49,10 @@ reprogramacion asistida, exportacion y auditoria.
 
 La jerarquia es: norma colombiana validada por Juridico, politica S&G aprobada,
 condicion contractual versionada y parametros del proyecto. El catalogo operativo
-es la unica fuente ejecutable cuando tenga decisiones aprobadas y version
-vigente. El catalogo I9 cumple esa condicion desde el 2026-07-29.
+solo podra convertirse en fuente ejecutable cuando tenga decisiones aprobadas,
+version vigente y todos los campos obligatorios completos y validados. El
+catalogo I9 mantiene pendiente esa condicion hasta completar valores, unidades,
+vigencia, alcance, mensajes, responsable y pruebas.
 
 Las reglas se clasifican como `BLOQUEANTE`, `SUBSANABLE` o `INFORMATIVA`.
 Jornada, descanso, cruces, novedades, ubicacion, requisitos y desviaciones deben

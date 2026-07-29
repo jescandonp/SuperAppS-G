@@ -143,6 +143,7 @@ Assert-DocumentContains $specPath @(
     '(?i)criterios de aceptacion',
     '(?i)exclusiones',
     '(?is)catalogo.*no\s+(?:es\s+)?ejecutable.*valores.*unidades.*vigencia.*alcance.*mensajes.*responsable.*pruebas',
+    '(?is)catalogo\s+I9.*pendiente.*valores.*unidades.*vigencia.*alcance.*mensajes.*responsable.*pruebas',
     '(?i)no publica.*autonom',
     'docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan\.md',
     '(?i)APROBADO COMO HOJA DE RUTA DOCUMENTAL',
@@ -157,6 +158,8 @@ Assert-DocumentContains $specPath @(
 )
 Assert-DocumentDoesNotContain $specPath @(
     '(?m)^> Estado: \*\*(En revision|Aprobado|Cerrado|APROBADO_EJECUTABLE)\*\*\s*$',
+    '(?is)catalogo\s+I9\s+cumple\s+esa\s+condicion',
+    '(?is)catalogo.*fuente\s+ejecutable.*cumple\s+esa\s+condicion',
     '/api/portal/scheduling/proposals/\{versionId\}',
     '(?im)^(?!.*\bno\b).*autoriza(?:r|da|do)?\s+(?:la\s+)?implementacion',
     '(?im)^\s*Implementacion\s*:\s*(autorizada|autorizado)\b',
@@ -189,7 +192,7 @@ Assert-DocumentContains $planPath @(
     '(?is)SPEC.*aprobada.*2026-07-29.*usuario.*patrocinador funcional',
     '(?is)catalogo.*APROBADO_PARA_PARAMETRIZACION.*decisiones.*Aprobada',
     '(?m)^\| Gate / Retake \| Estado \| Condiciones cumplidas / proxima condicion \|\s*$',
-    '(?m)^\| Gate 0 - autoridad documental \| Cerrado \| Catalogo aprobado y firmado; cierre ejecutivo registrado \|\s*$',
+    '(?m)^\| Gate 0 - autoridad documental \| Cerrado \| Catalogo aprobado para parametrizacion y firmado; no ejecutable; cierre ejecutivo registrado \|\s*$',
     '(?m)^\| Gate 1 / Task 2 - persistencia/configuracion \| Autorizada_no_iniciada \| Proxima condicion: ejecutar Task 2 bajo TDD; sin ejecucion registrada \|\s*$',
     '(?m)^\| Gate 2 - reglas/motor \| Bloqueado \| Proxima condicion: completar y validar parametros de las 7 reglas \|\s*$',
     '(?is)Task 2.*autorizada.*no iniciada',
@@ -203,6 +206,8 @@ Assert-DocumentContains $planPath @(
 Assert-DocumentDoesNotContain $planPath @(
     '(?m)^> Estado general: \*\*En revision\*\*\s*$',
     '(?m)^> Gate 0: \*\*En revision\*\*\s*$',
+    '(?i)catalogo\s+aprobado/ejecutable',
+    '(?m)^\| Gate 0 - autoridad documental \| Cerrado \| Catalogo aprobado y firmado;',
     '(?m)^\| Gate \| Estado \| Condicion pendiente \|\s*$',
     '(?m)^\| Gate 1 - persistencia/configuracion \| Bloqueado \| Gate 0 cerrado \|\s*$',
     '(?im)^(?!.*\b(no|bloquead)\b).*autoriza(?:r|da|do)?\s+(?:la\s+)?implementacion',
