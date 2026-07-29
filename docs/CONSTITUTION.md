@@ -49,6 +49,8 @@ El piloto se ejecuta por incrementos:
 | I5 | Cursos y acreditaciones |
 | I6 | Alertas y notificaciones |
 | I7 | Auditoria, dashboard y cierre piloto |
+| I8 | Consolidacion operativa y experiencia Sentinel Enterprise |
+| I9 | Programacion asistida de turnos |
 
 La SPEC 00 define el orden y reglas iniciales: `docs/specs/2026-05-21-sg-superapp-spec-00-arquitectura-incrementos.md`.
 
@@ -71,7 +73,7 @@ Incluye:
 Excluye:
 
 - guardas como usuarios del portal;
-- programacion automatica de turnos;
+- programacion autonoma de turnos;
 - bloqueo automatico de asignaciones;
 - modulo completo de novedades;
 - inventario funcional;
@@ -80,6 +82,16 @@ Excluye:
 - nomina como integracion obligatoria;
 - WhatsApp;
 - analitica predictiva o IA avanzada.
+
+I9 autoriza la **programacion asistida de turnos** como incremento posterior al
+piloto base. El sistema puede validar reglas, generar propuestas deterministicas,
+comparar alternativas y explicar excepciones. Toda aprobacion y publicacion queda
+bajo control humano y requiere una accion explicita, autorizada y auditada. El
+motor no aprueba ni publica de forma autonoma o automatica.
+
+La entrada a tareas tecnicas de I9 exige aprobacion humana de la SPEC, el plan y
+el catalogo juridico-operativo. Mientras cualquiera permanezca en revision o
+`BORRADOR_NO_EJECUTABLE`, solo se permite trabajo documental de Gate 0.
 
 ## 5. Stack Y Restricciones
 
@@ -99,6 +111,10 @@ Excluye:
 - Estados de cursos/acreditaciones deben calcularse por reglas, no por texto manual.
 - Notificaciones por rol deben registrar quien las atiende.
 - Novedades se modela como evento transversal, pero no se implementa completo en el MVP.
+- La programacion asistida consume datos maestros y reglas versionadas, conserva
+  snapshots de cada propuesta y separa generar, revisar, aprobar y publicar.
+- Una version publicada es inmutable; cualquier ajuste posterior crea una nueva
+  version trazable.
 
 ## 7. Reglas UX/UI
 
