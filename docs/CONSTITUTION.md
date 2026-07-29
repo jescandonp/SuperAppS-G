@@ -100,7 +100,9 @@ bajo control humano y requiere una accion explicita, autorizada y auditada. El
 motor no aprueba ni publica de forma autonoma o automatica.
 
 Las tres condiciones de Gate 0 quedaron satisfechas el 2026-07-29: SPEC
-aprobada, catalogo `APROBADO_EJECUTABLE` y cierre ejecutivo explicito. El usuario
+aprobada, catalogo `APROBADO_PARA_PARAMETRIZACION` y cierre ejecutivo explicito.
+Gate 0 queda cerrado, pero el catalogo no es ejecutable por el motor hasta
+completar y validar sus parametros. El usuario
 confirma a Jorge Guzman por Operaciones; Carolina Rodriguez Russi por Talento
 Humano y Juridica; y Camilo Piedrahita, Gerente General, para el cierre.
 

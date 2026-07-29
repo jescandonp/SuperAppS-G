@@ -1,6 +1,6 @@
 # Catalogo I9 De Reglas De Programacion
 
-> Estado: **APROBADO_EJECUTABLE**
+> Estado: **APROBADO_PARA_PARAMETRIZACION**
 > Fecha: 2026-07-29
 > Uso: levantamiento y validacion conjunta; no autoriza codigo ni ejecucion
 
@@ -16,19 +16,24 @@ explicita del usuario en esta conversacion del 2026-07-29.
 
 ## Regla De Uso
 
+El catalogo no es ejecutable por el motor hasta completar y validar valores,
+unidades, vigencia, alcance, mensajes, responsable y pruebas de cada regla. La
+aprobacion permite avanzar Task 2 para realizar esa parametrizacion sin inventar
+valores juridicos.
+
 Cada fila requiere fuente, version, severidad, parametros y firmas. Los valores
 legales numericos se diligencian solo con validacion de Juridico. Un campo
 pendiente invalida la regla como entrada del motor.
 
 | ID | Familia | Proposito verificable | Fuente/parametro pendiente | Severidad propuesta | Evidencia esperada | Estado |
 |---|---|---|---|---|---|---|
-| I9-R01 | Jornada maxima | Impedir o advertir que la carga acumulada exceda el limite aplicable | Norma/politica, periodo de calculo y valor por validar antes de codificar | Aprobada | Snapshot de turnos y acumulado | APROBADO_EJECUTABLE |
-| I9-R02 | Descanso minimo | Validar intervalo entre fin e inicio de turnos consecutivos | Norma/politica y valor por validar antes de codificar | Aprobada | Turnos anterior y propuesto | APROBADO_EJECUTABLE |
-| I9-R03 | Cruces | Bloquear solapamientos temporales del mismo guarda | Definicion operativa de bordes y traslados | Aprobada | Intervalos comparados | APROBADO_EJECUTABLE |
-| I9-R04 | Novedades | Excluir o advertir indisponibilidad por novedad vigente | Tipos, estados y prioridad por parametrizar sin inventar valores | Aprobada | Novedad fuente y vigencia | APROBADO_EJECUTABLE |
-| I9-R05 | Ubicacion | Evaluar compatibilidad territorial y tiempo de traslado | Zonas y criterio operativo por parametrizar sin inventar valores | Aprobada | Puestos, zonas y fuente | APROBADO_EJECUTABLE |
-| I9-R06 | Requisitos | Verificar cursos, acreditaciones y condiciones del puesto | Catalogo I3/I5 y tratamiento versionado | Aprobada | Requisito y habilitacion | APROBADO_EJECUTABLE |
-| I9-R07 | Desviacion de plantilla | Detectar cambios frente al ciclo aprobado y exigir motivo | Tolerancias y autorizador parametrizados antes de codificar | Aprobada | Plantilla, celda y motivo | APROBADO_EJECUTABLE |
+| I9-R01 | Jornada maxima | Impedir o advertir que la carga acumulada exceda el limite aplicable | Norma/politica, periodo de calculo y valor por validar antes de codificar | Aprobada | Snapshot de turnos y acumulado | APROBADA_PARA_PARAMETRIZACION |
+| I9-R02 | Descanso minimo | Validar intervalo entre fin e inicio de turnos consecutivos | Norma/politica y valor por validar antes de codificar | Aprobada | Turnos anterior y propuesto | APROBADA_PARA_PARAMETRIZACION |
+| I9-R03 | Cruces | Bloquear solapamientos temporales del mismo guarda | Definicion operativa de bordes y traslados | Aprobada | Intervalos comparados | APROBADA_PARA_PARAMETRIZACION |
+| I9-R04 | Novedades | Excluir o advertir indisponibilidad por novedad vigente | Tipos, estados y prioridad por parametrizar sin inventar valores | Aprobada | Novedad fuente y vigencia | APROBADA_PARA_PARAMETRIZACION |
+| I9-R05 | Ubicacion | Evaluar compatibilidad territorial y tiempo de traslado | Zonas y criterio operativo por parametrizar sin inventar valores | Aprobada | Puestos, zonas y fuente | APROBADA_PARA_PARAMETRIZACION |
+| I9-R06 | Requisitos | Verificar cursos, acreditaciones y condiciones del puesto | Catalogo I3/I5 y tratamiento versionado | Aprobada | Requisito y habilitacion | APROBADA_PARA_PARAMETRIZACION |
+| I9-R07 | Desviacion de plantilla | Detectar cambios frente al ciclo aprobado y exigir motivo | Tolerancias y autorizador parametrizados antes de codificar | Aprobada | Plantilla, celda y motivo | APROBADA_PARA_PARAMETRIZACION |
 
 ## Campos Obligatorios Por Regla Antes De Activarla
 
@@ -51,7 +56,7 @@ pendiente invalida la regla como entrada del motor.
 | Director de Talento Humano | Aprobada | Carolina Rodriguez Russi | Talento Humano y Juridica | Aprobada | Confirmada por el usuario | 2026-07-29 | Confirmacion explicita del usuario en esta conversacion; sin firma manuscrita ni documento externo |
 | Asesor Juridico | Aprobada | Carolina Rodriguez Russi | Talento Humano y Juridica | Aprobada | Confirmada por el usuario | 2026-07-29 | Confirmacion explicita del usuario en esta conversacion; sin firma manuscrita ni documento externo |
 
-El catalogo queda `APROBADO_EJECUTABLE`; no se atribuye firma manuscrita ni
+El catalogo queda `APROBADO_PARA_PARAMETRIZACION`; no se atribuye firma manuscrita ni
 documento externo.
 
 Acta para diligenciamiento:

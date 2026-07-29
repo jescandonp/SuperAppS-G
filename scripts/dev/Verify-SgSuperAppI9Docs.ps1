@@ -83,7 +83,7 @@ Assert-DocumentContains 'docs/CONSTITUTION.md' @(
     '(?i)APROBADO COMO HOJA DE RUTA DOCUMENTAL',
     '(?i)TASK 2 AUTORIZADA',
     '(?i)NO INICIADA',
-    '(?is)catalogo.*APROBADO_EJECUTABLE.*Gate 0.*cerrado',
+    '(?is)catalogo.*APROBADO_PARA_PARAMETRIZACION.*Gate 0.*cerrado',
     '(?is)Camilo\s+Piedrahita.*Gerente\s+General.*cierre',
     '(?is)Carolina\s+Rodriguez\s+Russi.*Talento\s+Humano\s+y\s+Juridica',
     '(?is)Jorge\s+Guzman.*Operaciones'
@@ -142,10 +142,11 @@ Assert-DocumentContains $specPath @(
     '(?i)API conceptual',
     '(?i)criterios de aceptacion',
     '(?i)exclusiones',
+    '(?is)catalogo.*no\s+(?:es\s+)?ejecutable.*valores.*unidades.*vigencia.*alcance.*mensajes.*responsable.*pruebas',
     '(?i)no publica.*autonom',
     'docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan\.md',
     '(?i)APROBADO COMO HOJA DE RUTA DOCUMENTAL',
-    'APROBADO_EJECUTABLE',
+    'APROBADO_PARA_PARAMETRIZACION',
     '(?is)Gate 0.*cerrado.*Camilo Piedrahita.*Gerente General',
     '(?is)Task 2.*autorizada.*no iniciada',
     'POST\s+/api/portal/scheduling/projects/\{id\}/versions',
@@ -186,10 +187,11 @@ Assert-DocumentContains $planPath @(
     '(?i)TASK 2 AUTORIZADA',
     '(?i)NO INICIADA',
     '(?is)SPEC.*aprobada.*2026-07-29.*usuario.*patrocinador funcional',
-    '(?is)catalogo.*APROBADO_EJECUTABLE.*decisiones.*Aprobada',
+    '(?is)catalogo.*APROBADO_PARA_PARAMETRIZACION.*decisiones.*Aprobada',
     '(?m)^\| Gate / Retake \| Estado \| Condiciones cumplidas / proxima condicion \|\s*$',
     '(?m)^\| Gate 0 - autoridad documental \| Cerrado \| Catalogo aprobado y firmado; cierre ejecutivo registrado \|\s*$',
     '(?m)^\| Gate 1 / Task 2 - persistencia/configuracion \| Autorizada_no_iniciada \| Proxima condicion: ejecutar Task 2 bajo TDD; sin ejecucion registrada \|\s*$',
+    '(?m)^\| Gate 2 - reglas/motor \| Bloqueado \| Proxima condicion: completar y validar parametros de las 7 reglas \|\s*$',
     '(?is)Task 2.*autorizada.*no iniciada',
     '(?is)Camilo\s+Piedrahita.*Gerente\s+General.*cierre',
     '(?i)GH-DE-01',
@@ -222,7 +224,7 @@ Assert-PatternCount $planPath '(?m)^> Gate 0: \*\*Cerrado\*\*\s*$' 1
 
 $catalogPath = 'docs/operations/2026-07-29-i9-catalogo-reglas-programacion.md'
 Assert-DocumentContains $catalogPath @(
-    '(?m)^> Estado: \*\*APROBADO_EJECUTABLE\*\*\s*$',
+    '(?m)^> Estado: \*\*APROBADO_PARA_PARAMETRIZACION\*\*\s*$',
     '(?i)jornada maxima',
     '(?i)descanso minimo',
     '(?i)cruces',
@@ -230,6 +232,7 @@ Assert-DocumentContains $catalogPath @(
     '(?i)ubicacion',
     '(?i)requisitos',
     '(?i)desviacion',
+    '(?is)no\s+(?:es\s+)?ejecutable.*valores.*unidades.*vigencia.*alcance.*mensajes.*responsable.*pruebas',
     '(?i)Operaciones',
     '(?i)Talento Humano',
     '(?i)Juridico',
@@ -243,6 +246,7 @@ Assert-DocumentContains $catalogPath @(
 )
 Assert-DocumentDoesNotContain $catalogPath @(
     '(?m)^> Estado: \*\*BORRADOR_NO_EJECUTABLE\*\*\s*$',
+    '(?i)APROBADO_EJECUTABLE',
     '(?im)^(?!.*\bno\b).*autoriza(?:r|da|do)?\s+(?:la\s+)?implementacion',
     '(?im)^\s*Implementacion\s*:\s*(autorizada|autorizado)\b',
     '(?im)^\s*(La\s+)?implementacion\s+(queda|esta)\s+autorizad[ao]\b',
@@ -251,7 +255,7 @@ Assert-DocumentDoesNotContain $catalogPath @(
     '(?i)(firma manuscrita adjunta|documento externo adjunto)'
 )
 Assert-PatternCount $catalogPath '(?m)^> Estado:' 1
-Assert-PatternCount $catalogPath '(?m)^> Estado: \*\*APROBADO_EJECUTABLE\*\*\s*$' 1
+Assert-PatternCount $catalogPath '(?m)^> Estado: \*\*APROBADO_PARA_PARAMETRIZACION\*\*\s*$' 1
 
 $catalogFullPath = Join-Path $repoRoot $catalogPath
 if (Test-Path -LiteralPath $catalogFullPath -PathType Leaf) {
@@ -280,6 +284,24 @@ if (Test-Path -LiteralPath $catalogFullPath -PathType Leaf) {
             $failures.Add("$catalogPath signature $expectedRole row count expected 1 but was $roleCount")
         }
     }
+
+    $ruleMatches = [regex]::Matches(
+        $catalogContent,
+        '(?m)^\|\s*(I9-R0[1-7])\s*\|(?:[^|]*\|){5}\s*([^|]+)\|\s*$'
+    )
+    if ($ruleMatches.Count -ne 7) {
+        $failures.Add("$catalogPath rule row count expected 7 but was $($ruleMatches.Count)")
+    }
+    foreach ($ruleNumber in 1..7) {
+        $ruleId = 'I9-R0' + $ruleNumber
+        $matchesForRule = @($ruleMatches | Where-Object { $_.Groups[1].Value -eq $ruleId })
+        if ($matchesForRule.Count -ne 1) {
+            $failures.Add("$catalogPath rule $ruleId row count expected 1 but was $($matchesForRule.Count)")
+        }
+        elseif ($matchesForRule[0].Groups[2].Value.Trim() -ne 'APROBADA_PARA_PARAMETRIZACION') {
+            $failures.Add("$catalogPath rule $ruleId must be APROBADA_PARA_PARAMETRIZACION")
+        }
+    }
 }
 
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
@@ -298,7 +320,7 @@ Assert-DocumentContains $validationActPath @(
     '(?i)observaciones',
     '(?i)fecha',
     '(?i)evidencia/firma',
-    'APROBADO_EJECUTABLE',
+    'APROBADO_PARA_PARAMETRIZACION',
     '(?i)Gate 0.*Cerrado',
     '(?i)Task 2.*autorizada.*no iniciada',
     '(?is)Camilo Piedrahita.*Gerente General.*cierre',
@@ -308,6 +330,8 @@ Assert-DocumentContains $validationActPath @(
 Assert-DocumentDoesNotContain $validationActPath @(
     '(?m)^> Estado: \*\*PENDIENTE_DE_FIRMAS\*\*\s*$',
     '(?i)BORRADOR_NO_EJECUTABLE',
+    '(?i)APROBADO_EJECUTABLE',
+    '(?i)APROBADO_EJECUTABLE',
     '(?im)^\s*Task 2\s*:\s*\*?\*?(Iniciada|En ejecucion)',
     '(?im)^\s*Task 2\s+(esta|queda|fue|se encuentra)\s+(iniciada|en ejecucion)',
     '(?i)evidencia/firma\s*:\s*(firma manuscrita|documento externo)'

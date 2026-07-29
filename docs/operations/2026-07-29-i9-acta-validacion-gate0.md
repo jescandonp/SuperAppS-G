@@ -15,10 +15,13 @@ aporta nombres de titulares para esta acta ni permite inferir decisiones.
 
 ## 2. Estado Confirmado
 
-- Catalogo: `APROBADO_EJECUTABLE`.
+- Catalogo: `APROBADO_PARA_PARAMETRIZACION`.
 - Gate 0: **Cerrado**.
 - Task 2: autorizada y no iniciada.
 - Evidencia: confirmacion explicita del usuario en esta conversacion.
+
+La aprobacion habilita parametrizacion. No habilita ejecucion por el motor hasta
+completar valores, unidades, vigencia, alcance, mensajes, responsable y pruebas.
 
 ## 3. Validaciones
 

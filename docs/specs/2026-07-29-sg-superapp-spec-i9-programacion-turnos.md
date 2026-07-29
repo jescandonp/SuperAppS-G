@@ -12,9 +12,12 @@ del usuario.
 Estado de aplicacion: **TASK_2_AUTORIZADA_NO_INICIADA**
 
 Las tres condiciones estan satisfechas. El catalogo queda
-`APROBADO_EJECUTABLE`; Gate 0 queda cerrado por Camilo Piedrahita, Gerente
+`APROBADO_PARA_PARAMETRIZACION`; Gate 0 queda cerrado por Camilo Piedrahita, Gerente
 General, segun confirmacion explicita del usuario. Task 2 queda autorizada y no
 iniciada.
+
+El catalogo no es ejecutable por el motor hasta completar y validar valores,
+unidades, vigencia, alcance, mensajes, responsable y pruebas de cada regla.
 
 ## 1. Objetivo
 

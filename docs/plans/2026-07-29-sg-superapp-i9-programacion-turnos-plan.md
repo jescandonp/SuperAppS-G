@@ -19,7 +19,7 @@ Estado de retake: **TASK 2 AUTORIZADA - NO INICIADA**.
 Las tres condiciones de Gate 0 estan satisfechas desde el 2026-07-29: SPEC
 aprobada, catalogo aprobado/ejecutable y cierre ejecutivo explicito.
 
-El catalogo conserva estado `APROBADO_EJECUTABLE`; las decisiones constan como
+El catalogo conserva estado `APROBADO_PARA_PARAMETRIZACION`; las decisiones constan como
 `Aprobada`. Gate 0 queda cerrado y Task 2 autorizada, pero no iniciada.
 
 ## Ruta De Validacion Del Catalogo
@@ -40,7 +40,7 @@ Piedrahita, Gerente General, realiza el cierre ejecutivo.
 |---|---|---|
 | Gate 0 - autoridad documental | Cerrado | Catalogo aprobado y firmado; cierre ejecutivo registrado |
 | Gate 1 / Task 2 - persistencia/configuracion | Autorizada_no_iniciada | Proxima condicion: ejecutar Task 2 bajo TDD; sin ejecucion registrada |
-| Gate 2 - reglas/motor | Bloqueado | Proxima condicion: cerrar Gate 1 |
+| Gate 2 - reglas/motor | Bloqueado | Proxima condicion: completar y validar parametros de las 7 reglas |
 | Gate 3 - workflow/seguridad | Bloqueado | Proxima condicion: cerrar Gate 2 |
 | Gate 4 - exportaciones/UI | Bloqueado | Proxima condicion: cerrar Gate 3 |
 | Gate 5 - piloto/cierre | Bloqueado | Proxima condicion: cerrar Gate 4 |
@@ -53,7 +53,7 @@ Estado: **Cerrado**.
 - [x] Constitucion, Arquitectura, Tecnologia y Design alineados con I9.
 - [x] SPEC formal creada.
 - [x] SPEC aprobada el 2026-07-29 por el usuario/patrocinador funcional.
-- [x] Catalogo juridico-operativo `APROBADO_EJECUTABLE`.
+- [x] Catalogo juridico-operativo `APROBADO_PARA_PARAMETRIZACION`.
 - [x] Validacion Operaciones: Jorge Guzman.
 - [x] Validacion Talento Humano y Juridica: Carolina Rodriguez Russi.
 - [x] Cierre ejecutivo: Camilo Piedrahita, Gerente General.
@@ -142,9 +142,11 @@ Resultados reales observados el 2026-07-29:
 
 | Caso mutado | Raiz temporal | Resultado | Exit | Controles activados |
 |---|---|---|---:|---:|
-| `Gate 0: **Aprobado**` | `C:\Users\jmep2\AppData\Local\Temp\sg-i9-negative-green-fc73fe9bc13140c78f9b601d47b6f973-gate` | `I9 DOCS FAIL` | 1 | 4 |
-| `Task 2: Autorizada` | `C:\Users\jmep2\AppData\Local\Temp\sg-i9-negative-green-fc73fe9bc13140c78f9b601d47b6f973-task` | `I9 DOCS FAIL` | 1 | 1 |
-| Operaciones `Aprobada` y fila duplicada | `C:\Users\jmep2\AppData\Local\Temp\sg-i9-negative-green-fc73fe9bc13140c78f9b601d47b6f973-sign` | `I9 DOCS FAIL` | 1 | 5 |
+| Task 2 iniciada prematuramente | Copia temporal aislada | `I9 DOCS FAIL` | 1 | 1 |
+| Gate 0 revertido a abierto | Copia temporal aislada | `I9 DOCS FAIL` | 1 | 1 |
+| Catalogo en borrador o inconsistente | Copia temporal aislada | `I9 DOCS FAIL` | 1 | 1 |
+| Mapeo o evidencia documental alterados | Copia temporal aislada | `I9 DOCS FAIL` | 1 | 1 |
+| Regla incompleta marcada `APROBADO_EJECUTABLE` | Copia temporal aislada | `I9 DOCS FAIL` | 1 | 2 |
 
 Las mutaciones no tocaron el repositorio ni crearon worktrees registrados.
 
