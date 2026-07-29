@@ -298,7 +298,16 @@ Assert-DocumentContains $validationActPath @(
     '(?i)Task 2.*no autorizada'
 )
 Assert-DocumentDoesNotContain $validationActPath @(
-    '(?m)^> Estado: \*\*(APROBADA|FIRMADA|CERRADA)\*\*\s*$'
+    '(?m)^> Estado: \*\*(APROBADA|FIRMADA|CERRADA)\*\*\s*$',
+    '(?im)^>?\s*Gate 0\s*:\s*\*?\*?(Aprobad[oa]|Cerrado|Completado)',
+    '(?im)^\s*(El\s+)?Gate 0\s+(esta|queda|fue|se encuentra)\s+(aprobado|cerrado|completado)',
+    '(?im)^\s*Task 2\s*:\s*\*?\*?(Autorizada|Iniciada|En ejecucion)',
+    '(?im)^\s*Task 2\s+(esta|queda|fue|se encuentra)\s+(autorizada|iniciada|en ejecucion)',
+    '(?im)^\s*(La\s+)?ejecucion( tecnica)?\s+(esta|queda|fue|se encuentra)\s+autorizada',
+    '(?im)^\s*Catalogo\s*:\s*\*?\*?(APROBADO|FIRMADO|APROBADO_EJECUTABLE)',
+    '(?im)^\s*(El\s+)?catalogo\s+(esta|queda|fue|se encuentra)\s+(aprobado|firmado)',
+    '(?im)^\s*Firmas\s*:\s*\*?\*?(Completadas|Aprobadas|Firmadas)',
+    '(?im)^\s*Las\s+firmas\s+(estan|quedan|fueron|se encuentran)\s+(completadas|aprobadas|firmadas)'
 )
 Assert-PatternCount $validationActPath '(?m)^> Estado:' 1
 Assert-PatternCount $validationActPath '(?m)^> Estado: \*\*PENDIENTE_DE_FIRMAS\*\*\s*$' 1
@@ -308,7 +317,7 @@ if (Test-Path -LiteralPath $validationActFullPath -PathType Leaf) {
     $validationActContent = Get-Content -Raw -LiteralPath $validationActFullPath
     $validationRoleMatches = [regex]::Matches(
         $validationActContent,
-        '(?m)^\|\s*(Director de Operaciones|Director de Talento Humano|Asesor Juridico)\s*\|\s*([^|]+)\|'
+        '(?m)^\|\s*(Director de Operaciones|Director de Talento Humano|Asesor Juridico)\s*\|\s*([^|]*)\|\s*([^|]*)\|\s*([^|]*)\|\s*([^|]*)\|\s*([^|]*)\|\s*([^|]*)\|\s*([^|]*)\|\s*$'
     )
     if ($validationRoleMatches.Count -ne 3) {
         $failures.Add("$validationActPath role row count expected 3 but was $($validationRoleMatches.Count)")
@@ -321,6 +330,19 @@ if (Test-Path -LiteralPath $validationActFullPath -PathType Leaf) {
         }
         elseif ($roleMatches[0].Groups[2].Value.Trim() -ne 'Pendiente') {
             $failures.Add("$validationActPath role $expectedRole status must be Pendiente")
+        }
+        else {
+            foreach ($field in @(
+                @{ Name = 'Nombre'; Group = 3 },
+                @{ Name = 'Decision'; Group = 5 },
+                @{ Name = 'Observaciones'; Group = 6 },
+                @{ Name = 'Fecha'; Group = 7 },
+                @{ Name = 'Evidencia/Firma'; Group = 8 }
+            )) {
+                if (-not [string]::IsNullOrWhiteSpace($roleMatches[0].Groups[$field.Group].Value)) {
+                    $failures.Add("$validationActPath role $expectedRole field $($field.Name) must be empty while status is Pendiente")
+                }
+            }
         }
     }
 }
