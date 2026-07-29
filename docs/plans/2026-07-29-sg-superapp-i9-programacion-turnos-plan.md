@@ -1,8 +1,8 @@
 # Execution Log I9 - Gate 0 - Programacion Asistida De Turnos
 
 > Tipo: **Execution log documental de Gate 0**
-> Estado general: **En revision**
-> Gate 0: **En revision**
+> Estado general: **Gate 0 cerrado - Task 2 autorizada no iniciada**
+> Gate 0: **Cerrado**
 > Fecha de apertura: 2026-07-29
 > SPEC: `docs/specs/2026-07-29-sg-superapp-spec-i9-programacion-turnos.md`
 > Plan tecnico: `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`
@@ -13,8 +13,8 @@
 Este artefacto registra la apertura documental de I9. No sustituye el plan
 tecnico exacto
 `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`.
-Estado del plan tecnico: **APROBADO COMO HOJA DE RUTA DOCUMENTAL** por decision
-del usuario. Estado de aplicacion: **EJECUCION NO AUTORIZADA**.
+Estado del plan tecnico: **APROBADO COMO HOJA DE RUTA DOCUMENTAL**.
+Estado de retake: **TASK 2 AUTORIZADA - NO INICIADA**.
 
 De las tres condiciones de Gate 0, la aprobacion humana de la SPEC esta
 satisfecha desde el 2026-07-29 por decision del usuario/patrocinador funcional.
@@ -22,9 +22,8 @@ Permanecen pendientes la aprobacion y firma del catalogo juridico-operativo y el
 acto explicito de cierre de Gate 0. Task 2 solo puede autorizarse despues de
 satisfacer las tres condiciones.
 
-El catalogo conserva estado `BORRADOR_NO_EJECUTABLE`; las firmas de Operaciones,
-Talento Humano y Juridico/Laboral conservan estado `Pendiente`; Gate 0 conserva
-estado **En revision**.
+El catalogo conserva estado `APROBADO_EJECUTABLE`; las decisiones constan como
+`Aprobada`. Gate 0 queda cerrado y Task 2 autorizada, pero no iniciada.
 
 ## Ruta De Validacion Del Catalogo
 
@@ -33,15 +32,16 @@ La fuente aportada por el usuario es el organigrama S&G codigo `GH-DE-01`, fecha
 Director de Operaciones, Director de Talento Humano y Asesor Juridico, pero no
 constituye aprobacion ni firma y no soporta inferir nombres o decisiones.
 
-El diligenciamiento se registra en
-`docs/operations/2026-07-29-i9-acta-validacion-gate0.md`. Los tres roles siguen
-`Pendiente`; por tanto, no cambia el estado del catalogo, Gate 0 ni Task 2.
+La validacion se registra en
+`docs/operations/2026-07-29-i9-acta-validacion-gate0.md`. Jorge Guzman valida
+Operaciones; Carolina Rodriguez Russi valida Talento Humano y Juridica; Camilo
+Piedrahita, Gerente General, realiza el cierre ejecutivo.
 
 ## Estado De Gates
 
 | Gate | Estado | Condicion pendiente |
 |---|---|---|
-| Gate 0 - autoridad documental | En revision | Catalogo aprobado y firmado; acto explicito de cierre |
+| Gate 0 - autoridad documental | Cerrado | Catalogo aprobado y firmado; cierre ejecutivo registrado |
 | Gate 1 - persistencia/configuracion | Bloqueado | Gate 0 cerrado |
 | Gate 2 - reglas/motor | Bloqueado | Catalogo ejecutable y Gate 1 |
 | Gate 3 - workflow/seguridad | Bloqueado | Gate 2 |
@@ -50,32 +50,27 @@ El diligenciamiento se registra en
 
 ## Task 1 - Gate 0 Documental
 
-Estado: **En revision**.
+Estado: **Cerrado**.
 
 - [x] Verificador documental creado y RED observado.
 - [x] Constitucion, Arquitectura, Tecnologia y Design alineados con I9.
 - [x] SPEC formal creada.
 - [x] SPEC aprobada el 2026-07-29 por el usuario/patrocinador funcional.
-- [x] Catalogo juridico-operativo creado como `BORRADOR_NO_EJECUTABLE`.
-- [ ] Revision de Operaciones.
-- [ ] Revision de Talento Humano.
-- [ ] Revision de Juridico/Laboral.
-- [ ] Aprobacion y firma del catalogo juridico-operativo.
-- [ ] Acto explicito de cierre de Gate 0.
+- [x] Catalogo juridico-operativo `APROBADO_EJECUTABLE`.
+- [x] Validacion Operaciones: Jorge Guzman.
+- [x] Validacion Talento Humano y Juridica: Carolina Rodriguez Russi.
+- [x] Cierre ejecutivo: Camilo Piedrahita, Gerente General.
 
-## Tasks Tecnicas Bloqueadas
+## Retake Tecnico Autorizado
 
-**No iniciar Task 2** ni ninguna tarea tecnica hasta cerrar Gate 0 con evidencia
-de firmas y aprobacion. Permanecen bloqueadas: persistencia, plantillas, ciclos,
-elegibilidad, motor heuristico, workflow, API, seguridad, notificaciones,
-exportaciones, frontend, UI, piloto y despliegue.
-
-Task 2 esta bloqueada. Este execution log no autoriza implementacion.
+Task 2 esta autorizada y no iniciada. Debe comenzar en una tarea posterior bajo
+TDD. Las Tasks 3 y siguientes conservan el orden y gates del plan tecnico. Este
+execution log no declara ejecucion tecnica.
 
 ## Evidencia TDD Documental
 
 - RED esperado: `I9 DOCS FAIL` por decisiones y artefactos ausentes.
-- GREEN requerido: `I9 DOCS PASS` sin declarar aprobacion.
+- GREEN requerido: `I9 DOCS PASS` con estados documentales coherentes.
 - Verificador: `scripts/dev/Verify-SgSuperAppI9Docs.ps1`.
 
 ### Replay RED reproducible con verificador final
@@ -158,6 +153,5 @@ Las mutaciones no tocaron el repositorio ni crearon worktrees registrados.
 
 ## Retake
 
-Retomar exclusivamente en revision humana del Gate 0. Si se aprueba, registrar
-firmas, version y fecha del catalogo; cambiar estados mediante un commit
-documental separado. El presente log no declara Gate 0 cerrado.
+Retomar en Task 2 autorizada, aun no iniciada, siguiendo TDD y el plan tecnico.
+Gate 0 queda cerrado por este registro documental.

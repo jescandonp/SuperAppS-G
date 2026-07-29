@@ -2,7 +2,7 @@
 
 > Estado: **Aprobada**
 > Fecha: 2026-07-29
-> Gate: 0 documental; no autoriza implementacion
+> Gate: 0 cerrado; Task 2 autorizada no iniciada
 > Fuentes: Constitucion, Arquitectura, Tecnologia, Design y diseño funcional del 2026-07-19.
 > Plan tecnico: `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`
 > Aprobacion: aprobada el 2026-07-29 por el usuario, en calidad de patrocinador funcional.
@@ -10,10 +10,10 @@
 Estado del plan tecnico: **APROBADO COMO HOJA DE RUTA DOCUMENTAL** por decision
 del usuario. Estado de aplicacion: **EJECUCION NO AUTORIZADA**.
 
-De las tres condiciones de Gate 0, la aprobacion humana de la SPEC es condicion
-satisfecha. Permanecen pendientes la aprobacion y firma del catalogo
-juridico-operativo y el acto explicito de cierre de Gate 0. Task 2 solo puede
-autorizarse despues de satisfacer las tres condiciones.
+Las tres condiciones estan satisfechas. El catalogo queda
+`APROBADO_EJECUTABLE`; Gate 0 queda cerrado por Camilo Piedrahita, Gerente
+General, segun confirmacion explicita del usuario. Task 2 queda autorizada y no
+iniciada.
 
 ## 1. Objetivo
 
@@ -45,8 +45,8 @@ reprogramacion asistida, exportacion y auditoria.
 
 La jerarquia es: norma colombiana validada por Juridico, politica S&G aprobada,
 condicion contractual versionada y parametros del proyecto. El catalogo operativo
-es la unica fuente ejecutable cuando tenga firmas y version aprobada. Mientras
-figure `BORRADOR_NO_EJECUTABLE`, ninguna regla se codifica ni ejecuta.
+es la unica fuente ejecutable cuando tenga decisiones aprobadas y version
+vigente. El catalogo I9 cumple esa condicion desde el 2026-07-29.
 
 Las reglas se clasifican como `BLOQUEANTE`, `SUBSANABLE` o `INFORMATIVA`.
 Jornada, descanso, cruces, novedades, ubicacion, requisitos y desviaciones deben
@@ -129,10 +129,9 @@ devuelven codigo, mensaje y razones de negocio.
 - app de guardas, WhatsApp e integraciones obligatorias con HELIZA;
 - reemplazo del modulo fuente de novedades.
 
-## 11. Gate 0 Pendiente
+## 11. Gate 0 Cerrado
 
-La SPEC esta **Aprobada** por el usuario/patrocinador funcional desde el
-2026-07-29. Esta aprobacion no cierra Gate 0: el catalogo sigue
-`BORRADOR_NO_EJECUTABLE`; las firmas de Operaciones, TH y Juridico/Laboral
-siguen `Pendiente`; y Task 2 continua no autorizada hasta completar las
-condiciones restantes y registrar el acto explicito de cierre.
+La SPEC esta **Aprobada**. El usuario confirma a Jorge Guzman para Operaciones,
+a Carolina Rodriguez Russi para Talento Humano y Juridica, y a Camilo
+Piedrahita, Gerente General, para el cierre ejecutivo. Gate 0 esta cerrado y
+Task 2 autorizada, pero no iniciada.

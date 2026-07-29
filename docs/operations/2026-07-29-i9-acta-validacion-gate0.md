@@ -1,6 +1,6 @@
 # Acta De Validacion Gate 0 - Catalogo I9
 
-> Estado: **PENDIENTE_DE_FIRMAS**
+> Estado: **APROBADA**
 > Fecha de preparacion: 2026-07-29
 > Catalogo: `docs/operations/2026-07-29-i9-catalogo-reglas-programacion.md`
 
@@ -13,12 +13,12 @@ Operaciones, Director de Talento Humano y Asesor Juridico.
 El organigrama identifica roles, pero no constituye aprobacion ni firma. Tampoco
 aporta nombres de titulares para esta acta ni permite inferir decisiones.
 
-## 2. Estado Antes Del Diligenciamiento
+## 2. Estado Confirmado
 
-- Catalogo: `BORRADOR_NO_EJECUTABLE`.
-- Gate 0: **En revision**.
-- Task 2: no autorizada.
-- Firmas: `Pendiente`.
+- Catalogo: `APROBADO_EJECUTABLE`.
+- Gate 0: **Cerrado**.
+- Task 2: autorizada y no iniciada.
+- Evidencia: confirmacion explicita del usuario en esta conversacion.
 
 ## 3. Validaciones
 
@@ -27,11 +27,15 @@ evidencia/firma. Un campo sin diligenciar conserva la fila en `Pendiente`.
 
 | Rol validador | Estado | Nombre | Cargo | Decision | Observaciones | Fecha | Evidencia/firma |
 |---|---|---|---|---|---|---|---|
-| Director de Operaciones | Pendiente |  | Director de Operaciones |  |  |  |  |
-| Director de Talento Humano | Pendiente |  | Director de Talento Humano |  |  |  |  |
-| Asesor Juridico | Pendiente |  | Asesor Juridico |  |  |  |  |
+| Director de Operaciones | Aprobada | Jorge Guzman | Operaciones | Aprobada | Confirmada por el usuario | 2026-07-29 | Confirmacion explicita del usuario en esta conversacion |
+| Director de Talento Humano | Aprobada | Carolina Rodriguez Russi | Talento Humano y Juridica | Aprobada | Confirmada por el usuario | 2026-07-29 | Confirmacion explicita del usuario en esta conversacion |
+| Asesor Juridico | Aprobada | Carolina Rodriguez Russi | Talento Humano y Juridica | Aprobada | Confirmada por el usuario | 2026-07-29 | Confirmacion explicita del usuario en esta conversacion |
 
 ## 4. Resultado Del Acta
 
-Resultado: pendiente de diligenciamiento por los tres roles. Esta acta no
-aprueba el catalogo, no cierra Gate 0 y no autoriza Task 2.
+Camilo Piedrahita, Gerente General, realiza el acto explicito de cierre ejecutivo
+de Gate 0 el 2026-07-29 por confirmacion del usuario. El catalogo queda aprobado,
+Gate 0 cerrado y Task 2 autorizada, pero no iniciada.
+
+Esta evidencia no corresponde a firma manuscrita ni documento externo y no
+atribuye cargos adicionales.

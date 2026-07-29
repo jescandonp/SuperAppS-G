@@ -1,6 +1,6 @@
 # Catalogo I9 De Reglas De Programacion
 
-> Estado: **BORRADOR_NO_EJECUTABLE**
+> Estado: **APROBADO_EJECUTABLE**
 > Fecha: 2026-07-29
 > Uso: levantamiento y validacion conjunta; no autoriza codigo ni ejecucion
 
@@ -10,10 +10,9 @@ Fuente aportada por el usuario: organigrama S&G, codigo `GH-DE-01`, fecha
 `24/07/2025`, version 4. En este artefacto son visibles los roles Director de
 Operaciones, Director de Talento Humano y Asesor Juridico.
 
-El organigrama identifica los roles responsables de la ruta de validacion, pero
-no constituye aprobacion ni firma, no identifica aqui a las personas titulares
-y no permite inferir ninguna decision. Los tres roles conservan estado
-`Pendiente`.
+El organigrama identifica roles, pero no constituye aprobacion ni firma. Los
+nombres y decisiones siguientes provienen exclusivamente de la confirmacion
+explicita del usuario en esta conversacion del 2026-07-29.
 
 ## Regla De Uso
 
@@ -23,13 +22,13 @@ pendiente invalida la regla como entrada del motor.
 
 | ID | Familia | Proposito verificable | Fuente/parametro pendiente | Severidad propuesta | Evidencia esperada | Estado |
 |---|---|---|---|---|---|---|
-| I9-R01 | Jornada maxima | Impedir o advertir que la carga acumulada exceda el limite aplicable | Norma/politica, periodo de calculo y valor por validar | Pendiente de firma | Snapshot de turnos y acumulado | BORRADOR_NO_EJECUTABLE |
-| I9-R02 | Descanso minimo | Validar intervalo entre fin e inicio de turnos consecutivos | Norma/politica y valor por validar | Pendiente de firma | Turnos anterior y propuesto | BORRADOR_NO_EJECUTABLE |
-| I9-R03 | Cruces | Bloquear solapamientos temporales del mismo guarda | Definicion operativa de bordes y traslados | BLOQUEANTE propuesto | Intervalos comparados | BORRADOR_NO_EJECUTABLE |
-| I9-R04 | Novedades | Excluir o advertir indisponibilidad por novedad vigente | Tipos, estados y prioridad por validar | Pendiente de firma | Novedad fuente y vigencia | BORRADOR_NO_EJECUTABLE |
-| I9-R05 | Ubicacion | Evaluar compatibilidad territorial y tiempo de traslado | Zonas y criterio operativo por validar | Pendiente de firma | Puestos, zonas y fuente | BORRADOR_NO_EJECUTABLE |
-| I9-R06 | Requisitos | Verificar cursos, acreditaciones y condiciones del puesto | Catalogo I3/I5 y tratamiento por validar | Pendiente de firma | Requisito y habilitacion | BORRADOR_NO_EJECUTABLE |
-| I9-R07 | Desviacion de plantilla | Detectar cambios frente al ciclo aprobado y exigir motivo | Tolerancias y autorizador por validar | SUBSANABLE propuesto | Plantilla, celda y motivo | BORRADOR_NO_EJECUTABLE |
+| I9-R01 | Jornada maxima | Impedir o advertir que la carga acumulada exceda el limite aplicable | Norma/politica, periodo de calculo y valor por validar antes de codificar | Aprobada | Snapshot de turnos y acumulado | APROBADO_EJECUTABLE |
+| I9-R02 | Descanso minimo | Validar intervalo entre fin e inicio de turnos consecutivos | Norma/politica y valor por validar antes de codificar | Aprobada | Turnos anterior y propuesto | APROBADO_EJECUTABLE |
+| I9-R03 | Cruces | Bloquear solapamientos temporales del mismo guarda | Definicion operativa de bordes y traslados | Aprobada | Intervalos comparados | APROBADO_EJECUTABLE |
+| I9-R04 | Novedades | Excluir o advertir indisponibilidad por novedad vigente | Tipos, estados y prioridad por parametrizar sin inventar valores | Aprobada | Novedad fuente y vigencia | APROBADO_EJECUTABLE |
+| I9-R05 | Ubicacion | Evaluar compatibilidad territorial y tiempo de traslado | Zonas y criterio operativo por parametrizar sin inventar valores | Aprobada | Puestos, zonas y fuente | APROBADO_EJECUTABLE |
+| I9-R06 | Requisitos | Verificar cursos, acreditaciones y condiciones del puesto | Catalogo I3/I5 y tratamiento versionado | Aprobada | Requisito y habilitacion | APROBADO_EJECUTABLE |
+| I9-R07 | Desviacion de plantilla | Detectar cambios frente al ciclo aprobado y exigir motivo | Tolerancias y autorizador parametrizados antes de codificar | Aprobada | Plantilla, celda y motivo | APROBADO_EJECUTABLE |
 
 ## Campos Obligatorios Por Regla Antes De Activarla
 
@@ -48,12 +47,12 @@ pendiente invalida la regla como entrada del motor.
 
 | Rol validador | Estado | Nombre | Cargo | Decision | Observaciones | Fecha | Evidencia/firma |
 |---|---|---|---|---|---|---|---|
-| Director de Operaciones | Pendiente | Pendiente | Director de Operaciones | Pendiente | Pendiente | Pendiente | Pendiente |
-| Director de Talento Humano | Pendiente | Pendiente | Director de Talento Humano | Pendiente | Pendiente | Pendiente | Pendiente |
-| Asesor Juridico | Pendiente | Pendiente | Asesor Juridico | Pendiente | Pendiente | Pendiente | Pendiente |
+| Director de Operaciones | Aprobada | Jorge Guzman | Operaciones | Aprobada | Confirmada por el usuario | 2026-07-29 | Confirmacion explicita del usuario en esta conversacion; sin firma manuscrita ni documento externo |
+| Director de Talento Humano | Aprobada | Carolina Rodriguez Russi | Talento Humano y Juridica | Aprobada | Confirmada por el usuario | 2026-07-29 | Confirmacion explicita del usuario en esta conversacion; sin firma manuscrita ni documento externo |
+| Asesor Juridico | Aprobada | Carolina Rodriguez Russi | Talento Humano y Juridica | Aprobada | Confirmada por el usuario | 2026-07-29 | Confirmacion explicita del usuario en esta conversacion; sin firma manuscrita ni documento externo |
 
-Hasta completar estas firmas, el catalogo conserva estado
-`BORRADOR_NO_EJECUTABLE`; el Gate 0 permanece En revision.
+El catalogo queda `APROBADO_EJECUTABLE`; no se atribuye firma manuscrita ni
+documento externo.
 
 Acta para diligenciamiento:
 `docs/operations/2026-07-29-i9-acta-validacion-gate0.md`.

@@ -81,19 +81,19 @@ Assert-DocumentContains 'docs/CONSTITUTION.md' @(
     '(?is)no\s+puede\s+contradecir.*autoridades\s+superiores',
     'docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan\.md',
     '(?i)APROBADO COMO HOJA DE RUTA DOCUMENTAL',
-    '(?i)EJECUCION NO AUTORIZADA',
-    '(?is)SPEC.*condicion\s+satisfecha.*pendientes.*aprobacion\s+y\s+firma\s+del\s+catalogo.*acto\s+explicito\s+de\s+cierre\s+de\s+Gate\s+0',
-    '(?is)Task 2.*solo.*despues.*tres'
+    '(?i)TASK 2 AUTORIZADA',
+    '(?i)NO INICIADA',
+    '(?is)catalogo.*APROBADO_EJECUTABLE.*Gate 0.*cerrado',
+    '(?is)Camilo\s+Piedrahita.*Gerente\s+General.*cierre',
+    '(?is)Carolina\s+Rodriguez\s+Russi.*Talento\s+Humano\s+y\s+Juridica',
+    '(?is)Jorge\s+Guzman.*Operaciones'
 )
 Assert-DocumentDoesNotContain 'docs/CONSTITUTION.md' @(
     '(?i)Aprobacion humana de SPEC y plan',
     '(?is)pendientes\s+de\s+Gate\s+0.*aprobacion\s+humana\s+de\s+la\s+SPEC',
     '(?i)SPEC,\s*plan\s*y\s*catalogo.*(?:aprobad|firmad)',
-    '(?im)^>?\s*Gate 0\s*:\s*\*?\*?(Aprobad[oa]|Cerrado|Completado)',
-    '(?im)^\s*(El\s+)?Gate 0\s+(esta|queda|fue|se encuentra)\s+(aprobado|cerrado|completado)',
-    '(?im)^\s*Task 2\s*:\s*\*?\*?(Autorizada|Iniciada|En ejecucion)',
-    '(?im)^\s*Task 2\s+(esta|queda|fue|se encuentra)\s+(autorizada|iniciada|en ejecucion)',
-    '(?im)^\s*(La\s+)?ejecucion tecnica\s+(esta|queda|fue|se encuentra)\s+autorizada'
+    '(?im)^\s*Task 2\s*:\s*\*?\*?(Iniciada|En ejecucion)',
+    '(?im)^\s*Task 2\s+(esta|queda|fue|se encuentra)\s+(iniciada|en ejecucion)'
 )
 
 Assert-DocumentContains 'docs/ARCHITECTURE.md' @(
@@ -133,7 +133,7 @@ $specPath = 'docs/specs/2026-07-29-sg-superapp-spec-i9-programacion-turnos.md'
 Assert-DocumentContains $specPath @(
     '(?m)^> Estado: \*\*Aprobada\*\*\s*$',
     '(?is)aprobada.*2026-07-29.*usuario.*patrocinador funcional',
-    '(?m)^> Gate: 0 documental; no autoriza implementacion\s*$',
+    '(?m)^> Gate: 0 cerrado; Task 2 autorizada no iniciada\s*$',
     '(?i)alcance',
     '(?i)contratos funcionales',
     '(?i)estados',
@@ -144,9 +144,9 @@ Assert-DocumentContains $specPath @(
     '(?i)no publica.*autonom',
     'docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan\.md',
     '(?i)APROBADO COMO HOJA DE RUTA DOCUMENTAL',
-    '(?i)EJECUCION NO AUTORIZADA',
-    '(?is)SPEC.*condicion\s+satisfecha.*aprobacion\s+y\s+firma\s+del\s+catalogo.*acto\s+explicito\s+de\s+cierre\s+de\s+Gate\s+0',
-    '(?is)Task 2.*solo.*despues.*tres',
+    'APROBADO_EJECUTABLE',
+    '(?is)Gate 0.*cerrado.*Camilo Piedrahita.*Gerente General',
+    '(?is)Task 2.*autorizada.*no iniciada',
     'POST\s+/api/portal/scheduling/projects/\{id\}/versions',
     'GET\s+/api/portal/scheduling/versions/\{versionId\}',
     'PUT\s+/api/portal/scheduling/versions/\{versionId\}/assignments/\{id\}',
@@ -163,9 +163,9 @@ Assert-DocumentDoesNotContain $specPath @(
     '(?i)SPEC,\s*plan\s*y\s*catalogo.*(?:aprobad|firmad)',
     '(?im)^>?\s*Gate 0\s*:\s*\*?\*?(Aprobad[oa]|Cerrado|Completado)',
     '(?im)^\s*(El\s+)?Gate 0\s+(esta|queda|fue|se encuentra)\s+(aprobado|cerrado|completado)',
-    '(?im)^\s*Task 2\s*:\s*\*?\*?(Autorizada|Iniciada|En ejecucion)',
-    '(?im)^\s*Task 2\s+(esta|queda|fue|se encuentra)\s+(autorizada|iniciada|en ejecucion)',
-    '(?im)^\s*(La\s+)?ejecucion tecnica\s+(esta|queda|fue|se encuentra)\s+autorizada'
+    '(?i)BORRADOR_NO_EJECUTABLE',
+    '(?im)^\s*Task 2\s*:\s*\*?\*?(Iniciada|En ejecucion)',
+    '(?im)^\s*Task 2\s+(esta|queda|fue|se encuentra)\s+(iniciada|en ejecucion)'
 )
 Assert-PatternCount $specPath '(?m)^> Estado:' 1
 Assert-PatternCount $specPath '(?m)^> Estado: \*\*Aprobada\*\*\s*$' 1
@@ -174,19 +174,20 @@ $planPath = 'docs/plans/2026-07-29-sg-superapp-i9-programacion-turnos-plan.md'
 Assert-DocumentContains $planPath @(
     '(?m)^# Execution Log I9 - Gate 0 - Programacion Asistida De Turnos\s*$',
     '(?m)^> Tipo: \*\*Execution log documental de Gate 0\*\*\s*$',
-    '(?m)^> Estado general: \*\*En revision\*\*\s*$',
-    '(?m)^> Gate 0: \*\*En revision\*\*\s*$',
-    '(?i)Tasks? tecnicas.*bloqueadas',
-    '(?i)Task 2',
-    '(?i)Task 2.*bloqueada',
-    '(?i)no iniciar',
+    '(?m)^> Estado general: \*\*Gate 0 cerrado - Task 2 autorizada no iniciada\*\*\s*$',
+    '(?m)^> Gate 0: \*\*Cerrado\*\*\s*$',
+    '(?i)Task 2.*autorizada',
+    '(?i)no iniciada',
+    '(?i)no declara ejecucion',
     'docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan\.md',
     '(?i)APROBADO COMO HOJA DE RUTA DOCUMENTAL',
-    '(?i)EJECUCION NO AUTORIZADA',
+    '(?i)TASK 2 AUTORIZADA',
+    '(?i)NO INICIADA',
     '(?is)SPEC.*aprobada.*2026-07-29.*usuario.*patrocinador funcional',
-    '(?is)catalogo.*BORRADOR_NO_EJECUTABLE.*firmas.*Pendiente.*Gate 0.*En revision',
-    '(?m)^\| Gate 0 - autoridad documental \| En revision \| Catalogo aprobado y firmado; acto explicito de cierre \|\s*$',
-    '(?is)Task 2.*solo.*despues.*tres',
+    '(?is)catalogo.*APROBADO_EJECUTABLE.*decisiones.*Aprobada',
+    '(?m)^\| Gate 0 - autoridad documental \| Cerrado \| Catalogo aprobado y firmado; cierre ejecutivo registrado \|\s*$',
+    '(?is)Task 2.*autorizada.*no iniciada',
+    '(?is)Camilo\s+Piedrahita.*Gerente\s+General.*cierre',
     '(?i)GH-DE-01',
     '24/07/2025',
     '(?i)version 4',
@@ -194,28 +195,26 @@ Assert-DocumentContains $planPath @(
     'docs/operations/2026-07-29-i9-acta-validacion-gate0\.md'
 )
 Assert-DocumentDoesNotContain $planPath @(
-    '(?m)^> Estado general: \*\*(Aprobada|Aprobado|Cerrado|APROBADO_EJECUTABLE)\*\*\s*$',
-    '(?m)^> Gate 0: \*\*(Aprobada|Aprobado|Cerrado|APROBADO_EJECUTABLE)\*\*\s*$',
+    '(?m)^> Estado general: \*\*En revision\*\*\s*$',
+    '(?m)^> Gate 0: \*\*En revision\*\*\s*$',
     '(?im)^(?!.*\b(no|bloquead)\b).*autoriza(?:r|da|do)?\s+(?:la\s+)?implementacion',
     '(?im)^\s*Implementacion\s*:\s*(autorizada|autorizado)\b',
     '(?im)^\s*(La\s+)?implementacion\s+(queda|esta)\s+autorizad[ao]\b',
     '(?i)Aprobacion humana de SPEC y plan',
     '(?m)^\| Gate 0 - autoridad documental \| En revision \|.*SPEC aprobada.*\|\s*$',
     '(?i)SPEC,\s*plan\s*y\s*catalogo.*(?:aprobad|firmad)',
-    '(?im)^>?\s*Gate 0\s*:\s*\*?\*?(Aprobad[oa]|Cerrado|Completado)',
-    '(?im)^\s*(El\s+)?Gate 0\s+(esta|queda|fue|se encuentra)\s+(aprobado|cerrado|completado)',
-    '(?im)^\s*Task 2\s*:\s*\*?\*?(Autorizada|Iniciada|En ejecucion)',
-    '(?im)^\s*Task 2\s+(esta|queda|fue|se encuentra)\s+(autorizada|iniciada|en ejecucion)',
-    '(?im)^\s*(La\s+)?ejecucion tecnica\s+(esta|queda|fue|se encuentra)\s+autorizada'
+    '(?i)BORRADOR_NO_EJECUTABLE',
+    '(?im)^\s*Task 2\s*:\s*\*?\*?(Iniciada|En ejecucion)',
+    '(?im)^\s*Task 2\s+(esta|queda|fue|se encuentra)\s+(iniciada|en ejecucion)'
 )
 Assert-PatternCount $planPath '(?m)^> Estado general:' 1
-Assert-PatternCount $planPath '(?m)^> Estado general: \*\*En revision\*\*\s*$' 1
+Assert-PatternCount $planPath '(?m)^> Estado general: \*\*Gate 0 cerrado - Task 2 autorizada no iniciada\*\*\s*$' 1
 Assert-PatternCount $planPath '(?m)^> Gate 0:' 1
-Assert-PatternCount $planPath '(?m)^> Gate 0: \*\*En revision\*\*\s*$' 1
+Assert-PatternCount $planPath '(?m)^> Gate 0: \*\*Cerrado\*\*\s*$' 1
 
 $catalogPath = 'docs/operations/2026-07-29-i9-catalogo-reglas-programacion.md'
 Assert-DocumentContains $catalogPath @(
-    '(?m)^> Estado: \*\*BORRADOR_NO_EJECUTABLE\*\*\s*$',
+    '(?m)^> Estado: \*\*APROBADO_EJECUTABLE\*\*\s*$',
     '(?i)jornada maxima',
     '(?i)descanso minimo',
     '(?i)cruces',
@@ -230,23 +229,21 @@ Assert-DocumentContains $catalogPath @(
     '24/07/2025',
     '(?i)version 4',
     '(?is)organigrama.*identifica.*roles.*no.*aprobacion.*firma',
-    '(?m)^\| Director de Operaciones \| Pendiente \|',
-    '(?m)^\| Director de Talento Humano \| Pendiente \|',
-    '(?m)^\| Asesor Juridico \| Pendiente \|'
+    '(?m)^\| Director de Operaciones \| Aprobada \| Jorge Guzman \| Operaciones \| Aprobada \|',
+    '(?m)^\| Director de Talento Humano \| Aprobada \| Carolina Rodriguez Russi \| Talento Humano y Juridica \| Aprobada \|',
+    '(?m)^\| Asesor Juridico \| Aprobada \| Carolina Rodriguez Russi \| Talento Humano y Juridica \| Aprobada \|'
 )
 Assert-DocumentDoesNotContain $catalogPath @(
-    '(?m)^> Estado: \*\*(Aprobada|Aprobado|Cerrado|APROBADO_EJECUTABLE)\*\*\s*$',
+    '(?m)^> Estado: \*\*BORRADOR_NO_EJECUTABLE\*\*\s*$',
     '(?im)^(?!.*\bno\b).*autoriza(?:r|da|do)?\s+(?:la\s+)?implementacion',
     '(?im)^\s*Implementacion\s*:\s*(autorizada|autorizado)\b',
     '(?im)^\s*(La\s+)?implementacion\s+(queda|esta)\s+autorizad[ao]\b',
-    '(?im)^>?\s*Gate 0\s*:\s*\*?\*?(Aprobad[oa]|Cerrado|Completado)',
-    '(?im)^\s*(El\s+)?Gate 0\s+(esta|queda|fue|se encuentra)\s+(aprobado|cerrado|completado)',
-    '(?im)^\s*Task 2\s*:\s*\*?\*?(Autorizada|Iniciada|En ejecucion)',
-    '(?im)^\s*Task 2\s+(esta|queda|fue|se encuentra)\s+(autorizada|iniciada|en ejecucion)',
-    '(?im)^\s*(La\s+)?ejecucion tecnica\s+(esta|queda|fue|se encuentra)\s+autorizada'
+    '(?im)^\s*Task 2\s*:\s*\*?\*?(Iniciada|En ejecucion)',
+    '(?im)^\s*Task 2\s+(esta|queda|fue|se encuentra)\s+(iniciada|en ejecucion)',
+    '(?i)(firma manuscrita adjunta|documento externo adjunto)'
 )
 Assert-PatternCount $catalogPath '(?m)^> Estado:' 1
-Assert-PatternCount $catalogPath '(?m)^> Estado: \*\*BORRADOR_NO_EJECUTABLE\*\*\s*$' 1
+Assert-PatternCount $catalogPath '(?m)^> Estado: \*\*APROBADO_EJECUTABLE\*\*\s*$' 1
 
 $catalogFullPath = Join-Path $repoRoot $catalogPath
 if (Test-Path -LiteralPath $catalogFullPath -PathType Leaf) {
@@ -266,8 +263,8 @@ if (Test-Path -LiteralPath $catalogFullPath -PathType Leaf) {
             if ($rawRole -eq $expectedRole) {
                 $roleCount++
                 $signatureStatus = $signatureMatch.Groups[2].Value.Trim()
-                if ($signatureStatus -ne 'Pendiente') {
-                    $failures.Add("$catalogPath signature $expectedRole status must be Pendiente but was $signatureStatus")
+                if ($signatureStatus -ne 'Aprobada') {
+                    $failures.Add("$catalogPath signature $expectedRole status must be Aprobada but was $signatureStatus")
                 }
             }
         }
@@ -279,38 +276,36 @@ if (Test-Path -LiteralPath $catalogFullPath -PathType Leaf) {
 
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
 Assert-DocumentContains $validationActPath @(
-    '(?m)^> Estado: \*\*PENDIENTE_DE_FIRMAS\*\*\s*$',
+    '(?m)^> Estado: \*\*APROBADA\*\*\s*$',
     '(?i)GH-DE-01',
     '24/07/2025',
     '(?i)version 4',
     '(?m)^El organigrama identifica roles, pero no constituye aprobacion ni firma\.',
-    '(?m)^\| Director de Operaciones \| Pendiente \|',
-    '(?m)^\| Director de Talento Humano \| Pendiente \|',
-    '(?m)^\| Asesor Juridico \| Pendiente \|',
+    '(?m)^\| Director de Operaciones \| Aprobada \| Jorge Guzman \| Operaciones \| Aprobada \|',
+    '(?m)^\| Director de Talento Humano \| Aprobada \| Carolina Rodriguez Russi \| Talento Humano y Juridica \| Aprobada \|',
+    '(?m)^\| Asesor Juridico \| Aprobada \| Carolina Rodriguez Russi \| Talento Humano y Juridica \| Aprobada \|',
     '(?i)nombre',
     '(?i)cargo',
     '(?i)decision',
     '(?i)observaciones',
     '(?i)fecha',
     '(?i)evidencia/firma',
-    'BORRADOR_NO_EJECUTABLE',
-    '(?i)Gate 0.*En revision',
-    '(?i)Task 2.*no autorizada'
+    'APROBADO_EJECUTABLE',
+    '(?i)Gate 0.*Cerrado',
+    '(?i)Task 2.*autorizada.*no iniciada',
+    '(?is)Camilo Piedrahita.*Gerente General.*cierre',
+    '(?i)confirmacion explicita del usuario en esta conversacion',
+    '(?i)no.*firma manuscrita.*documento externo'
 )
 Assert-DocumentDoesNotContain $validationActPath @(
-    '(?m)^> Estado: \*\*(APROBADA|FIRMADA|CERRADA)\*\*\s*$',
-    '(?im)^>?\s*Gate 0\s*:\s*\*?\*?(Aprobad[oa]|Cerrado|Completado)',
-    '(?im)^\s*(El\s+)?Gate 0\s+(esta|queda|fue|se encuentra)\s+(aprobado|cerrado|completado)',
-    '(?im)^\s*Task 2\s*:\s*\*?\*?(Autorizada|Iniciada|En ejecucion)',
-    '(?im)^\s*Task 2\s+(esta|queda|fue|se encuentra)\s+(autorizada|iniciada|en ejecucion)',
-    '(?im)^\s*(La\s+)?ejecucion( tecnica)?\s+(esta|queda|fue|se encuentra)\s+autorizada',
-    '(?im)^\s*Catalogo\s*:\s*\*?\*?(APROBADO|FIRMADO|APROBADO_EJECUTABLE)',
-    '(?im)^\s*(El\s+)?catalogo\s+(esta|queda|fue|se encuentra)\s+(aprobado|firmado)',
-    '(?im)^\s*Firmas\s*:\s*\*?\*?(Completadas|Aprobadas|Firmadas)',
-    '(?im)^\s*Las\s+firmas\s+(estan|quedan|fueron|se encuentran)\s+(completadas|aprobadas|firmadas)'
+    '(?m)^> Estado: \*\*PENDIENTE_DE_FIRMAS\*\*\s*$',
+    '(?i)BORRADOR_NO_EJECUTABLE',
+    '(?im)^\s*Task 2\s*:\s*\*?\*?(Iniciada|En ejecucion)',
+    '(?im)^\s*Task 2\s+(esta|queda|fue|se encuentra)\s+(iniciada|en ejecucion)',
+    '(?i)evidencia/firma\s*:\s*(firma manuscrita|documento externo)'
 )
 Assert-PatternCount $validationActPath '(?m)^> Estado:' 1
-Assert-PatternCount $validationActPath '(?m)^> Estado: \*\*PENDIENTE_DE_FIRMAS\*\*\s*$' 1
+Assert-PatternCount $validationActPath '(?m)^> Estado: \*\*APROBADA\*\*\s*$' 1
 
 $validationActFullPath = Join-Path $repoRoot $validationActPath
 if (Test-Path -LiteralPath $validationActFullPath -PathType Leaf) {
@@ -328,19 +323,20 @@ if (Test-Path -LiteralPath $validationActFullPath -PathType Leaf) {
         if ($roleMatches.Count -ne 1) {
             $failures.Add("$validationActPath role $expectedRole row count expected 1 but was $($roleMatches.Count)")
         }
-        elseif ($roleMatches[0].Groups[2].Value.Trim() -ne 'Pendiente') {
-            $failures.Add("$validationActPath role $expectedRole status must be Pendiente")
+        elseif ($roleMatches[0].Groups[2].Value.Trim() -ne 'Aprobada') {
+            $failures.Add("$validationActPath role $expectedRole status must be Aprobada")
         }
         else {
             foreach ($field in @(
                 @{ Name = 'Nombre'; Group = 3 },
+                @{ Name = 'Cargo'; Group = 4 },
                 @{ Name = 'Decision'; Group = 5 },
                 @{ Name = 'Observaciones'; Group = 6 },
                 @{ Name = 'Fecha'; Group = 7 },
                 @{ Name = 'Evidencia/Firma'; Group = 8 }
             )) {
-                if (-not [string]::IsNullOrWhiteSpace($roleMatches[0].Groups[$field.Group].Value)) {
-                    $failures.Add("$validationActPath role $expectedRole field $($field.Name) must be empty while status is Pendiente")
+                if ([string]::IsNullOrWhiteSpace($roleMatches[0].Groups[$field.Group].Value)) {
+                    $failures.Add("$validationActPath role $expectedRole field $($field.Name) must be populated while status is Aprobada")
                 }
             }
         }
