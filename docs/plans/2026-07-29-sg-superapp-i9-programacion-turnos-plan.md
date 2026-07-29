@@ -6,6 +6,7 @@
 > Fecha de apertura: 2026-07-29
 > SPEC: `docs/specs/2026-07-29-sg-superapp-spec-i9-programacion-turnos.md`
 > Plan tecnico: `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`
+> Hito: SPEC aprobada el 2026-07-29 por el usuario, patrocinador funcional.
 
 ## Alcance Del Log
 
@@ -15,10 +16,15 @@ tecnico exacto
 Estado del plan tecnico: **APROBADO COMO HOJA DE RUTA DOCUMENTAL** por decision
 del usuario. Estado de aplicacion: **EJECUCION NO AUTORIZADA**.
 
-Los pendientes de Gate 0 son exactamente: aprobacion humana de la SPEC;
-aprobacion y firma del catalogo juridico-operativo; y acto explicito de cierre de
-Gate 0. Task 2 solo puede autorizarse despues de satisfacer estas tres
-condiciones.
+De las tres condiciones de Gate 0, la aprobacion humana de la SPEC esta
+satisfecha desde el 2026-07-29 por decision del usuario/patrocinador funcional.
+Permanecen pendientes la aprobacion y firma del catalogo juridico-operativo y el
+acto explicito de cierre de Gate 0. Task 2 solo puede autorizarse despues de
+satisfacer las tres condiciones.
+
+El catalogo conserva estado `BORRADOR_NO_EJECUTABLE`; las firmas de Operaciones,
+Talento Humano y Juridico/Laboral conservan estado `Pendiente`; Gate 0 conserva
+estado **En revision**.
 
 ## Estado De Gates
 
@@ -37,12 +43,12 @@ Estado: **En revision**.
 
 - [x] Verificador documental creado y RED observado.
 - [x] Constitucion, Arquitectura, Tecnologia y Design alineados con I9.
-- [x] SPEC formal creada en estado En revision.
+- [x] SPEC formal creada.
+- [x] SPEC aprobada el 2026-07-29 por el usuario/patrocinador funcional.
 - [x] Catalogo juridico-operativo creado como `BORRADOR_NO_EJECUTABLE`.
 - [ ] Revision de Operaciones.
 - [ ] Revision de Talento Humano.
-- [ ] Revision de Juridico.
-- [ ] Aprobacion humana de la SPEC.
+- [ ] Revision de Juridico/Laboral.
 - [ ] Aprobacion y firma del catalogo juridico-operativo.
 - [ ] Acto explicito de cierre de Gate 0.
 

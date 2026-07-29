@@ -130,7 +130,8 @@ Assert-DocumentContains 'docs/DESIGN.md' @(
 
 $specPath = 'docs/specs/2026-07-29-sg-superapp-spec-i9-programacion-turnos.md'
 Assert-DocumentContains $specPath @(
-    '(?m)^> Estado: \*\*En revision\*\*\s*$',
+    '(?m)^> Estado: \*\*Aprobada\*\*\s*$',
+    '(?is)aprobada.*2026-07-29.*usuario.*patrocinador funcional',
     '(?m)^> Gate: 0 documental; no autoriza implementacion\s*$',
     '(?i)alcance',
     '(?i)contratos funcionales',
@@ -143,7 +144,7 @@ Assert-DocumentContains $specPath @(
     'docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan\.md',
     '(?i)APROBADO COMO HOJA DE RUTA DOCUMENTAL',
     '(?i)EJECUCION NO AUTORIZADA',
-    '(?is)aprobacion\s+humana\s+de\s+la\s+SPEC.*aprobacion\s+y\s+firma\s+del\s+catalogo.*acto\s+explicito\s+de\s+cierre\s+de\s+Gate\s+0',
+    '(?is)SPEC.*condicion\s+satisfecha.*aprobacion\s+y\s+firma\s+del\s+catalogo.*acto\s+explicito\s+de\s+cierre\s+de\s+Gate\s+0',
     '(?is)Task 2.*solo.*despues.*tres',
     'POST\s+/api/portal/scheduling/projects/\{id\}/versions',
     'GET\s+/api/portal/scheduling/versions/\{versionId\}',
@@ -152,7 +153,7 @@ Assert-DocumentContains $specPath @(
     'POST\s+/api/portal/scheduling/versions/\{versionId\}/publish'
 )
 Assert-DocumentDoesNotContain $specPath @(
-    '(?m)^> Estado: \*\*(Aprobada|Aprobado|Cerrado|APROBADO_EJECUTABLE)\*\*\s*$',
+    '(?m)^> Estado: \*\*(En revision|Aprobado|Cerrado|APROBADO_EJECUTABLE)\*\*\s*$',
     '/api/portal/scheduling/proposals/\{versionId\}',
     '(?im)^(?!.*\bno\b).*autoriza(?:r|da|do)?\s+(?:la\s+)?implementacion',
     '(?im)^\s*Implementacion\s*:\s*(autorizada|autorizado)\b',
@@ -166,7 +167,7 @@ Assert-DocumentDoesNotContain $specPath @(
     '(?im)^\s*(La\s+)?ejecucion tecnica\s+(esta|queda|fue|se encuentra)\s+autorizada'
 )
 Assert-PatternCount $specPath '(?m)^> Estado:' 1
-Assert-PatternCount $specPath '(?m)^> Estado: \*\*En revision\*\*\s*$' 1
+Assert-PatternCount $specPath '(?m)^> Estado: \*\*Aprobada\*\*\s*$' 1
 
 $planPath = 'docs/plans/2026-07-29-sg-superapp-i9-programacion-turnos-plan.md'
 Assert-DocumentContains $planPath @(
@@ -181,7 +182,8 @@ Assert-DocumentContains $planPath @(
     'docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan\.md',
     '(?i)APROBADO COMO HOJA DE RUTA DOCUMENTAL',
     '(?i)EJECUCION NO AUTORIZADA',
-    '(?is)aprobacion\s+humana\s+de\s+la\s+SPEC.*aprobacion\s+y\s+firma\s+del\s+catalogo.*acto\s+explicito\s+de\s+cierre\s+de\s+Gate\s+0',
+    '(?is)SPEC.*aprobada.*2026-07-29.*usuario.*patrocinador funcional',
+    '(?is)catalogo.*BORRADOR_NO_EJECUTABLE.*firmas.*Pendiente.*Gate 0.*En revision',
     '(?is)Task 2.*solo.*despues.*tres'
 )
 Assert-DocumentDoesNotContain $planPath @(
