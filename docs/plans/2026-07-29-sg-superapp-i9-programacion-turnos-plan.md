@@ -36,14 +36,14 @@ Piedrahita, Gerente General, realiza el cierre ejecutivo.
 
 ## Estado De Gates
 
-| Gate | Estado | Condicion pendiente |
+| Gate / Retake | Estado | Condiciones cumplidas / proxima condicion |
 |---|---|---|
 | Gate 0 - autoridad documental | Cerrado | Catalogo aprobado y firmado; cierre ejecutivo registrado |
-| Gate 1 - persistencia/configuracion | Bloqueado | Gate 0 cerrado |
-| Gate 2 - reglas/motor | Bloqueado | Catalogo ejecutable y Gate 1 |
-| Gate 3 - workflow/seguridad | Bloqueado | Gate 2 |
-| Gate 4 - exportaciones/UI | Bloqueado | Gate 3 |
-| Gate 5 - piloto/cierre | Bloqueado | Gate 4 |
+| Gate 1 / Task 2 - persistencia/configuracion | Autorizada_no_iniciada | Proxima condicion: ejecutar Task 2 bajo TDD; sin ejecucion registrada |
+| Gate 2 - reglas/motor | Bloqueado | Proxima condicion: cerrar Gate 1 |
+| Gate 3 - workflow/seguridad | Bloqueado | Proxima condicion: cerrar Gate 2 |
+| Gate 4 - exportaciones/UI | Bloqueado | Proxima condicion: cerrar Gate 3 |
+| Gate 5 - piloto/cierre | Bloqueado | Proxima condicion: cerrar Gate 4 |
 
 ## Task 1 - Gate 0 Documental
 

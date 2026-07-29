@@ -187,7 +187,9 @@ Assert-DocumentContains $planPath @(
     '(?i)NO INICIADA',
     '(?is)SPEC.*aprobada.*2026-07-29.*usuario.*patrocinador funcional',
     '(?is)catalogo.*APROBADO_EJECUTABLE.*decisiones.*Aprobada',
+    '(?m)^\| Gate / Retake \| Estado \| Condiciones cumplidas / proxima condicion \|\s*$',
     '(?m)^\| Gate 0 - autoridad documental \| Cerrado \| Catalogo aprobado y firmado; cierre ejecutivo registrado \|\s*$',
+    '(?m)^\| Gate 1 / Task 2 - persistencia/configuracion \| Autorizada_no_iniciada \| Proxima condicion: ejecutar Task 2 bajo TDD; sin ejecucion registrada \|\s*$',
     '(?is)Task 2.*autorizada.*no iniciada',
     '(?is)Camilo\s+Piedrahita.*Gerente\s+General.*cierre',
     '(?i)GH-DE-01',
@@ -199,6 +201,8 @@ Assert-DocumentContains $planPath @(
 Assert-DocumentDoesNotContain $planPath @(
     '(?m)^> Estado general: \*\*En revision\*\*\s*$',
     '(?m)^> Gate 0: \*\*En revision\*\*\s*$',
+    '(?m)^\| Gate \| Estado \| Condicion pendiente \|\s*$',
+    '(?m)^\| Gate 1 - persistencia/configuracion \| Bloqueado \| Gate 0 cerrado \|\s*$',
     '(?im)^(?!.*\b(no|bloquead)\b).*autoriza(?:r|da|do)?\s+(?:la\s+)?implementacion',
     '(?im)^\s*Implementacion\s*:\s*(autorizada|autorizado)\b',
     '(?im)^\s*(La\s+)?implementacion\s+(queda|esta)\s+autorizad[ao]\b',
