@@ -14,8 +14,10 @@ Cuando exista tension entre documentos, decisiones, planes o codigo, aplicar est
 4. `docs/DESIGN.md`
 5. PRD vigente en `docs/prd/`
 6. SPEC tecnica del incremento activo en `docs/specs/`
-7. Plan de implementacion aprobado en `docs/plans/`
-8. Codigo fuente
+7. Catalogo operativo versionado y aprobado en `docs/operations/`
+8. Plan de implementacion aprobado en `docs/superpowers/plans/`
+9. Execution log documental en `docs/plans/`
+10. Codigo fuente
 
 El codigo nunca es la fuente primaria de verdad del proyecto. Si el codigo contradice la SPEC, se corrige el codigo o primero se actualiza la SPEC y luego el plan.
 
@@ -23,10 +25,18 @@ Los HTML ejecutivos y documentos de presentacion son artefactos de comunicacion.
 
 Los prototipos visuales en `Prototipos/` son referencias de diseño. Cuando una SPEC los cite explicitamente, pasan a ser referencia obligatoria para ese incremento, subordinada a `docs/DESIGN.md`.
 
+Los catalogos de `docs/operations/` estan subordinados a `CONSTITUTION`,
+`ARCHITECTURE`, `TECNOLOGIA`, `DESIGN` y la SPEC activa. Una vez versionado y
+aprobado, el catalogo es la fuente ejecutable de parametros operativos, pero no
+puede contradecir las autoridades superiores. Ante contradiccion, prevalece la
+autoridad superior, se bloquea la ejecucion de la regla y se corrige el catalogo
+antes de implementar o continuar.
+
 ## 2. Reglas SDD
 
 - Todo incremento debe tener SPEC escrita, revisada y aprobada antes de implementarse.
-- Todo incremento debe tener plan de implementacion en `docs/plans/` antes de ejecutar tareas.
+- Todo incremento debe tener plan tecnico en `docs/superpowers/plans/` y
+  execution log en `docs/plans/` antes de ejecutar tareas.
 - Todo cambio de alcance entra primero por PRD o SPEC, no por codigo.
 - Todo cambio de arquitectura entra primero por `docs/ARCHITECTURE.md` o por esta constitucion.
 - Todo cambio de stack entra primero por `docs/TECNOLOGIA.md`.
@@ -89,9 +99,15 @@ comparar alternativas y explicar excepciones. Toda aprobacion y publicacion qued
 bajo control humano y requiere una accion explicita, autorizada y auditada. El
 motor no aprueba ni publica de forma autonoma o automatica.
 
-La entrada a tareas tecnicas de I9 exige aprobacion humana de la SPEC, el plan y
-el catalogo juridico-operativo. Mientras cualquiera permanezca en revision o
-`BORRADOR_NO_EJECUTABLE`, solo se permite trabajo documental de Gate 0.
+La entrada a tareas tecnicas de I9 exige aprobacion humana de la SPEC, el
+catalogo juridico-operativo y Gate 0. Mientras cualquiera permanezca en revision
+o `BORRADOR_NO_EJECUTABLE`, solo se permite trabajo documental de Gate 0.
+
+Para I9, `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`
+esta aprobado solo como hoja de ruta documental; su ejecucion tecnica esta
+bloqueada hasta la aprobacion de la SPEC, el catalogo operativo y Gate 0. El
+execution log en `docs/plans/` registra evidencia y estado, pero no autoriza
+implementacion.
 
 ## 5. Stack Y Restricciones
 

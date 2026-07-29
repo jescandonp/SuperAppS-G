@@ -1,14 +1,19 @@
-# Execution Log I9 - Programacion Asistida De Turnos
+# Execution Log I9 - Gate 0 - Programacion Asistida De Turnos
 
+> Tipo: **Execution log documental de Gate 0**
 > Estado general: **En revision**
 > Gate 0: **En revision**
 > Fecha de apertura: 2026-07-29
 > SPEC: `docs/specs/2026-07-29-sg-superapp-spec-i9-programacion-turnos.md`
+> Plan tecnico: `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`
 
 ## Alcance Del Log
 
 Este artefacto registra la apertura documental de I9. No sustituye el plan
-tecnico detallado en `docs/superpowers/plans/`; lo subordina al gate humano.
+tecnico exacto
+`docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`.
+Ese plan tecnico esta aprobado solo como hoja de ruta documental; su ejecucion
+tecnica esta bloqueada hasta aprobar la SPEC, el catalogo operativo y Gate 0.
 
 ## Estado De Gates
 
@@ -41,6 +46,8 @@ de firmas y aprobacion. Permanecen bloqueadas: persistencia, plantillas, ciclos,
 elegibilidad, motor heuristico, workflow, API, seguridad, notificaciones,
 exportaciones, frontend, UI, piloto y despliegue.
 
+Task 2 esta bloqueada. Este execution log no autoriza implementacion.
+
 ## Evidencia TDD Documental
 
 - RED esperado: `I9 DOCS FAIL` por decisiones y artefactos ausentes.
@@ -61,38 +68,44 @@ Expand-Archive -LiteralPath $archivePath -DestinationPath $redRoot
 powershell -ExecutionPolicy Bypass -File scripts/dev/Verify-SgSuperAppI9Docs.ps1 -RepositoryRoot $redRoot
 ```
 
-Resultado observado el 2026-07-29: `I9 DOCS FAIL`, exit code `1`, **29
+Resultado observado el 2026-07-29: `I9 DOCS FAIL`, exit code `1`, **35
 faltantes exactos**:
 
 1. `CONSTITUTION`: tabla I9.
 2. `CONSTITUTION`: control humano.
 3. `CONSTITUTION`: prohibicion de aprobacion/publicacion autonoma.
-4. `ARCHITECTURE`: modulo Programacion asistida de turnos.
-5. `ARCHITECTURE`: `PlantillaDeTurno`.
-6. `ARCHITECTURE`: `VersionDeProgramacion`.
-7. `ARCHITECTURE`: `ExcepcionDeProgramacion`.
-8. `ARCHITECTURE`: integracion I2-I3-I5-I6-I7.
-9. `TECNOLOGIA`: motor heuristico deterministico.
-10. `TECNOLOGIA`: `.NET 6`.
-11. `TECNOLOGIA`: MVP sin dependencia externa.
-12. `DESIGN`: Enterprise Sentinel.
-13. `DESIGN`: referencia `Prototipos/stitch_ecosistema_digital_unificado/sentinel_enterprise/DESIGN.md`.
-14. `DESIGN`: `#003366`.
-15. `DESIGN`: `#FFC700`.
-16. `DESIGN`: `#F8F9FA`.
-17. `DESIGN`: `#FFFFFF`.
-18. `DESIGN`: `#E1E4E8`.
-19. `DESIGN`: radios 4px-8px.
-20. `DESIGN`: Montserrat/sans para jerarquia.
-21. `DESIGN`: Arial/Inter-compatible para datos.
-22. `DESIGN`: prohibicion de landing/decoracion sin valor operativo.
-23. `DESIGN`: matriz mensual.
-24. `DESIGN`: plantillas.
-25. `DESIGN`: comparacion.
-26. `DESIGN`: excepciones.
-27. SPEC I9 ausente.
-28. Execution log I9 ausente.
-29. Catalogo de reglas I9 ausente.
+4. `CONSTITUTION`: jerarquia de `docs/operations/`.
+5. `CONSTITUTION`: subordinacion del catalogo a las autoridades SDD.
+6. `CONSTITUTION`: catalogo como fuente ejecutable de parametros operativos.
+7. `CONSTITUTION`: prohibicion de contradecir autoridades superiores.
+8. `CONSTITUTION`: enlace al plan tecnico exacto.
+9. `CONSTITUTION`: plan como hoja de ruta con ejecucion tecnica bloqueada.
+10. `ARCHITECTURE`: modulo Programacion asistida de turnos.
+11. `ARCHITECTURE`: `PlantillaDeTurno`.
+12. `ARCHITECTURE`: `VersionDeProgramacion`.
+13. `ARCHITECTURE`: `ExcepcionDeProgramacion`.
+14. `ARCHITECTURE`: integracion I2-I3-I5-I6-I7.
+15. `TECNOLOGIA`: motor heuristico deterministico.
+16. `TECNOLOGIA`: `.NET 6`.
+17. `TECNOLOGIA`: MVP sin dependencia externa.
+18. `DESIGN`: Enterprise Sentinel.
+19. `DESIGN`: referencia `Prototipos/stitch_ecosistema_digital_unificado/sentinel_enterprise/DESIGN.md`.
+20. `DESIGN`: `#003366`.
+21. `DESIGN`: `#FFC700`.
+22. `DESIGN`: `#F8F9FA`.
+23. `DESIGN`: `#FFFFFF`.
+24. `DESIGN`: `#E1E4E8`.
+25. `DESIGN`: radios 4px-8px.
+26. `DESIGN`: Montserrat/sans para jerarquia.
+27. `DESIGN`: Arial/Inter-compatible para datos.
+28. `DESIGN`: prohibicion de landing/decoracion sin valor operativo.
+29. `DESIGN`: matriz mensual.
+30. `DESIGN`: plantillas.
+31. `DESIGN`: comparacion.
+32. `DESIGN`: excepciones.
+33. SPEC I9 ausente.
+34. Execution log I9 ausente.
+35. Catalogo de reglas I9 ausente.
 
 La copia usada para esta observacion fue
 `C:\Users\jmep2\AppData\Local\Temp\sg-i9-red-baaf482-ba354d86c487418c992c1186b721c7e0`.

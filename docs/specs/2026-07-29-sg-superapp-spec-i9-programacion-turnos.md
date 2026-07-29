@@ -4,6 +4,11 @@
 > Fecha: 2026-07-29
 > Gate: 0 documental; no autoriza implementacion
 > Fuentes: Constitucion, Arquitectura, Tecnologia, Design y diseño funcional del 2026-07-19.
+> Plan tecnico: `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`
+
+El plan tecnico esta aprobado solo como hoja de ruta documental; su ejecucion
+tecnica permanece bloqueada hasta aprobar esta SPEC, el catalogo operativo y
+Gate 0.
 
 ## 1. Objetivo
 
@@ -81,18 +86,20 @@ identificadores y snapshots. No reasigna propiedad de esos datos.
 ```text
 GET/POST /api/portal/scheduling/templates
 GET/POST /api/portal/scheduling/projects
-POST     /api/portal/scheduling/projects/{id}/proposals
-GET      /api/portal/scheduling/proposals/{versionId}
-PUT      /api/portal/scheduling/proposals/{versionId}/assignments/{id}
-POST     /api/portal/scheduling/proposals/{versionId}/exceptions
-POST     /api/portal/scheduling/proposals/{versionId}/approve
-POST     /api/portal/scheduling/proposals/{versionId}/publish
+POST     /api/portal/scheduling/projects/{id}/versions
+GET      /api/portal/scheduling/versions/{versionId}
+PUT      /api/portal/scheduling/versions/{versionId}/assignments/{id}
+POST     /api/portal/scheduling/versions/{versionId}/exceptions
+POST     /api/portal/scheduling/versions/{versionId}/approve
+POST     /api/portal/scheduling/versions/{versionId}/publish
 POST     /api/portal/scheduling/versions/{versionId}/replan
 GET      /api/portal/scheduling/versions/{versionId}/audit
 GET      /api/portal/scheduling/versions/{versionId}/export.{pdf|xlsx}
 ```
 
-Las mutaciones usan version esperada e idempotencia cuando aplique. Los errores
+El POST de generacion crea una `schedule version` en estado `PROPUESTA`. Toda
+consulta y accion posterior usa la ruta canonica `versions/{versionId}`. Las
+mutaciones usan version esperada e idempotencia cuando aplique. Los errores
 devuelven codigo, mensaje y razones de negocio.
 
 ## 9. Criterios De Aceptacion
