@@ -36,6 +36,27 @@ BEGIN
         RAISE EXCEPTION 'Missing service_positions.project_id';
     END IF;
 
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'shift_templates'
+          AND column_name = 'mandatory_by_default'
+          AND column_default = 'true'
+    ) THEN
+        RAISE EXCEPTION 'shift_templates.mandatory_by_default must default to TRUE';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conrelid = 'shift_template_steps'::regclass
+          AND conname = 'shift_template_steps_template_id_fkey'
+          AND confdeltype = 'r'
+    ) THEN
+        RAISE EXCEPTION 'shift_template_steps.template_id must use ON DELETE RESTRICT';
+    END IF;
+
     IF EXISTS (SELECT 1 FROM scheduling_rules) THEN
         RAISE EXCEPTION 'I9 seeds must not create executable scheduling rules';
     END IF;

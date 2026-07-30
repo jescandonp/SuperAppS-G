@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS shift_templates (
     version                 INTEGER NOT NULL CHECK (version > 0),
     effective_from          DATE NOT NULL,
     effective_to            DATE,
-    mandatory_by_default    BOOLEAN NOT NULL DEFAULT FALSE,
+    mandatory_by_default    BOOLEAN NOT NULL DEFAULT TRUE,
     status                  VARCHAR(20) NOT NULL DEFAULT 'ACTIVO' CHECK (status IN ('ACTIVO', 'INACTIVO')),
     created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -65,11 +65,21 @@ CREATE TABLE IF NOT EXISTS shift_templates (
 
 CREATE TABLE IF NOT EXISTS shift_template_steps (
     id          BIGSERIAL PRIMARY KEY,
-    template_id BIGINT NOT NULL REFERENCES shift_templates(id) ON DELETE CASCADE,
+    template_id BIGINT NOT NULL REFERENCES shift_templates(id) ON DELETE RESTRICT,
     step_order  INTEGER NOT NULL CHECK (step_order > 0),
     shift_code  CHAR(1) NOT NULL CHECK (shift_code IN ('D', 'N', 'X')),
     CONSTRAINT uq_shift_template_steps_order UNIQUE (template_id, step_order)
 );
+
+ALTER TABLE shift_templates
+    ALTER COLUMN mandatory_by_default SET DEFAULT TRUE;
+
+ALTER TABLE shift_template_steps
+    DROP CONSTRAINT IF EXISTS shift_template_steps_template_id_fkey;
+
+ALTER TABLE shift_template_steps
+    ADD CONSTRAINT shift_template_steps_template_id_fkey
+    FOREIGN KEY (template_id) REFERENCES shift_templates(id) ON DELETE RESTRICT;
 
 CREATE TABLE IF NOT EXISTS position_coverage_rules (
     id                  BIGSERIAL PRIMARY KEY,
