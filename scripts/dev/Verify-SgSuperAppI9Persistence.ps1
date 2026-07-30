@@ -14,6 +14,7 @@ $partialSchemaName = "${schemaName}_partial"
 $constraintSchemaName = "${schemaName}_constraint"
 $incompatibleSchemaName = "${schemaName}_incompatible"
 $sequenceSchemaName = "${schemaName}_sequence"
+$typeErrorSchemaName = "${schemaName}_type_error"
 $originalPassword = $env:PGPASSWORD
 $originalPgOptions = $env:PGOPTIONS
 
@@ -23,6 +24,7 @@ if ($partialSchemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_partial$') { th
 if ($constraintSchemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_constraint$') { throw "Unsafe constraint verification schema name." }
 if ($incompatibleSchemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_incompatible$') { throw "Unsafe incompatible verification schema name." }
 if ($sequenceSchemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_sequence$') { throw "Unsafe sequence verification schema name." }
+if ($typeErrorSchemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_type_error$') { throw "Unsafe type-error verification schema name." }
 
 function Invoke-PsqlFile([string]$Path) {
     & $psqlExe -X -q -h $HostName -p $Port -U $AppUser -d $Database -f $Path
@@ -62,13 +64,31 @@ try {
     if ($repairedConstraint -notmatch 'version > 0') { throw "Incorrect same-table constraint was not repaired." }
 
     Initialize-I9Base $sequenceSchemaName
-    Invoke-PsqlScalar "CREATE TABLE shift_templates (id BIGINT PRIMARY KEY, code varchar(50), name varchar(180), version integer, effective_from date, effective_to date, mandatory_by_default boolean, status varchar(20)); INSERT INTO shift_templates(id,code,name,version,effective_from,mandatory_by_default,status) VALUES (9000,'EXISTING','Existing row',1,CURRENT_DATE,true,'ACTIVO')" | Out-Null
+    Invoke-PsqlScalar "CREATE TABLE shift_templates (id INTEGER PRIMARY KEY, code TEXT, name varchar(180), version integer, effective_from date, effective_to date, mandatory_by_default boolean, status varchar(20)); INSERT INTO shift_templates(id,code,name,version,effective_from,mandatory_by_default,status) VALUES (9000,'EXISTING','Existing row',1,CURRENT_DATE,true,'ACTIVO')" | Out-Null
     Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\009_i9_scheduling.sql")
+    $convergedTypes = Invoke-PsqlScalar "SELECT format_type(a.atttypid,a.atttypmod) FROM pg_attribute a WHERE a.attrelid='shift_templates'::regclass AND a.attname IN ('id','code') ORDER BY a.attname"
+    if ($convergedTypes -ne "character varying(30)`nbigint") { throw "Compatible INTEGER/TEXT columns did not converge to BIGINT/VARCHAR(30)." }
     $generatedId = Invoke-PsqlScalar "INSERT INTO shift_templates(code,name,version,effective_from) VALUES ('GENERATED','Generated row',1,CURRENT_DATE) RETURNING id"
     if ([long]$generatedId -le 9000) { throw "Converged shift_templates sequence did not advance beyond the existing ID." }
     Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\009_i9_scheduling.sql")
     $rerunId = Invoke-PsqlScalar "INSERT INTO shift_templates(code,name,version,effective_from) VALUES ('RERUN','Rerun row',1,CURRENT_DATE) RETURNING id"
     if ([long]$rerunId -le [long]$generatedId) { throw "Converged shift_templates sequence was not stable across rerun." }
+
+    Initialize-I9Base $typeErrorSchemaName
+    Invoke-PsqlScalar "CREATE TABLE shift_templates (id INTEGER PRIMARY KEY, code TEXT, name varchar(180), version integer, effective_from date, effective_to date, mandatory_by_default boolean, status varchar(20)); INSERT INTO shift_templates(id,code,name,version,effective_from,mandatory_by_default,status) VALUES (1,repeat('X',31),'Too long',1,CURRENT_DATE,true,'ACTIVO')" | Out-Null
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $typeErrorOutput = & $psqlExe -X -h $HostName -p $Port -U $AppUser -d $Database -f (Join-Path $workspaceRoot "db\migrations\009_i9_scheduling.sql") 2>&1
+        $typeErrorExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($typeErrorExitCode -eq 0) { throw "Oversized TEXT fixture unexpectedly converged to VARCHAR(30)." }
+    if (($typeErrorOutput -join "`n") -notmatch 'I9_PARTIAL_SCHEMA_INCOMPATIBLE: shift_templates\.code has type text, expected character varying\(30\)') {
+        throw "Oversized TEXT fixture did not return the canonical type error."
+    }
 
     Initialize-I9Base $incompatibleSchemaName
     Invoke-PsqlScalar "CREATE TABLE shift_templates (id BIGSERIAL PRIMARY KEY, code varchar(50)); INSERT INTO shift_templates(code) VALUES ('PARTIAL')" | Out-Null
@@ -117,6 +137,7 @@ finally {
         & $psqlExe -X -q -h $HostName -p $Port -U $AppUser -d $Database -c "DROP SCHEMA IF EXISTS $constraintSchemaName CASCADE" | Out-Null
         & $psqlExe -X -q -h $HostName -p $Port -U $AppUser -d $Database -c "DROP SCHEMA IF EXISTS $incompatibleSchemaName CASCADE" | Out-Null
         & $psqlExe -X -q -h $HostName -p $Port -U $AppUser -d $Database -c "DROP SCHEMA IF EXISTS $sequenceSchemaName CASCADE" | Out-Null
+        & $psqlExe -X -q -h $HostName -p $Port -U $AppUser -d $Database -c "DROP SCHEMA IF EXISTS $typeErrorSchemaName CASCADE" | Out-Null
     }
     $env:PGPASSWORD = $originalPassword
     $env:PGOPTIONS = $originalPgOptions

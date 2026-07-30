@@ -29,7 +29,7 @@ ALTER TABLE service_projects
 ALTER TABLE service_positions ADD COLUMN IF NOT EXISTS project_id BIGINT;
 ALTER TABLE shift_templates
  ADD COLUMN IF NOT EXISTS id BIGSERIAL,
- ADD COLUMN IF NOT EXISTS code VARCHAR(50),
+ ADD COLUMN IF NOT EXISTS code VARCHAR(30),
  ADD COLUMN IF NOT EXISTS name VARCHAR(180),
  ADD COLUMN IF NOT EXISTS version INTEGER,
  ADD COLUMN IF NOT EXISTS effective_from DATE,
@@ -75,6 +75,88 @@ ALTER TABLE employee_availability_exceptions
  ADD COLUMN IF NOT EXISTS status VARCHAR(20),
  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ,
  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+
+DO $$
+DECLARE
+    r RECORD;
+    actual_type TEXT;
+    row_count BIGINT;
+    maximum_length BIGINT;
+    compatible BOOLEAN;
+BEGIN
+    FOR r IN SELECT * FROM (VALUES
+        ('clients','id','bigint'),('clients','code','character varying(50)'),('clients','name','character varying(180)'),('clients','status','character varying(20)'),('clients','created_at','timestamp with time zone'),('clients','updated_at','timestamp with time zone'),
+        ('service_projects','id','bigint'),('service_projects','client_id','bigint'),('service_projects','code','character varying(50)'),('service_projects','name','character varying(180)'),('service_projects','effective_from','date'),('service_projects','effective_to','date'),('service_projects','status','character varying(20)'),('service_projects','created_at','timestamp with time zone'),('service_projects','updated_at','timestamp with time zone'),
+        ('service_positions','project_id','bigint'),
+        ('shift_templates','id','bigint'),('shift_templates','code','character varying(30)'),('shift_templates','name','character varying(180)'),('shift_templates','version','integer'),('shift_templates','effective_from','date'),('shift_templates','effective_to','date'),('shift_templates','mandatory_by_default','boolean'),('shift_templates','status','character varying(20)'),('shift_templates','created_at','timestamp with time zone'),('shift_templates','updated_at','timestamp with time zone'),
+        ('shift_template_steps','id','bigint'),('shift_template_steps','template_id','bigint'),('shift_template_steps','step_order','integer'),('shift_template_steps','shift_code','character(1)'),
+        ('position_coverage_rules','id','bigint'),('position_coverage_rules','position_id','bigint'),('position_coverage_rules','template_id','bigint'),('position_coverage_rules','required_quantity','integer'),('position_coverage_rules','effective_from','date'),('position_coverage_rules','effective_to','date'),('position_coverage_rules','status','character varying(20)'),('position_coverage_rules','created_at','timestamp with time zone'),('position_coverage_rules','updated_at','timestamp with time zone'),
+        ('scheduling_rules','id','bigint'),('scheduling_rules','source_level','character varying(50)'),('scheduling_rules','scope_type','character varying(50)'),('scheduling_rules','scope_id','bigint'),('scheduling_rules','severity','character varying(30)'),('scheduling_rules','effective_from','date'),('scheduling_rules','effective_to','date'),('scheduling_rules','parameters','jsonb'),('scheduling_rules','status','character varying(20)'),('scheduling_rules','created_at','timestamp with time zone'),('scheduling_rules','updated_at','timestamp with time zone'),
+        ('employee_availability_exceptions','id','bigint'),('employee_availability_exceptions','employee_id','bigint'),('employee_availability_exceptions','starts_at','timestamp with time zone'),('employee_availability_exceptions','ends_at','timestamp with time zone'),('employee_availability_exceptions','reason','character varying(500)'),('employee_availability_exceptions','created_by','character varying(80)'),('employee_availability_exceptions','status','character varying(20)'),('employee_availability_exceptions','created_at','timestamp with time zone'),('employee_availability_exceptions','updated_at','timestamp with time zone')
+    ) expected(t,c,expected_type)
+    LOOP
+        SELECT format_type(a.atttypid,a.atttypmod) INTO actual_type
+        FROM pg_attribute a WHERE a.attrelid=r.t::regclass AND a.attname=r.c AND NOT a.attisdropped;
+        IF actual_type <> r.expected_type THEN
+            EXECUTE format('SELECT count(*) FROM %I',r.t) INTO row_count;
+            compatible := row_count=0 OR (actual_type='integer' AND r.expected_type='bigint');
+            IF actual_type IN ('text','character varying')
+               OR actual_type LIKE 'character varying(%'
+               OR actual_type LIKE 'character(%' THEN
+                IF r.expected_type LIKE 'character varying(%' OR r.expected_type LIKE 'character(%' THEN
+                    EXECUTE format('SELECT max(length(%I::text)) FROM %I',r.c,r.t) INTO maximum_length;
+                    compatible := coalesce(maximum_length,0) <=
+                        substring(r.expected_type FROM '\(([0-9]+)\)')::integer;
+                END IF;
+            END IF;
+            IF NOT compatible THEN
+                RAISE EXCEPTION 'I9_PARTIAL_SCHEMA_INCOMPATIBLE: %.% has type %, expected %; conversion is not provably lossless',
+                    r.t,r.c,actual_type,r.expected_type;
+            END IF;
+        END IF;
+    END LOOP;
+
+    FOR r IN SELECT * FROM (VALUES
+        ('clients','id','bigint'),('clients','code','character varying(50)'),('clients','name','character varying(180)'),('clients','status','character varying(20)'),('clients','created_at','timestamp with time zone'),('clients','updated_at','timestamp with time zone'),
+        ('service_projects','id','bigint'),('service_projects','client_id','bigint'),('service_projects','code','character varying(50)'),('service_projects','name','character varying(180)'),('service_projects','effective_from','date'),('service_projects','effective_to','date'),('service_projects','status','character varying(20)'),('service_projects','created_at','timestamp with time zone'),('service_projects','updated_at','timestamp with time zone'),
+        ('service_positions','project_id','bigint'),
+        ('shift_templates','id','bigint'),('shift_templates','code','character varying(30)'),('shift_templates','name','character varying(180)'),('shift_templates','version','integer'),('shift_templates','effective_from','date'),('shift_templates','effective_to','date'),('shift_templates','mandatory_by_default','boolean'),('shift_templates','status','character varying(20)'),('shift_templates','created_at','timestamp with time zone'),('shift_templates','updated_at','timestamp with time zone'),
+        ('shift_template_steps','id','bigint'),('shift_template_steps','template_id','bigint'),('shift_template_steps','step_order','integer'),('shift_template_steps','shift_code','character(1)'),
+        ('position_coverage_rules','id','bigint'),('position_coverage_rules','position_id','bigint'),('position_coverage_rules','template_id','bigint'),('position_coverage_rules','required_quantity','integer'),('position_coverage_rules','effective_from','date'),('position_coverage_rules','effective_to','date'),('position_coverage_rules','status','character varying(20)'),('position_coverage_rules','created_at','timestamp with time zone'),('position_coverage_rules','updated_at','timestamp with time zone'),
+        ('scheduling_rules','id','bigint'),('scheduling_rules','source_level','character varying(50)'),('scheduling_rules','scope_type','character varying(50)'),('scheduling_rules','scope_id','bigint'),('scheduling_rules','severity','character varying(30)'),('scheduling_rules','effective_from','date'),('scheduling_rules','effective_to','date'),('scheduling_rules','parameters','jsonb'),('scheduling_rules','status','character varying(20)'),('scheduling_rules','created_at','timestamp with time zone'),('scheduling_rules','updated_at','timestamp with time zone'),
+        ('employee_availability_exceptions','id','bigint'),('employee_availability_exceptions','employee_id','bigint'),('employee_availability_exceptions','starts_at','timestamp with time zone'),('employee_availability_exceptions','ends_at','timestamp with time zone'),('employee_availability_exceptions','reason','character varying(500)'),('employee_availability_exceptions','created_by','character varying(80)'),('employee_availability_exceptions','status','character varying(20)'),('employee_availability_exceptions','created_at','timestamp with time zone'),('employee_availability_exceptions','updated_at','timestamp with time zone')
+    ) expected(t,c,expected_type)
+    LOOP
+        SELECT format_type(a.atttypid,a.atttypmod) INTO actual_type
+        FROM pg_attribute a WHERE a.attrelid=r.t::regclass AND a.attname=r.c AND NOT a.attisdropped;
+        IF actual_type <> r.expected_type THEN
+            BEGIN
+                EXECUTE format('ALTER TABLE %I ALTER COLUMN %I TYPE %s USING %I::%s',r.t,r.c,r.expected_type,r.c,r.expected_type);
+            EXCEPTION WHEN OTHERS THEN
+                RAISE EXCEPTION 'I9_PARTIAL_SCHEMA_INCOMPATIBLE: %.% cannot be converted from % to %: %',
+                    r.t,r.c,actual_type,r.expected_type,SQLERRM;
+            END;
+        END IF;
+    END LOOP;
+
+    FOR r IN SELECT * FROM (VALUES
+        ('clients','id','bigint'),('clients','code','character varying(50)'),('clients','name','character varying(180)'),('clients','status','character varying(20)'),('clients','created_at','timestamp with time zone'),('clients','updated_at','timestamp with time zone'),
+        ('service_projects','id','bigint'),('service_projects','client_id','bigint'),('service_projects','code','character varying(50)'),('service_projects','name','character varying(180)'),('service_projects','effective_from','date'),('service_projects','effective_to','date'),('service_projects','status','character varying(20)'),('service_projects','created_at','timestamp with time zone'),('service_projects','updated_at','timestamp with time zone'),
+        ('service_positions','project_id','bigint'),
+        ('shift_templates','id','bigint'),('shift_templates','code','character varying(30)'),('shift_templates','name','character varying(180)'),('shift_templates','version','integer'),('shift_templates','effective_from','date'),('shift_templates','effective_to','date'),('shift_templates','mandatory_by_default','boolean'),('shift_templates','status','character varying(20)'),('shift_templates','created_at','timestamp with time zone'),('shift_templates','updated_at','timestamp with time zone'),
+        ('shift_template_steps','id','bigint'),('shift_template_steps','template_id','bigint'),('shift_template_steps','step_order','integer'),('shift_template_steps','shift_code','character(1)'),
+        ('position_coverage_rules','id','bigint'),('position_coverage_rules','position_id','bigint'),('position_coverage_rules','template_id','bigint'),('position_coverage_rules','required_quantity','integer'),('position_coverage_rules','effective_from','date'),('position_coverage_rules','effective_to','date'),('position_coverage_rules','status','character varying(20)'),('position_coverage_rules','created_at','timestamp with time zone'),('position_coverage_rules','updated_at','timestamp with time zone'),
+        ('scheduling_rules','id','bigint'),('scheduling_rules','source_level','character varying(50)'),('scheduling_rules','scope_type','character varying(50)'),('scheduling_rules','scope_id','bigint'),('scheduling_rules','severity','character varying(30)'),('scheduling_rules','effective_from','date'),('scheduling_rules','effective_to','date'),('scheduling_rules','parameters','jsonb'),('scheduling_rules','status','character varying(20)'),('scheduling_rules','created_at','timestamp with time zone'),('scheduling_rules','updated_at','timestamp with time zone'),
+        ('employee_availability_exceptions','id','bigint'),('employee_availability_exceptions','employee_id','bigint'),('employee_availability_exceptions','starts_at','timestamp with time zone'),('employee_availability_exceptions','ends_at','timestamp with time zone'),('employee_availability_exceptions','reason','character varying(500)'),('employee_availability_exceptions','created_by','character varying(80)'),('employee_availability_exceptions','status','character varying(20)'),('employee_availability_exceptions','created_at','timestamp with time zone'),('employee_availability_exceptions','updated_at','timestamp with time zone')
+    ) expected(t,c,expected_type)
+    LOOP
+        SELECT format_type(a.atttypid,a.atttypmod) INTO actual_type
+        FROM pg_attribute a WHERE a.attrelid=r.t::regclass AND a.attname=r.c AND NOT a.attisdropped;
+        IF actual_type <> r.expected_type THEN
+            RAISE EXCEPTION 'I9_PARTIAL_SCHEMA_INCOMPATIBLE: %.% remains type %, expected %',r.t,r.c,actual_type,r.expected_type;
+        END IF;
+    END LOOP;
+END $$;
 
 DO $$
 DECLARE

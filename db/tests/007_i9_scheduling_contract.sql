@@ -66,6 +66,23 @@ BEGIN
     END IF;
 
     IF EXISTS (
+        SELECT 1 FROM (VALUES
+            ('clients','id','bigint'),('clients','code','character varying(50)'),('clients','name','character varying(180)'),('clients','status','character varying(20)'),('clients','created_at','timestamp with time zone'),('clients','updated_at','timestamp with time zone'),
+            ('service_projects','id','bigint'),('service_projects','client_id','bigint'),('service_projects','code','character varying(50)'),('service_projects','name','character varying(180)'),('service_projects','effective_from','date'),('service_projects','effective_to','date'),('service_projects','status','character varying(20)'),('service_projects','created_at','timestamp with time zone'),('service_projects','updated_at','timestamp with time zone'),
+            ('service_positions','project_id','bigint'),
+            ('shift_templates','id','bigint'),('shift_templates','code','character varying(30)'),('shift_templates','name','character varying(180)'),('shift_templates','version','integer'),('shift_templates','effective_from','date'),('shift_templates','effective_to','date'),('shift_templates','mandatory_by_default','boolean'),('shift_templates','status','character varying(20)'),('shift_templates','created_at','timestamp with time zone'),('shift_templates','updated_at','timestamp with time zone'),
+            ('shift_template_steps','id','bigint'),('shift_template_steps','template_id','bigint'),('shift_template_steps','step_order','integer'),('shift_template_steps','shift_code','character(1)'),
+            ('position_coverage_rules','id','bigint'),('position_coverage_rules','position_id','bigint'),('position_coverage_rules','template_id','bigint'),('position_coverage_rules','required_quantity','integer'),('position_coverage_rules','effective_from','date'),('position_coverage_rules','effective_to','date'),('position_coverage_rules','status','character varying(20)'),('position_coverage_rules','created_at','timestamp with time zone'),('position_coverage_rules','updated_at','timestamp with time zone'),
+            ('scheduling_rules','id','bigint'),('scheduling_rules','source_level','character varying(50)'),('scheduling_rules','scope_type','character varying(50)'),('scheduling_rules','scope_id','bigint'),('scheduling_rules','severity','character varying(30)'),('scheduling_rules','effective_from','date'),('scheduling_rules','effective_to','date'),('scheduling_rules','parameters','jsonb'),('scheduling_rules','status','character varying(20)'),('scheduling_rules','created_at','timestamp with time zone'),('scheduling_rules','updated_at','timestamp with time zone'),
+            ('employee_availability_exceptions','id','bigint'),('employee_availability_exceptions','employee_id','bigint'),('employee_availability_exceptions','starts_at','timestamp with time zone'),('employee_availability_exceptions','ends_at','timestamp with time zone'),('employee_availability_exceptions','reason','character varying(500)'),('employee_availability_exceptions','created_by','character varying(80)'),('employee_availability_exceptions','status','character varying(20)'),('employee_availability_exceptions','created_at','timestamp with time zone'),('employee_availability_exceptions','updated_at','timestamp with time zone')
+        ) expected(table_name,column_name,expected_type)
+        JOIN pg_attribute a ON a.attrelid=expected.table_name::regclass AND a.attname=expected.column_name AND NOT a.attisdropped
+        WHERE format_type(a.atttypid,a.atttypmod) <> expected.expected_type
+    ) THEN
+        RAISE EXCEPTION 'I9 critical column type or length mismatch';
+    END IF;
+
+    IF EXISTS (
         SELECT 1
         FROM unnest(ARRAY[
             'clients','service_projects','shift_templates','shift_template_steps',
