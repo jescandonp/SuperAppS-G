@@ -142,4 +142,85 @@ CREATE INDEX IF NOT EXISTS idx_scheduling_rules_scope_dates
 CREATE INDEX IF NOT EXISTS idx_employee_availability_employee_dates
     ON employee_availability_exceptions (employee_id, starts_at, ends_at);
 
+DO $$
+DECLARE
+    required_column RECORD;
+    required_constraint TEXT;
+    required_index TEXT;
+BEGIN
+    FOR required_column IN
+        SELECT *
+        FROM (VALUES
+            ('clients','id'), ('clients','code'), ('clients','name'), ('clients','status'),
+            ('service_projects','id'), ('service_projects','client_id'), ('service_projects','code'), ('service_projects','name'), ('service_projects','effective_from'), ('service_projects','effective_to'), ('service_projects','status'),
+            ('service_positions','project_id'),
+            ('shift_templates','id'), ('shift_templates','code'), ('shift_templates','name'), ('shift_templates','version'), ('shift_templates','effective_from'), ('shift_templates','effective_to'), ('shift_templates','mandatory_by_default'), ('shift_templates','status'),
+            ('shift_template_steps','id'), ('shift_template_steps','template_id'), ('shift_template_steps','step_order'), ('shift_template_steps','shift_code'),
+            ('position_coverage_rules','id'), ('position_coverage_rules','position_id'), ('position_coverage_rules','template_id'), ('position_coverage_rules','required_quantity'), ('position_coverage_rules','effective_from'), ('position_coverage_rules','effective_to'), ('position_coverage_rules','status'),
+            ('scheduling_rules','id'), ('scheduling_rules','source_level'), ('scheduling_rules','scope_type'), ('scheduling_rules','scope_id'), ('scheduling_rules','severity'), ('scheduling_rules','effective_from'), ('scheduling_rules','effective_to'), ('scheduling_rules','parameters'), ('scheduling_rules','status'),
+            ('employee_availability_exceptions','id'), ('employee_availability_exceptions','employee_id'), ('employee_availability_exceptions','starts_at'), ('employee_availability_exceptions','ends_at'), ('employee_availability_exceptions','reason'), ('employee_availability_exceptions','created_by'), ('employee_availability_exceptions','status')
+        ) AS expected(table_name, column_name)
+    LOOP
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns c
+            WHERE c.table_schema = current_schema()
+              AND c.table_name = required_column.table_name
+              AND c.column_name = required_column.column_name
+        ) THEN
+            RAISE EXCEPTION 'I9 partial installation is incompatible: missing %.%. Add/backfill the column before rerunning 009_i9_scheduling.sql.',
+                required_column.table_name, required_column.column_name;
+        END IF;
+    END LOOP;
+
+    FOREACH required_constraint IN ARRAY ARRAY[
+        'clients_code_key',
+        'clients_status_check',
+        'service_projects_client_id_fkey',
+        'service_projects_code_key',
+        'service_projects_status_check',
+        'fk_service_positions_project',
+        'uq_shift_templates_code_version',
+        'shift_templates_status_check',
+        'uq_shift_template_steps_order',
+        'shift_template_steps_template_id_fkey',
+        'shift_template_steps_shift_code_check',
+        'uq_position_coverage_rules_period',
+        'position_coverage_rules_position_id_fkey',
+        'position_coverage_rules_template_id_fkey',
+        'position_coverage_rules_required_quantity_check',
+        'ck_position_coverage_rules_dates',
+        'scheduling_rules_status_check',
+        'ck_scheduling_rules_dates',
+        'ck_scheduling_rules_parameters_object',
+        'employee_availability_exceptions_employee_id_fkey',
+        'employee_availability_exceptions_status_check',
+        'ck_employee_availability_exception_range'
+    ]
+    LOOP
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE connamespace = current_schema()::regnamespace
+              AND conname = required_constraint
+        ) THEN
+            RAISE EXCEPTION 'I9 partial installation is incompatible: missing constraint %. Repair the partial schema before rerunning 009_i9_scheduling.sql.',
+                required_constraint;
+        END IF;
+    END LOOP;
+
+    FOREACH required_index IN ARRAY ARRAY[
+        'idx_service_projects_client_status',
+        'idx_service_positions_project',
+        'idx_shift_templates_status_dates',
+        'idx_position_coverage_rules_position_dates',
+        'idx_scheduling_rules_scope_dates',
+        'idx_employee_availability_employee_dates'
+    ]
+    LOOP
+        IF to_regclass(required_index) IS NULL THEN
+            RAISE EXCEPTION 'I9 partial installation is incompatible: missing index %.', required_index;
+        END IF;
+    END LOOP;
+END
+$$;
+
 COMMIT;

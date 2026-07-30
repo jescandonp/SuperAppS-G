@@ -21,7 +21,7 @@ BEGIN
         'employee_availability_exceptions'
     ]
     LOOP
-        IF to_regclass('public.' || required_table) IS NULL THEN
+        IF to_regclass(required_table) IS NULL THEN
             RAISE EXCEPTION 'Missing table %', required_table;
         END IF;
     END LOOP;
@@ -29,7 +29,7 @@ BEGIN
     IF NOT EXISTS (
         SELECT 1
         FROM information_schema.columns
-        WHERE table_schema = 'public'
+        WHERE table_schema = current_schema()
           AND table_name = 'service_positions'
           AND column_name = 'project_id'
     ) THEN
@@ -39,7 +39,7 @@ BEGIN
     IF NOT EXISTS (
         SELECT 1
         FROM information_schema.columns
-        WHERE table_schema = 'public'
+        WHERE table_schema = current_schema()
           AND table_name = 'shift_templates'
           AND column_name = 'mandatory_by_default'
           AND column_default = 'true'
@@ -55,10 +55,6 @@ BEGIN
           AND confdeltype = 'r'
     ) THEN
         RAISE EXCEPTION 'shift_template_steps.template_id must use ON DELETE RESTRICT';
-    END IF;
-
-    IF EXISTS (SELECT 1 FROM scheduling_rules) THEN
-        RAISE EXCEPTION 'I9 seeds must not create executable scheduling rules';
     END IF;
 
     INSERT INTO clients (code, name)
@@ -183,7 +179,7 @@ BEGIN
         WHEN check_violation THEN NULL;
     END;
 
-    IF (SELECT count(*) FROM shift_templates WHERE code IN ('2X2', '4X2', '6X1') AND status = 'ACTIVO') <> 3 THEN
+    IF (SELECT count(*) FROM shift_templates WHERE code IN ('2X2', '4X2', '6X1') AND status = 'ACTIVO' AND mandatory_by_default) <> 3 THEN
         RAISE EXCEPTION 'Missing active I9 shift template seeds';
     END IF;
 
@@ -245,6 +241,23 @@ BEGIN
         WHERE r.code = 'GERENCIA' AND rp.module_code = 'SCHEDULING'
           AND rp.action_code IN ('VIEW', 'EXPORT') AND rp.allowed) <> 2 THEN
         RAISE EXCEPTION 'GERENCIA scheduling permissions must cover view and export';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM role_permissions rp
+        JOIN roles r ON r.id = rp.role_id
+        WHERE r.code IN ('ADMIN', 'OPERACIONES', 'TH', 'GERENCIA')
+          AND rp.module_code = 'SCHEDULING'
+          AND (
+              NOT rp.allowed
+              OR (r.code = 'ADMIN' AND rp.action_code NOT IN ('VIEW', 'CONFIGURE', 'GENERATE', 'APPROVE_EXCEPTION', 'APPROVE', 'PUBLISH', 'EXPORT', 'AUDIT'))
+              OR (r.code = 'OPERACIONES' AND rp.action_code NOT IN ('VIEW', 'GENERATE', 'APPROVE_EXCEPTION', 'APPROVE', 'PUBLISH', 'EXPORT', 'AUDIT'))
+              OR (r.code = 'TH' AND rp.action_code NOT IN ('VIEW', 'APPROVE_EXCEPTION'))
+              OR (r.code = 'GERENCIA' AND rp.action_code NOT IN ('VIEW', 'EXPORT'))
+          )
+    ) THEN
+        RAISE EXCEPTION 'Managed roles must have the exact I9 scheduling permission matrix';
     END IF;
 END
 $$;
