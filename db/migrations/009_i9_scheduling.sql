@@ -77,6 +77,62 @@ ALTER TABLE employee_availability_exceptions
  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
 
 DO $$
+DECLARE
+    table_name TEXT;
+    sequence_name TEXT;
+    qualified_sequence TEXT;
+    sequence_kind "char";
+    sequence_owner_table REGCLASS;
+    sequence_owner_column SMALLINT;
+    maximum_id BIGINT;
+BEGIN
+    FOREACH table_name IN ARRAY ARRAY[
+        'clients', 'service_projects', 'shift_templates', 'shift_template_steps',
+        'position_coverage_rules', 'scheduling_rules', 'employee_availability_exceptions'
+    ]
+    LOOP
+        sequence_name := pg_get_serial_sequence(format('%I.%I', current_schema(), table_name), 'id');
+        IF sequence_name IS NULL THEN
+            qualified_sequence := format('%I.%I', current_schema(), table_name || '_id_seq');
+            SELECT c.relkind INTO sequence_kind
+            FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+            WHERE n.nspname=current_schema() AND c.relname=table_name || '_id_seq';
+
+            IF sequence_kind IS NULL THEN
+                EXECUTE format('CREATE SEQUENCE %s AS BIGINT', qualified_sequence);
+            ELSIF sequence_kind <> 'S' THEN
+                RAISE EXCEPTION 'I9_PARTIAL_SCHEMA_INCOMPATIBLE: %.id requires sequence %, but that name belongs to a non-sequence object',
+                    table_name, qualified_sequence;
+            ELSE
+                SELECT d.refobjid::regclass, d.refobjsubid
+                  INTO sequence_owner_table, sequence_owner_column
+                FROM pg_depend d
+                WHERE d.classid='pg_class'::regclass
+                  AND d.objid=qualified_sequence::regclass
+                  AND d.refclassid='pg_class'::regclass
+                  AND d.deptype='a';
+                IF sequence_owner_table IS NOT NULL
+                   AND (sequence_owner_table <> table_name::regclass
+                        OR sequence_owner_column <> (SELECT attnum FROM pg_attribute WHERE attrelid=table_name::regclass AND attname='id')) THEN
+                    RAISE EXCEPTION 'I9_PARTIAL_SCHEMA_INCOMPATIBLE: sequence % is owned by another column and cannot safely back %.id',
+                        qualified_sequence, table_name;
+                END IF;
+            END IF;
+            sequence_name := qualified_sequence;
+        END IF;
+
+        EXECUTE format('SELECT max(id) FROM %I', table_name) INTO maximum_id;
+        IF maximum_id IS NULL THEN
+            EXECUTE format('SELECT setval(%L::regclass, 1, false)', sequence_name);
+        ELSE
+            EXECUTE format('SELECT setval(%L::regclass, %s, true)', sequence_name, maximum_id);
+        END IF;
+        EXECUTE format('ALTER SEQUENCE %s OWNED BY %I.id', sequence_name, table_name);
+        EXECUTE format('ALTER TABLE %I ALTER COLUMN id SET DEFAULT nextval(%L::regclass)', table_name, sequence_name);
+    END LOOP;
+END $$;
+
+DO $$
 DECLARE r RECORD; n BIGINT;
 BEGIN
  FOR r IN SELECT * FROM (VALUES

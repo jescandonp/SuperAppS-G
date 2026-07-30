@@ -13,6 +13,7 @@ $schemaName = "sg_i9_verify_{0}_{1}" -f $PID, (Get-Date -Format "yyyyMMddHHmmssf
 $partialSchemaName = "${schemaName}_partial"
 $constraintSchemaName = "${schemaName}_constraint"
 $incompatibleSchemaName = "${schemaName}_incompatible"
+$sequenceSchemaName = "${schemaName}_sequence"
 $originalPassword = $env:PGPASSWORD
 $originalPgOptions = $env:PGOPTIONS
 
@@ -21,6 +22,7 @@ if ($schemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}$') { throw "Unsafe ver
 if ($partialSchemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_partial$') { throw "Unsafe partial verification schema name." }
 if ($constraintSchemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_constraint$') { throw "Unsafe constraint verification schema name." }
 if ($incompatibleSchemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_incompatible$') { throw "Unsafe incompatible verification schema name." }
+if ($sequenceSchemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_sequence$') { throw "Unsafe sequence verification schema name." }
 
 function Invoke-PsqlFile([string]$Path) {
     & $psqlExe -X -q -h $HostName -p $Port -U $AppUser -d $Database -f $Path
@@ -58,6 +60,15 @@ try {
     Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\009_i9_scheduling.sql")
     $repairedConstraint = Invoke-PsqlScalar "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid='shift_templates'::regclass AND conname='shift_templates_version_check'"
     if ($repairedConstraint -notmatch 'version > 0') { throw "Incorrect same-table constraint was not repaired." }
+
+    Initialize-I9Base $sequenceSchemaName
+    Invoke-PsqlScalar "CREATE TABLE shift_templates (id BIGINT PRIMARY KEY, code varchar(50), name varchar(180), version integer, effective_from date, effective_to date, mandatory_by_default boolean, status varchar(20)); INSERT INTO shift_templates(id,code,name,version,effective_from,mandatory_by_default,status) VALUES (9000,'EXISTING','Existing row',1,CURRENT_DATE,true,'ACTIVO')" | Out-Null
+    Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\009_i9_scheduling.sql")
+    $generatedId = Invoke-PsqlScalar "INSERT INTO shift_templates(code,name,version,effective_from) VALUES ('GENERATED','Generated row',1,CURRENT_DATE) RETURNING id"
+    if ([long]$generatedId -le 9000) { throw "Converged shift_templates sequence did not advance beyond the existing ID." }
+    Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\009_i9_scheduling.sql")
+    $rerunId = Invoke-PsqlScalar "INSERT INTO shift_templates(code,name,version,effective_from) VALUES ('RERUN','Rerun row',1,CURRENT_DATE) RETURNING id"
+    if ([long]$rerunId -le [long]$generatedId) { throw "Converged shift_templates sequence was not stable across rerun." }
 
     Initialize-I9Base $incompatibleSchemaName
     Invoke-PsqlScalar "CREATE TABLE shift_templates (id BIGSERIAL PRIMARY KEY, code varchar(50)); INSERT INTO shift_templates(code) VALUES ('PARTIAL')" | Out-Null
@@ -105,6 +116,7 @@ finally {
         & $psqlExe -X -q -h $HostName -p $Port -U $AppUser -d $Database -c "DROP SCHEMA IF EXISTS $partialSchemaName CASCADE" | Out-Null
         & $psqlExe -X -q -h $HostName -p $Port -U $AppUser -d $Database -c "DROP SCHEMA IF EXISTS $constraintSchemaName CASCADE" | Out-Null
         & $psqlExe -X -q -h $HostName -p $Port -U $AppUser -d $Database -c "DROP SCHEMA IF EXISTS $incompatibleSchemaName CASCADE" | Out-Null
+        & $psqlExe -X -q -h $HostName -p $Port -U $AppUser -d $Database -c "DROP SCHEMA IF EXISTS $sequenceSchemaName CASCADE" | Out-Null
     }
     $env:PGPASSWORD = $originalPassword
     $env:PGOPTIONS = $originalPgOptions

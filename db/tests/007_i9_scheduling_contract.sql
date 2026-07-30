@@ -65,6 +65,17 @@ BEGIN
         RAISE EXCEPTION 'I9 critical columns are missing or nullable';
     END IF;
 
+    IF EXISTS (
+        SELECT 1
+        FROM unnest(ARRAY[
+            'clients','service_projects','shift_templates','shift_template_steps',
+            'position_coverage_rules','scheduling_rules','employee_availability_exceptions'
+        ]) AS expected(table_name)
+        WHERE pg_get_serial_sequence(format('%I.%I', current_schema(), expected.table_name), 'id') IS NULL
+    ) THEN
+        RAISE EXCEPTION 'I9 id columns must have owned sequence defaults';
+    END IF;
+
     IF NOT EXISTS (
         SELECT 1
         FROM pg_constraint
