@@ -11,12 +11,16 @@ $workspaceRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $psqlExe = "C:\Program Files\PostgreSQL\18\bin\psql.exe"
 $schemaName = "sg_i9_verify_{0}_{1}" -f $PID, (Get-Date -Format "yyyyMMddHHmmssfff")
 $partialSchemaName = "${schemaName}_partial"
+$constraintSchemaName = "${schemaName}_constraint"
+$incompatibleSchemaName = "${schemaName}_incompatible"
 $originalPassword = $env:PGPASSWORD
 $originalPgOptions = $env:PGOPTIONS
 
 if (-not (Test-Path $psqlExe)) { throw "psql not found: $psqlExe" }
 if ($schemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}$') { throw "Unsafe verification schema name." }
 if ($partialSchemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_partial$') { throw "Unsafe partial verification schema name." }
+if ($constraintSchemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_constraint$') { throw "Unsafe constraint verification schema name." }
+if ($incompatibleSchemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_incompatible$') { throw "Unsafe incompatible verification schema name." }
 
 function Invoke-PsqlFile([string]$Path) {
     & $psqlExe -X -q -h $HostName -p $Port -U $AppUser -d $Database -f $Path
@@ -29,13 +33,34 @@ function Invoke-PsqlScalar([string]$Sql) {
     return ($result -join "`n").Trim()
 }
 
+function Initialize-I9Base([string]$Schema) {
+    Invoke-PsqlScalar "CREATE SCHEMA $Schema" | Out-Null
+    $env:PGOPTIONS = "-c search_path=$Schema"
+    Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\001_identity_and_access.sql")
+    Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\002_employee_master.sql")
+    Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\005_i3_service_positions_assignments.sql")
+}
+
 try {
     $env:PGPASSWORD = $AppPassword
     $env:PGOPTIONS = ""
 
-    Invoke-PsqlScalar "CREATE SCHEMA $partialSchemaName" | Out-Null
-    $env:PGOPTIONS = "-c search_path=$partialSchemaName"
-    Invoke-PsqlScalar "CREATE TABLE shift_templates (id BIGINT PRIMARY KEY)" | Out-Null
+    Initialize-I9Base $partialSchemaName
+    Invoke-PsqlScalar "CREATE TABLE shift_templates (id BIGSERIAL PRIMARY KEY); CREATE TABLE i9_constraint_decoy (x integer CONSTRAINT shift_templates_version_check CHECK (x < 0))" | Out-Null
+    Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\009_i9_scheduling.sql")
+    Invoke-PsqlScalar "INSERT INTO roles(code,name,description) VALUES ('ADMIN','Admin','I9'),('OPERACIONES','Operaciones','I9'),('TH','TH','I9'),('GERENCIA','Gerencia','I9')" | Out-Null
+    Invoke-PsqlFile (Join-Path $workspaceRoot "db\seeds\009_i9_scheduling_permissions.sql")
+    Invoke-PsqlFile (Join-Path $workspaceRoot "db\seeds\010_i9_shift_templates.sql")
+    Invoke-PsqlFile (Join-Path $workspaceRoot "db\tests\007_i9_scheduling_contract.sql")
+
+    Initialize-I9Base $constraintSchemaName
+    Invoke-PsqlScalar "CREATE TABLE shift_templates (id BIGSERIAL PRIMARY KEY, CONSTRAINT shift_templates_version_check CHECK (id > 0))" | Out-Null
+    Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\009_i9_scheduling.sql")
+    $repairedConstraint = Invoke-PsqlScalar "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid='shift_templates'::regclass AND conname='shift_templates_version_check'"
+    if ($repairedConstraint -notmatch 'version > 0') { throw "Incorrect same-table constraint was not repaired." }
+
+    Initialize-I9Base $incompatibleSchemaName
+    Invoke-PsqlScalar "CREATE TABLE shift_templates (id BIGSERIAL PRIMARY KEY, code varchar(50)); INSERT INTO shift_templates(code) VALUES ('PARTIAL')" | Out-Null
     $previousErrorActionPreference = $ErrorActionPreference
     try {
         $ErrorActionPreference = "Continue"
@@ -45,19 +70,13 @@ try {
     finally {
         $ErrorActionPreference = $previousErrorActionPreference
     }
-    if ($partialExitCode -eq 0) { throw "Partial I9 fixture unexpectedly accepted an incomplete shift_templates table." }
-    if (($partialOutput -join "`n") -notmatch 'I9_PARTIAL_SCHEMA_INCOMPATIBLE: missing shift_templates\.code') {
+    if ($partialExitCode -eq 0) { throw "Partial I9 fixture unexpectedly accepted data without a safe backfill." }
+    if (($partialOutput -join "`n") -notmatch 'I9_PARTIAL_SCHEMA_INCOMPATIBLE: shift_templates\.name contains NULL values') {
         throw "Partial I9 fixture did not return the canonical actionable migration error."
     }
     $env:PGOPTIONS = ""
-    Invoke-PsqlScalar "DROP SCHEMA $partialSchemaName CASCADE" | Out-Null
 
-    Invoke-PsqlScalar "CREATE SCHEMA $schemaName" | Out-Null
-    $env:PGOPTIONS = "-c search_path=$schemaName"
-
-    Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\001_identity_and_access.sql")
-    Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\002_employee_master.sql")
-    Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\005_i3_service_positions_assignments.sql")
+    Initialize-I9Base $schemaName
     Invoke-PsqlScalar "INSERT INTO roles(code,name,description) VALUES ('ADMIN','Admin','I9'),('OPERACIONES','Operaciones','I9'),('TH','TH','I9'),('GERENCIA','Gerencia','I9')" | Out-Null
     Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\009_i9_scheduling.sql")
 
@@ -84,6 +103,8 @@ finally {
     if ($env:PGPASSWORD) {
         & $psqlExe -X -q -h $HostName -p $Port -U $AppUser -d $Database -c "DROP SCHEMA IF EXISTS $schemaName CASCADE" | Out-Null
         & $psqlExe -X -q -h $HostName -p $Port -U $AppUser -d $Database -c "DROP SCHEMA IF EXISTS $partialSchemaName CASCADE" | Out-Null
+        & $psqlExe -X -q -h $HostName -p $Port -U $AppUser -d $Database -c "DROP SCHEMA IF EXISTS $constraintSchemaName CASCADE" | Out-Null
+        & $psqlExe -X -q -h $HostName -p $Port -U $AppUser -d $Database -c "DROP SCHEMA IF EXISTS $incompatibleSchemaName CASCADE" | Out-Null
     }
     $env:PGPASSWORD = $originalPassword
     $env:PGOPTIONS = $originalPgOptions

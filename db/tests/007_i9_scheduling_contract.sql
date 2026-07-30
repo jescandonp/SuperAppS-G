@@ -47,6 +47,24 @@ BEGIN
         RAISE EXCEPTION 'shift_templates.mandatory_by_default must default to TRUE';
     END IF;
 
+    IF EXISTS (
+        SELECT 1
+        FROM (VALUES
+            ('clients','code'),('clients','name'),('clients','status'),('clients','created_at'),('clients','updated_at'),
+            ('service_projects','client_id'),('service_projects','code'),('service_projects','name'),('service_projects','effective_from'),('service_projects','status'),('service_projects','created_at'),('service_projects','updated_at'),
+            ('shift_templates','code'),('shift_templates','name'),('shift_templates','version'),('shift_templates','effective_from'),('shift_templates','mandatory_by_default'),('shift_templates','status'),('shift_templates','created_at'),('shift_templates','updated_at'),
+            ('shift_template_steps','template_id'),('shift_template_steps','step_order'),('shift_template_steps','shift_code'),
+            ('position_coverage_rules','position_id'),('position_coverage_rules','template_id'),('position_coverage_rules','required_quantity'),('position_coverage_rules','effective_from'),('position_coverage_rules','status'),('position_coverage_rules','created_at'),('position_coverage_rules','updated_at'),
+            ('scheduling_rules','source_level'),('scheduling_rules','scope_type'),('scheduling_rules','severity'),('scheduling_rules','effective_from'),('scheduling_rules','parameters'),('scheduling_rules','status'),('scheduling_rules','created_at'),('scheduling_rules','updated_at'),
+            ('employee_availability_exceptions','employee_id'),('employee_availability_exceptions','starts_at'),('employee_availability_exceptions','ends_at'),('employee_availability_exceptions','reason'),('employee_availability_exceptions','created_by'),('employee_availability_exceptions','status'),('employee_availability_exceptions','created_at'),('employee_availability_exceptions','updated_at')
+        ) expected(table_name,column_name)
+        LEFT JOIN information_schema.columns c
+          ON c.table_schema=current_schema() AND c.table_name=expected.table_name AND c.column_name=expected.column_name
+        WHERE c.column_name IS NULL OR c.is_nullable <> 'NO'
+    ) THEN
+        RAISE EXCEPTION 'I9 critical columns are missing or nullable';
+    END IF;
+
     IF NOT EXISTS (
         SELECT 1
         FROM pg_constraint
@@ -93,6 +111,24 @@ BEGIN
 
     BEGIN
         INSERT INTO shift_templates (code, name, version, effective_from)
+        VALUES (' ', 'Texto valido', 1, CURRENT_DATE);
+        RAISE EXCEPTION 'shift_templates accepted blank code';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+
+    BEGIN
+        INSERT INTO shift_templates (code, name, version, effective_from)
+        VALUES ('I9-BAD-VERSION', 'Version invalida', 0, CURRENT_DATE);
+        RAISE EXCEPTION 'shift_templates accepted non-positive version';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+
+    BEGIN
+        INSERT INTO shift_templates (code, name, version, effective_from, effective_to)
+        VALUES ('I9-BAD-DATES', 'Vigencia invalida', 1, CURRENT_DATE, CURRENT_DATE - 1);
+        RAISE EXCEPTION 'shift_templates accepted invalid effective dates';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+
+    BEGIN
+        INSERT INTO shift_templates (code, name, version, effective_from)
         VALUES ('I9-TEMPLATE', 'Plantilla duplicada', 1, CURRENT_DATE);
         RAISE EXCEPTION 'shift_templates accepted duplicate code and version';
     EXCEPTION
@@ -109,6 +145,12 @@ BEGIN
 
     INSERT INTO shift_template_steps (template_id, step_order, shift_code)
     VALUES (template_id, 1, 'D');
+
+    BEGIN
+        INSERT INTO shift_template_steps (template_id, step_order, shift_code)
+        VALUES (template_id, 0, 'D');
+        RAISE EXCEPTION 'shift_template_steps accepted non-positive order';
+    EXCEPTION WHEN check_violation THEN NULL; END;
 
     BEGIN
         INSERT INTO shift_template_steps (template_id, step_order, shift_code)
@@ -145,6 +187,12 @@ BEGIN
         source_level, scope_type, scope_id, severity, effective_from, parameters
     )
     VALUES ('POLITICA_INTERNA', 'PROYECTO', project_id, 'BLOQUEANTE', CURRENT_DATE, '{"maximo": 1}'::jsonb);
+
+    BEGIN
+        INSERT INTO scheduling_rules (source_level, scope_type, severity, effective_from)
+        VALUES ('POLITICA_INTERNA', 'GLOBAL', ' ', CURRENT_DATE);
+        RAISE EXCEPTION 'scheduling_rules accepted blank severity';
+    EXCEPTION WHEN check_violation THEN NULL; END;
 
     BEGIN
         INSERT INTO scheduling_rules (
