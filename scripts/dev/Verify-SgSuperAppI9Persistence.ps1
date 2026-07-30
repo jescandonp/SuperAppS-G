@@ -36,8 +36,15 @@ try {
     Invoke-PsqlScalar "CREATE SCHEMA $partialSchemaName" | Out-Null
     $env:PGOPTIONS = "-c search_path=$partialSchemaName"
     Invoke-PsqlScalar "CREATE TABLE shift_templates (id BIGINT PRIMARY KEY)" | Out-Null
-    $partialOutput = & $psqlExe -X -h $HostName -p $Port -U $AppUser -d $Database -f (Join-Path $workspaceRoot "db\migrations\009_i9_scheduling.sql") 2>&1
-    $partialExitCode = $LASTEXITCODE
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $partialOutput = & $psqlExe -X -h $HostName -p $Port -U $AppUser -d $Database -f (Join-Path $workspaceRoot "db\migrations\009_i9_scheduling.sql") 2>&1
+        $partialExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
     if ($partialExitCode -eq 0) { throw "Partial I9 fixture unexpectedly accepted an incomplete shift_templates table." }
     if (($partialOutput -join "`n") -notmatch 'I9_PARTIAL_SCHEMA_INCOMPATIBLE: missing shift_templates\.code') {
         throw "Partial I9 fixture did not return the canonical actionable migration error."
