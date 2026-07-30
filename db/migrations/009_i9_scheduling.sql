@@ -2,6 +2,37 @@
 
 BEGIN;
 
+DO $$
+DECLARE
+    required_column RECORD;
+BEGIN
+    FOR required_column IN
+        SELECT *
+        FROM (VALUES
+            ('clients','id'), ('clients','code'), ('clients','name'), ('clients','status'),
+            ('service_projects','id'), ('service_projects','client_id'), ('service_projects','code'), ('service_projects','name'), ('service_projects','effective_from'), ('service_projects','effective_to'), ('service_projects','status'),
+            ('shift_templates','id'), ('shift_templates','code'), ('shift_templates','name'), ('shift_templates','version'), ('shift_templates','effective_from'), ('shift_templates','effective_to'), ('shift_templates','mandatory_by_default'), ('shift_templates','status'),
+            ('shift_template_steps','id'), ('shift_template_steps','template_id'), ('shift_template_steps','step_order'), ('shift_template_steps','shift_code'),
+            ('position_coverage_rules','id'), ('position_coverage_rules','position_id'), ('position_coverage_rules','template_id'), ('position_coverage_rules','required_quantity'), ('position_coverage_rules','effective_from'), ('position_coverage_rules','effective_to'), ('position_coverage_rules','status'),
+            ('scheduling_rules','id'), ('scheduling_rules','source_level'), ('scheduling_rules','scope_type'), ('scheduling_rules','scope_id'), ('scheduling_rules','severity'), ('scheduling_rules','effective_from'), ('scheduling_rules','effective_to'), ('scheduling_rules','parameters'), ('scheduling_rules','status'),
+            ('employee_availability_exceptions','id'), ('employee_availability_exceptions','employee_id'), ('employee_availability_exceptions','starts_at'), ('employee_availability_exceptions','ends_at'), ('employee_availability_exceptions','reason'), ('employee_availability_exceptions','created_by'), ('employee_availability_exceptions','status')
+        ) AS expected(table_name, column_name)
+    LOOP
+        IF to_regclass(required_column.table_name) IS NOT NULL
+           AND NOT EXISTS (
+               SELECT 1
+               FROM information_schema.columns c
+               WHERE c.table_schema = current_schema()
+                 AND c.table_name = required_column.table_name
+                 AND c.column_name = required_column.column_name
+           ) THEN
+            RAISE EXCEPTION 'I9_PARTIAL_SCHEMA_INCOMPATIBLE: missing %.%; repair and backfill the partial table before rerunning 009_i9_scheduling.sql',
+                required_column.table_name, required_column.column_name;
+        END IF;
+    END LOOP;
+END
+$$;
+
 CREATE TABLE IF NOT EXISTS clients (
     id          BIGSERIAL PRIMARY KEY,
     code        VARCHAR(50) NOT NULL UNIQUE,

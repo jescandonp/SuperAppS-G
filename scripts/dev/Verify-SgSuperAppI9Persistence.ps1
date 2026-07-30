@@ -10,11 +10,13 @@ $ErrorActionPreference = "Stop"
 $workspaceRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $psqlExe = "C:\Program Files\PostgreSQL\18\bin\psql.exe"
 $schemaName = "sg_i9_verify_{0}_{1}" -f $PID, (Get-Date -Format "yyyyMMddHHmmssfff")
+$partialSchemaName = "${schemaName}_partial"
 $originalPassword = $env:PGPASSWORD
 $originalPgOptions = $env:PGOPTIONS
 
 if (-not (Test-Path $psqlExe)) { throw "psql not found: $psqlExe" }
 if ($schemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}$') { throw "Unsafe verification schema name." }
+if ($partialSchemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_partial$') { throw "Unsafe partial verification schema name." }
 
 function Invoke-PsqlFile([string]$Path) {
     & $psqlExe -X -q -h $HostName -p $Port -U $AppUser -d $Database -f $Path
@@ -30,6 +32,19 @@ function Invoke-PsqlScalar([string]$Sql) {
 try {
     $env:PGPASSWORD = $AppPassword
     $env:PGOPTIONS = ""
+
+    Invoke-PsqlScalar "CREATE SCHEMA $partialSchemaName" | Out-Null
+    $env:PGOPTIONS = "-c search_path=$partialSchemaName"
+    Invoke-PsqlScalar "CREATE TABLE shift_templates (id BIGINT PRIMARY KEY)" | Out-Null
+    $partialOutput = & $psqlExe -X -h $HostName -p $Port -U $AppUser -d $Database -f (Join-Path $workspaceRoot "db\migrations\009_i9_scheduling.sql") 2>&1
+    $partialExitCode = $LASTEXITCODE
+    if ($partialExitCode -eq 0) { throw "Partial I9 fixture unexpectedly accepted an incomplete shift_templates table." }
+    if (($partialOutput -join "`n") -notmatch 'I9_PARTIAL_SCHEMA_INCOMPATIBLE: missing shift_templates\.code') {
+        throw "Partial I9 fixture did not return the canonical actionable migration error."
+    }
+    $env:PGOPTIONS = ""
+    Invoke-PsqlScalar "DROP SCHEMA $partialSchemaName CASCADE" | Out-Null
+
     Invoke-PsqlScalar "CREATE SCHEMA $schemaName" | Out-Null
     $env:PGOPTIONS = "-c search_path=$schemaName"
 
@@ -61,6 +76,7 @@ finally {
     $env:PGOPTIONS = ""
     if ($env:PGPASSWORD) {
         & $psqlExe -X -q -h $HostName -p $Port -U $AppUser -d $Database -c "DROP SCHEMA IF EXISTS $schemaName CASCADE" | Out-Null
+        & $psqlExe -X -q -h $HostName -p $Port -U $AppUser -d $Database -c "DROP SCHEMA IF EXISTS $partialSchemaName CASCADE" | Out-Null
     }
     $env:PGPASSWORD = $originalPassword
     $env:PGOPTIONS = $originalPgOptions
