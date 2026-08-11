@@ -10,6 +10,50 @@ public static class PortalEndpoints
 {
     public static IEndpointRouteBuilder MapPortalEndpoints(this IEndpointRouteBuilder app)
     {
+        app.MapPost("/api/portal/scheduling/cycles/project", async (
+            ShiftCycleProjectionRequest request,
+            ShiftCycleProjector projector,
+            PortalAuthorizationService authorization,
+            CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("SCHEDULING", "GENERATE", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!DateOnly.TryParse(request.AnchorDate, out var anchorDate)
+                || !DateOnly.TryParse(request.From, out var from)
+                || !DateOnly.TryParse(request.To, out var to))
+            {
+                return Results.BadRequest(new { message = "Las fechas del ciclo no son validas." });
+            }
+
+            try
+            {
+                var result = projector.Project(new ShiftCycleRequest(
+                    request.Sequence ?? Array.Empty<string>(),
+                    anchorDate,
+                    from,
+                    to,
+                    request.PhaseOffset));
+
+                return Results.Ok(new
+                {
+                    days = result.Select(day => new
+                    {
+                        date = day.Date.ToString("yyyy-MM-dd"),
+                        day.ShiftCode,
+                        day.StepIndex
+                    })
+                });
+            }
+            catch (ArgumentException exception)
+            {
+                return Results.BadRequest(new { message = exception.Message });
+            }
+        });
+
         app.MapGet("/api/portal/modules/{role}", async (string role, MockPortalQueryService portalService, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
         {
             if (!TryParseRole(role, out var parsedRole))
