@@ -2904,6 +2904,110 @@ public sealed class PostgresPortalRepository
                 command.Parameters.Add("resolutionDueDate", NpgsqlDbType.Date).Value = resolutionDueDate.HasValue ? resolutionDueDate.Value : DBNull.Value;
             }, actorUserId, actorUsername, cancellationToken);
 
+    public async Task<SchedulingClientResponse?> GetSchedulingClientAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("select id,code,name,status from clients where id=@id", connection);
+        command.Parameters.AddWithValue("id", id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? new SchedulingClientResponse(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)) : null;
+    }
+
+    public async Task<SchedulingProjectResponse?> GetSchedulingProjectAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("select id,client_id,code,name,effective_from,effective_to,status from service_projects where id=@id", connection);
+        command.Parameters.AddWithValue("id", id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken)) return null;
+        return new SchedulingProjectResponse(reader.GetInt64(0), reader.GetInt64(1), reader.GetString(2), reader.GetString(3),
+            reader.GetFieldValue<DateOnly>(4).ToString("yyyy-MM-dd"), reader.IsDBNull(5) ? null : reader.GetFieldValue<DateOnly>(5).ToString("yyyy-MM-dd"), reader.GetString(6));
+    }
+
+    public async Task<CoverageRuleResponse?> GetCoverageRuleAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("select id,position_id,template_id,weekday_scope,starts_at,ends_at,required_quantity,effective_from,effective_to,status from position_coverage_rules where id=@id", connection);
+        command.Parameters.AddWithValue("id", id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken)) return null;
+        return new CoverageRuleResponse(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetString(3),
+            reader.GetFieldValue<TimeOnly>(4).ToString("HH:mm"), reader.GetFieldValue<TimeOnly>(5).ToString("HH:mm"), reader.GetInt32(6),
+            reader.GetFieldValue<DateOnly>(7).ToString("yyyy-MM-dd"), reader.IsDBNull(8) ? null : reader.GetFieldValue<DateOnly>(8).ToString("yyyy-MM-dd"), reader.GetString(9));
+    }
+
+    public async Task<AvailabilityExceptionResponse?> GetAvailabilityExceptionAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("select id,employee_id,starts_at,ends_at,kind,blocking,reason,status from employee_availability_exceptions where id=@id", connection);
+        command.Parameters.AddWithValue("id", id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken)) return null;
+        return new AvailabilityExceptionResponse(reader.GetInt64(0), reader.GetInt64(1), reader.GetFieldValue<DateTimeOffset>(2).ToString("O"),
+            reader.GetFieldValue<DateTimeOffset>(3).ToString("O"), reader.GetString(4), reader.GetBoolean(5), reader.GetString(6), reader.GetString(7));
+    }
+
+    public async Task<PositionRequirementResponse?> GetPositionRequirementAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("select id,position_id,requirement_type_id,severity,resolution_due_date,status from position_requirements where id=@id", connection);
+        command.Parameters.AddWithValue("id", id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken)) return null;
+        return new PositionRequirementResponse(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetString(3),
+            reader.IsDBNull(4) ? null : reader.GetFieldValue<DateOnly>(4).ToString("yyyy-MM-dd"), reader.GetString(5));
+    }
+
+    public Task<bool> UpdateSchedulingClientAsync(long id, UpsertSchedulingClientRequest request, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        UpdateSchedulingConfigurationAsync("update clients set code=@code,name=@name,status=@status,updated_at=now() where id=@id returning id", "SCHEDULING_CLIENT_UPDATED", "SCHEDULING_CLIENT", id,
+            c => { c.Parameters.AddWithValue("code", request.Code.Trim()); c.Parameters.AddWithValue("name", request.Name.Trim()); c.Parameters.AddWithValue("status", request.Status.Trim().ToUpperInvariant()); }, actorUserId, actorUsername, cancellationToken);
+
+    public Task<bool> UpdateSchedulingProjectAsync(long id, UpsertSchedulingProjectRequest request, DateOnly effectiveFrom, DateOnly? effectiveTo, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        UpdateSchedulingConfigurationAsync("update service_projects set client_id=@clientId,code=@code,name=@name,effective_from=@effectiveFrom,effective_to=@effectiveTo,status=@status,updated_at=now() where id=@id returning id", "SCHEDULING_PROJECT_UPDATED", "SCHEDULING_PROJECT", id,
+            c => { c.Parameters.AddWithValue("clientId", request.ClientId); c.Parameters.AddWithValue("code", request.Code.Trim()); c.Parameters.AddWithValue("name", request.Name.Trim()); c.Parameters.AddWithValue("effectiveFrom", effectiveFrom); c.Parameters.Add("effectiveTo", NpgsqlDbType.Date).Value=effectiveTo.HasValue?effectiveTo.Value:DBNull.Value; c.Parameters.AddWithValue("status", request.Status.Trim().ToUpperInvariant()); }, actorUserId, actorUsername, cancellationToken);
+
+    public Task<bool> UpdateCoverageRuleAsync(long id, UpsertCoverageRuleRequest request, TimeOnly startsAt, TimeOnly endsAt, DateOnly effectiveFrom, DateOnly? effectiveTo, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        UpdateSchedulingConfigurationAsync("update position_coverage_rules set position_id=@positionId,template_id=@templateId,weekday_scope=@weekdayScope,starts_at=@startsAt,ends_at=@endsAt,required_quantity=@quantity,effective_from=@effectiveFrom,effective_to=@effectiveTo,status=@status,updated_at=now() where id=@id returning id", "COVERAGE_RULE_UPDATED", "POSITION_COVERAGE_RULE", id,
+            c => { c.Parameters.AddWithValue("positionId", request.PositionId); c.Parameters.AddWithValue("templateId", request.TemplateId); c.Parameters.AddWithValue("weekdayScope", request.WeekdayScope.Trim()); c.Parameters.AddWithValue("startsAt", startsAt); c.Parameters.AddWithValue("endsAt", endsAt); c.Parameters.AddWithValue("quantity", request.RequiredGuards); c.Parameters.AddWithValue("effectiveFrom", effectiveFrom); c.Parameters.Add("effectiveTo", NpgsqlDbType.Date).Value=effectiveTo.HasValue?effectiveTo.Value:DBNull.Value; c.Parameters.AddWithValue("status", request.Status.Trim().ToUpperInvariant()); }, actorUserId, actorUsername, cancellationToken);
+
+    public Task<bool> UpdateAvailabilityExceptionAsync(long id, UpsertAvailabilityExceptionRequest request, DateTimeOffset from, DateTimeOffset to, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        UpdateSchedulingConfigurationAsync("update employee_availability_exceptions set employee_id=@employeeId,starts_at=@startsAt,ends_at=@endsAt,kind=@kind,blocking=@blocking,reason=@reason,updated_at=now() where id=@id returning id", "AVAILABILITY_UPDATED", "EMPLOYEE_AVAILABILITY_EXCEPTION", id,
+            c => { c.Parameters.AddWithValue("employeeId", request.EmployeeId); c.Parameters.AddWithValue("startsAt", from.ToUniversalTime()); c.Parameters.AddWithValue("endsAt", to.ToUniversalTime()); c.Parameters.AddWithValue("kind", request.Kind.Trim()); c.Parameters.AddWithValue("blocking", request.Blocking); c.Parameters.AddWithValue("reason", request.Reason.Trim()); }, actorUserId, actorUsername, cancellationToken);
+
+    public Task<bool> UpdatePositionRequirementAsync(long id, UpsertPositionRequirementRequest request, DateOnly? dueDate, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        UpdateSchedulingConfigurationAsync("update position_requirements set position_id=@positionId,requirement_type_id=@requirementTypeId,severity=@severity,resolution_due_date=@dueDate,updated_at=now() where id=@id returning id", "POSITION_REQUIREMENT_UPDATED", "POSITION_REQUIREMENT", id,
+            c => { c.Parameters.AddWithValue("positionId", request.PositionId); c.Parameters.AddWithValue("requirementTypeId", request.RequirementTypeId); c.Parameters.AddWithValue("severity", request.Severity.Trim().ToUpperInvariant()); c.Parameters.Add("dueDate", NpgsqlDbType.Date).Value=dueDate.HasValue?dueDate.Value:DBNull.Value; }, actorUserId, actorUsername, cancellationToken);
+
+    public Task<bool> InactivateSchedulingClientAsync(long id, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) => InactivateSchedulingConfigurationAsync("clients", "SCHEDULING_CLIENT_INACTIVATED", "SCHEDULING_CLIENT", id, actorUserId, actorUsername, cancellationToken);
+    public Task<bool> InactivateSchedulingProjectAsync(long id, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) => InactivateSchedulingConfigurationAsync("service_projects", "SCHEDULING_PROJECT_INACTIVATED", "SCHEDULING_PROJECT", id, actorUserId, actorUsername, cancellationToken);
+    public Task<bool> InactivateCoverageRuleAsync(long id, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) => InactivateSchedulingConfigurationAsync("position_coverage_rules", "COVERAGE_RULE_INACTIVATED", "POSITION_COVERAGE_RULE", id, actorUserId, actorUsername, cancellationToken);
+    public Task<bool> InactivateAvailabilityExceptionAsync(long id, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) => InactivateSchedulingConfigurationAsync("employee_availability_exceptions", "AVAILABILITY_INACTIVATED", "EMPLOYEE_AVAILABILITY_EXCEPTION", id, actorUserId, actorUsername, cancellationToken);
+    public Task<bool> InactivatePositionRequirementAsync(long id, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) => InactivateSchedulingConfigurationAsync("position_requirements", "POSITION_REQUIREMENT_INACTIVATED", "POSITION_REQUIREMENT", id, actorUserId, actorUsername, cancellationToken);
+
+    private async Task<bool> UpdateSchedulingConfigurationAsync(string sql, string eventType, string entityType, long id, Action<NpgsqlCommand> addParameters, long actorUserId, string actorUsername, CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("id", id);
+        addParameters(command);
+        var updated = await command.ExecuteScalarAsync(cancellationToken) is not null;
+        if (!updated) { await transaction.RollbackAsync(cancellationToken); return false; }
+        await InsertAuditLogAsync(connection, transaction, actorUserId, actorUsername, eventType, entityType, id.ToString(), "'{}'::jsonb", null, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
+    private Task<bool> InactivateSchedulingConfigurationAsync(string table, string eventType, string entityType, long id, long actorUserId, string actorUsername, CancellationToken cancellationToken) =>
+        UpdateSchedulingConfigurationAsync($"update {table} set status='INACTIVO',updated_at=now() where id=@id returning id", eventType, entityType, id, _ => { }, actorUserId, actorUsername, cancellationToken);
+
     private async Task<long> InsertSchedulingConfigurationAsync(
         string insertSql,
         string eventType,

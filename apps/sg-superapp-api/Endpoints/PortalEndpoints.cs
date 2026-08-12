@@ -66,6 +66,37 @@ public static class PortalEndpoints
                 () => repository.CreateSchedulingClientAsync(request, userContext.User!.Id, userContext.User.Username, cancellationToken));
         });
 
+        app.MapGet("/api/portal/scheduling/clients/{id:long}", async (long id, PortalAuthorizationService authorization,
+            PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await RequireSchedulingConfigurationAsync(authorization, userContext, cancellationToken);
+            if (denied is not null) return denied;
+            var item = await repository.GetSchedulingClientAsync(id, cancellationToken);
+            return item is null ? Results.NotFound() : Results.Ok(item);
+        });
+
+        app.MapPut("/api/portal/scheduling/clients/{id:long}", async (long id, UpsertSchedulingClientRequest request,
+            PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext,
+            CancellationToken cancellationToken) =>
+        {
+            var denied = await RequireSchedulingConfigurationAsync(authorization, userContext, cancellationToken);
+            if (denied is not null) return denied;
+            if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.Name) || !IsActiveStatus(request.Status))
+                return Results.BadRequest(new { message = "Codigo, nombre y estado ACTIVO/INACTIVO son obligatorios." });
+            var updated = await repository.UpdateSchedulingClientAsync(id, request, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return updated ? Results.Ok(await repository.GetSchedulingClientAsync(id, cancellationToken)) : Results.NotFound();
+        });
+
+        app.MapPost("/api/portal/scheduling/clients/{id:long}/inactivate", async (long id,
+            PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext,
+            CancellationToken cancellationToken) =>
+        {
+            var denied = await RequireSchedulingConfigurationAsync(authorization, userContext, cancellationToken);
+            if (denied is not null) return denied;
+            var updated = await repository.InactivateSchedulingClientAsync(id, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return updated ? Results.Ok(await repository.GetSchedulingClientAsync(id, cancellationToken)) : Results.NotFound();
+        });
+
         app.MapPost("/api/portal/scheduling/projects", async (UpsertSchedulingProjectRequest request,
             PortalAuthorizationService authorization, PostgresPortalRepository repository,
             RequestUserContext userContext, CancellationToken cancellationToken) =>
@@ -80,6 +111,41 @@ public static class PortalEndpoints
             if (effectiveTo < effectiveFrom) return Results.BadRequest(new { message = "La vigencia final no puede ser anterior a la inicial." });
             return await CreateSchedulingResultAsync(
                 () => repository.CreateSchedulingProjectAsync(request, effectiveFrom, effectiveTo, userContext.User!.Id, userContext.User.Username, cancellationToken));
+        });
+
+        app.MapGet("/api/portal/scheduling/projects/{id:long}", async (long id, PortalAuthorizationService authorization,
+            PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await RequireSchedulingConfigurationAsync(authorization, userContext, cancellationToken);
+            if (denied is not null) return denied;
+            var item = await repository.GetSchedulingProjectAsync(id, cancellationToken);
+            return item is null ? Results.NotFound() : Results.Ok(item);
+        });
+
+        app.MapPut("/api/portal/scheduling/projects/{id:long}", async (long id, UpsertSchedulingProjectRequest request,
+            PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext,
+            CancellationToken cancellationToken) =>
+        {
+            var denied = await RequireSchedulingConfigurationAsync(authorization, userContext, cancellationToken);
+            if (denied is not null) return denied;
+            if (request.ClientId <= 0 || string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.Name)
+                || !IsActiveStatus(request.Status) || !DateOnly.TryParse(request.EffectiveFrom, out var effectiveFrom)
+                || (!string.IsNullOrWhiteSpace(request.EffectiveTo) && !DateOnly.TryParse(request.EffectiveTo, out _)))
+                return Results.BadRequest(new { message = "Los datos y la vigencia del proyecto no son validos." });
+            DateOnly? effectiveTo = string.IsNullOrWhiteSpace(request.EffectiveTo) ? null : DateOnly.Parse(request.EffectiveTo);
+            if (effectiveTo < effectiveFrom) return Results.BadRequest(new { message = "La vigencia final no puede ser anterior a la inicial." });
+            var updated = await repository.UpdateSchedulingProjectAsync(id, request, effectiveFrom, effectiveTo, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return updated ? Results.Ok(await repository.GetSchedulingProjectAsync(id, cancellationToken)) : Results.NotFound();
+        });
+
+        app.MapPost("/api/portal/scheduling/projects/{id:long}/inactivate", async (long id,
+            PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext,
+            CancellationToken cancellationToken) =>
+        {
+            var denied = await RequireSchedulingConfigurationAsync(authorization, userContext, cancellationToken);
+            if (denied is not null) return denied;
+            var updated = await repository.InactivateSchedulingProjectAsync(id, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return updated ? Results.Ok(await repository.GetSchedulingProjectAsync(id, cancellationToken)) : Results.NotFound();
         });
 
         app.MapPost("/api/portal/scheduling/coverage-rules", async (UpsertCoverageRuleRequest request,
@@ -100,6 +166,43 @@ public static class PortalEndpoints
                 () => repository.CreateCoverageRuleAsync(request, startsAt, endsAt, effectiveFrom, effectiveTo, userContext.User!.Id, userContext.User.Username, cancellationToken));
         });
 
+        app.MapGet("/api/portal/scheduling/coverage-rules/{id:long}", async (long id, PortalAuthorizationService authorization,
+            PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await RequireSchedulingConfigurationAsync(authorization, userContext, cancellationToken);
+            if (denied is not null) return denied;
+            var item = await repository.GetCoverageRuleAsync(id, cancellationToken);
+            return item is null ? Results.NotFound() : Results.Ok(item);
+        });
+
+        app.MapPut("/api/portal/scheduling/coverage-rules/{id:long}", async (long id, UpsertCoverageRuleRequest request,
+            PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext,
+            CancellationToken cancellationToken) =>
+        {
+            var denied = await RequireSchedulingConfigurationAsync(authorization, userContext, cancellationToken);
+            if (denied is not null) return denied;
+            if (request.PositionId <= 0 || request.TemplateId <= 0 || request.RequiredGuards <= 0
+                || string.IsNullOrWhiteSpace(request.WeekdayScope) || !IsActiveStatus(request.Status)
+                || !TimeOnly.TryParse(request.StartsAt, out var startsAt) || !TimeOnly.TryParse(request.EndsAt, out var endsAt)
+                || startsAt == endsAt || !DateOnly.TryParse(request.EffectiveFrom, out var effectiveFrom)
+                || (!string.IsNullOrWhiteSpace(request.EffectiveTo) && !DateOnly.TryParse(request.EffectiveTo, out _)))
+                return Results.BadRequest(new { message = "La cobertura, franja o vigencia no es valida." });
+            DateOnly? effectiveTo = string.IsNullOrWhiteSpace(request.EffectiveTo) ? null : DateOnly.Parse(request.EffectiveTo);
+            if (effectiveTo < effectiveFrom) return Results.BadRequest(new { message = "La vigencia final no puede ser anterior a la inicial." });
+            var updated = await repository.UpdateCoverageRuleAsync(id, request, startsAt, endsAt, effectiveFrom, effectiveTo, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return updated ? Results.Ok(await repository.GetCoverageRuleAsync(id, cancellationToken)) : Results.NotFound();
+        });
+
+        app.MapPost("/api/portal/scheduling/coverage-rules/{id:long}/inactivate", async (long id,
+            PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext,
+            CancellationToken cancellationToken) =>
+        {
+            var denied = await RequireSchedulingConfigurationAsync(authorization, userContext, cancellationToken);
+            if (denied is not null) return denied;
+            var updated = await repository.InactivateCoverageRuleAsync(id, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return updated ? Results.Ok(await repository.GetCoverageRuleAsync(id, cancellationToken)) : Results.NotFound();
+        });
+
         app.MapPost("/api/portal/scheduling/availability-exceptions", async (UpsertAvailabilityExceptionRequest request,
             PortalAuthorizationService authorization, PostgresPortalRepository repository,
             RequestUserContext userContext, CancellationToken cancellationToken) =>
@@ -111,6 +214,38 @@ public static class PortalEndpoints
                 return Results.BadRequest(new { message = "La excepcion de disponibilidad no es valida." });
             return await CreateSchedulingResultAsync(
                 () => repository.CreateAvailabilityExceptionAsync(request, from, to, userContext.User!.Id, userContext.User.Username, cancellationToken));
+        });
+
+        app.MapGet("/api/portal/scheduling/availability-exceptions/{id:long}", async (long id,
+            PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("SCHEDULING", "APPROVE_EXCEPTION", cancellationToken);
+            if (denied is not null) return denied;
+            var item = await repository.GetAvailabilityExceptionAsync(id, cancellationToken);
+            return item is null ? Results.NotFound() : Results.Ok(item);
+        });
+
+        app.MapPut("/api/portal/scheduling/availability-exceptions/{id:long}", async (long id, UpsertAvailabilityExceptionRequest request,
+            PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext,
+            CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("SCHEDULING", "APPROVE_EXCEPTION", cancellationToken);
+            if (denied is not null) return denied;
+            if (request.EmployeeId <= 0 || string.IsNullOrWhiteSpace(request.Kind) || string.IsNullOrWhiteSpace(request.Reason)
+                || !DateTimeOffset.TryParse(request.From, out var from) || !DateTimeOffset.TryParse(request.To, out var to) || to <= from)
+                return Results.BadRequest(new { message = "La excepcion de disponibilidad no es valida." });
+            var updated = await repository.UpdateAvailabilityExceptionAsync(id, request, from, to, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return updated ? Results.Ok(await repository.GetAvailabilityExceptionAsync(id, cancellationToken)) : Results.NotFound();
+        });
+
+        app.MapPost("/api/portal/scheduling/availability-exceptions/{id:long}/inactivate", async (long id,
+            PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext,
+            CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("SCHEDULING", "APPROVE_EXCEPTION", cancellationToken);
+            if (denied is not null) return denied;
+            var updated = await repository.InactivateAvailabilityExceptionAsync(id, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return updated ? Results.Ok(await repository.GetAvailabilityExceptionAsync(id, cancellationToken)) : Results.NotFound();
         });
 
         app.MapPost("/api/portal/scheduling/position-requirements", async (UpsertPositionRequirementRequest request,
@@ -127,6 +262,42 @@ public static class PortalEndpoints
             DateOnly? dueDate = string.IsNullOrWhiteSpace(request.ResolutionDueDate) ? null : DateOnly.Parse(request.ResolutionDueDate);
             return await CreateSchedulingResultAsync(
                 () => repository.CreatePositionRequirementAsync(request, dueDate, userContext.User!.Id, userContext.User.Username, cancellationToken));
+        });
+
+        app.MapGet("/api/portal/scheduling/position-requirements/{id:long}", async (long id,
+            PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext,
+            CancellationToken cancellationToken) =>
+        {
+            var denied = await RequireSchedulingConfigurationAsync(authorization, userContext, cancellationToken);
+            if (denied is not null) return denied;
+            var item = await repository.GetPositionRequirementAsync(id, cancellationToken);
+            return item is null ? Results.NotFound() : Results.Ok(item);
+        });
+
+        app.MapPut("/api/portal/scheduling/position-requirements/{id:long}", async (long id, UpsertPositionRequirementRequest request,
+            PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext,
+            CancellationToken cancellationToken) =>
+        {
+            var denied = await RequireSchedulingConfigurationAsync(authorization, userContext, cancellationToken);
+            if (denied is not null) return denied;
+            var severity = request.Severity?.Trim().ToUpperInvariant();
+            if (request.PositionId <= 0 || request.RequirementTypeId <= 0
+                || severity is not ("BLOQUEANTE" or "SUBSANABLE" or "INFORMATIVA")
+                || (!string.IsNullOrWhiteSpace(request.ResolutionDueDate) && !DateOnly.TryParse(request.ResolutionDueDate, out _)))
+                return Results.BadRequest(new { message = "El requisito o su severidad no es valido." });
+            DateOnly? dueDate = string.IsNullOrWhiteSpace(request.ResolutionDueDate) ? null : DateOnly.Parse(request.ResolutionDueDate);
+            var updated = await repository.UpdatePositionRequirementAsync(id, request, dueDate, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return updated ? Results.Ok(await repository.GetPositionRequirementAsync(id, cancellationToken)) : Results.NotFound();
+        });
+
+        app.MapPost("/api/portal/scheduling/position-requirements/{id:long}/inactivate", async (long id,
+            PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext,
+            CancellationToken cancellationToken) =>
+        {
+            var denied = await RequireSchedulingConfigurationAsync(authorization, userContext, cancellationToken);
+            if (denied is not null) return denied;
+            var updated = await repository.InactivatePositionRequirementAsync(id, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            return updated ? Results.Ok(await repository.GetPositionRequirementAsync(id, cancellationToken)) : Results.NotFound();
         });
 
         app.MapGet("/api/portal/modules/{role}", async (string role, MockPortalQueryService portalService, PostgresPortalRepository repository, CancellationToken cancellationToken) =>

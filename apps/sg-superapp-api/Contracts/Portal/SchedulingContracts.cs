@@ -16,3 +16,9 @@ public sealed record UpsertPositionRequirementRequest(
     long PositionId, long RequirementTypeId, string Severity, string? ResolutionDueDate);
 
 public sealed record SchedulingConfigurationResponse(long Id, string Status);
+
+public sealed record SchedulingClientResponse(long Id, string Code, string Name, string Status);
+public sealed record SchedulingProjectResponse(long Id, long ClientId, string Code, string Name, string EffectiveFrom, string? EffectiveTo, string Status);
+public sealed record CoverageRuleResponse(long Id, long PositionId, long TemplateId, string WeekdayScope, string StartsAt, string EndsAt, int RequiredGuards, string EffectiveFrom, string? EffectiveTo, string Status);
+public sealed record AvailabilityExceptionResponse(long Id, long EmployeeId, string From, string To, string Kind, bool Blocking, string Reason, string Status);
+public sealed record PositionRequirementResponse(long Id, long PositionId, long RequirementTypeId, string Severity, string? ResolutionDueDate, string Status);
