@@ -364,4 +364,151 @@ BEGIN
 END
 $$;
 
+DO $$
+DECLARE
+    missing_tables TEXT;
+    client_id BIGINT;
+    project_id BIGINT;
+    position_id BIGINT;
+    employee_id BIGINT;
+    schedule_id BIGINT;
+    version_id BIGINT;
+    required_shift_id BIGINT;
+    assignment_id BIGINT;
+BEGIN
+    SELECT string_agg(expected_table, ', ' ORDER BY expected_table)
+    INTO missing_tables
+    FROM unnest(ARRAY[
+        'schedules', 'schedule_versions', 'required_shifts',
+        'schedule_assignments', 'schedule_exceptions', 'schedule_generation_runs'
+    ]) AS expected(expected_table)
+    WHERE to_regclass(expected_table) IS NULL;
+
+    IF missing_tables IS NOT NULL THEN
+        RAISE EXCEPTION 'I9 schedule version tables missing: %', missing_tables;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_indexes
+        WHERE schemaname = current_schema()
+          AND tablename = 'schedule_versions'
+          AND indexname = 'schedule_versions_one_published_per_schedule'
+          AND indexdef LIKE '%UNIQUE%WHERE%status%PUBLICADA%'
+    ) THEN
+        RAISE EXCEPTION 'Missing unique published schedule version index';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_trigger
+        WHERE tgrelid = 'schedule_versions'::regclass
+          AND tgname = 'schedule_versions_immutable_when_published'
+          AND NOT tgisinternal
+    ) OR NOT EXISTS (
+        SELECT 1
+        FROM pg_trigger
+        WHERE tgrelid = 'schedule_assignments'::regclass
+          AND tgname = 'schedule_assignments_immutable_when_published'
+          AND NOT tgisinternal
+    ) THEN
+        RAISE EXCEPTION 'Missing published schedule immutability triggers';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'schedule_versions'::regclass
+          AND conname = 'schedule_versions_status_check'
+          AND pg_get_constraintdef(oid) LIKE '%BORRADOR%PROPUESTA%APROBADA%PUBLICADA%REEMPLAZADA%CANCELADA%'
+    ) THEN
+        RAISE EXCEPTION 'Invalid schedule version status contract';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'schedule_assignments'::regclass
+          AND conname = 'schedule_assignments_employee_status_check'
+    ) THEN
+        RAISE EXCEPTION 'Invalid vacant assignment contract';
+    END IF;
+
+    INSERT INTO clients (code, name, status)
+    VALUES ('I9-VERSION-CLIENT', 'Cliente versiones I9', 'ACTIVO')
+    RETURNING id INTO client_id;
+
+    INSERT INTO service_projects (client_id, code, name, effective_from, status)
+    VALUES (client_id, 'I9-VERSION-PROJECT', 'Proyecto versiones I9', CURRENT_DATE, 'ACTIVO')
+    RETURNING id INTO project_id;
+
+    INSERT INTO service_positions (project_id, code, name)
+    VALUES (project_id, 'I9-VERSION-POSITION', 'Puesto versiones I9')
+    RETURNING id INTO position_id;
+
+    INSERT INTO employees (
+        identification_type, identification_number, full_name,
+        employment_status, job_title, hire_date
+    ) VALUES (
+        'CC', 'I9-VERSION-EMPLOYEE', 'Empleado versiones I9',
+        'ACTIVO', 'Guarda', CURRENT_DATE
+    ) RETURNING id INTO employee_id;
+
+    INSERT INTO schedules (project_id, period_start, period_end, created_by)
+    VALUES (project_id, CURRENT_DATE, CURRENT_DATE + 30, 'test.i9')
+    RETURNING id INTO schedule_id;
+
+    INSERT INTO schedule_versions (
+        schedule_id, version_number, status, source_snapshot,
+        rules_snapshot, parameters_snapshot, created_by
+    ) VALUES (
+        schedule_id, 1, 'PROPUESTA', '{"source":"test"}',
+        '{"rules":[]}', '{"parameters":{}}', 'test.i9'
+    ) RETURNING id INTO version_id;
+
+    INSERT INTO required_shifts (
+        schedule_version_id, position_id, shift_date, starts_at, ends_at
+    ) VALUES (version_id, position_id, CURRENT_DATE, '06:00', '18:00')
+    RETURNING id INTO required_shift_id;
+
+    BEGIN
+        INSERT INTO schedule_assignments (
+            schedule_version_id, required_shift_id, status
+        ) VALUES (version_id, required_shift_id, 'ASIGNADA');
+        RAISE EXCEPTION 'schedule_assignments accepted ASIGNADA without employee';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+
+    INSERT INTO schedule_assignments (
+        schedule_version_id, required_shift_id, employee_id, status, reasons
+    ) VALUES (version_id, required_shift_id, employee_id, 'ASIGNADA', '["eligible"]')
+    RETURNING id INTO assignment_id;
+
+    INSERT INTO schedule_exceptions (
+        schedule_version_id, assignment_id, exception_type, reason, responsible
+    ) VALUES (version_id, assignment_id, 'DESVIACION_PLANTILLA', 'Excepcion contractual', 'test.i9');
+
+    INSERT INTO schedule_generation_runs (schedule_version_id, idempotency_key)
+    VALUES (version_id, 'i9-contract-run');
+
+    UPDATE schedule_versions
+    SET status = 'PUBLICADA', published_by = 'test.i9', published_at = NOW()
+    WHERE id = version_id;
+
+    BEGIN
+        UPDATE schedule_assignments SET score = 99 WHERE id = assignment_id;
+        RAISE EXCEPTION 'published schedule assignment remained mutable';
+    EXCEPTION WHEN SQLSTATE '55000' THEN NULL; END;
+
+    BEGIN
+        UPDATE schedule_versions SET vacancy_count = 1 WHERE id = version_id;
+        RAISE EXCEPTION 'published schedule version remained mutable';
+    EXCEPTION WHEN SQLSTATE '55000' THEN NULL; END;
+
+    BEGIN
+        INSERT INTO schedule_versions (
+            schedule_id, version_number, status, created_by, published_by, published_at
+        ) VALUES (schedule_id, 2, 'PUBLICADA', 'test.i9', 'test.i9', NOW());
+        RAISE EXCEPTION 'schedule accepted more than one published version';
+    EXCEPTION WHEN unique_violation THEN NULL; END;
+END
+$$;
+
 ROLLBACK;

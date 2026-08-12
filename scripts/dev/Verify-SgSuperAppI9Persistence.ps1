@@ -53,6 +53,7 @@ try {
     Initialize-I9Base $partialSchemaName
     Invoke-PsqlScalar "CREATE TABLE shift_templates (id BIGSERIAL PRIMARY KEY); CREATE TABLE i9_constraint_decoy (x integer CONSTRAINT shift_templates_version_check CHECK (x < 0))" | Out-Null
     Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\009_i9_scheduling.sql")
+    Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\010_i9_schedule_versions.sql")
     Invoke-PsqlScalar "INSERT INTO roles(code,name,description) VALUES ('ADMIN','Admin','I9'),('OPERACIONES','Operaciones','I9'),('TH','TH','I9'),('GERENCIA','Gerencia','I9')" | Out-Null
     Invoke-PsqlFile (Join-Path $workspaceRoot "db\seeds\009_i9_scheduling_permissions.sql")
     Invoke-PsqlFile (Join-Path $workspaceRoot "db\seeds\010_i9_shift_templates.sql")
@@ -61,12 +62,14 @@ try {
     Initialize-I9Base $constraintSchemaName
     Invoke-PsqlScalar "CREATE TABLE shift_templates (id BIGSERIAL PRIMARY KEY, CONSTRAINT shift_templates_version_check CHECK (id > 0))" | Out-Null
     Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\009_i9_scheduling.sql")
+    Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\010_i9_schedule_versions.sql")
     $repairedConstraint = Invoke-PsqlScalar "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid='shift_templates'::regclass AND conname='shift_templates_version_check'"
     if ($repairedConstraint -notmatch 'version > 0') { throw "Incorrect same-table constraint was not repaired." }
 
     Initialize-I9Base $sequenceSchemaName
     Invoke-PsqlScalar "CREATE TABLE shift_templates (id INTEGER PRIMARY KEY, code TEXT, name varchar(180), version integer, effective_from date, effective_to date, mandatory_by_default boolean, status varchar(20)); INSERT INTO shift_templates(id,code,name,version,effective_from,mandatory_by_default,status) VALUES (9000,'EXISTING','Existing row',1,CURRENT_DATE,true,'ACTIVO')" | Out-Null
     Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\009_i9_scheduling.sql")
+    Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\010_i9_schedule_versions.sql")
     $convergedTypes = Invoke-PsqlScalar "SELECT format_type(a.atttypid,a.atttypmod) FROM pg_attribute a WHERE a.attrelid='shift_templates'::regclass AND a.attname IN ('id','code') ORDER BY a.attname"
     if ($convergedTypes -ne "character varying(30)`nbigint") { throw "Compatible INTEGER/TEXT columns did not converge to BIGINT/VARCHAR(30)." }
     $generatedId = Invoke-PsqlScalar "INSERT INTO shift_templates(code,name,version,effective_from) VALUES ('GENERATED','Generated row',1,CURRENT_DATE) RETURNING id"
@@ -111,6 +114,7 @@ try {
     Initialize-I9Base $schemaName
     Invoke-PsqlScalar "INSERT INTO roles(code,name,description) VALUES ('ADMIN','Admin','I9'),('OPERACIONES','Operaciones','I9'),('TH','TH','I9'),('GERENCIA','Gerencia','I9')" | Out-Null
     Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\009_i9_scheduling.sql")
+    Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\010_i9_schedule_versions.sql")
 
     Invoke-PsqlScalar "INSERT INTO scheduling_rules(source_level,scope_type,severity,effective_from,parameters) VALUES ('VERIFICACION','GLOBAL','INFORMATIVA',CURRENT_DATE,'{}')" | Out-Null
     $rulesBefore = Invoke-PsqlScalar "SELECT count(*) FROM scheduling_rules"
@@ -121,6 +125,7 @@ try {
     Invoke-PsqlScalar "INSERT INTO shift_template_steps(template_id,step_order,shift_code) SELECT id,99,'X' FROM shift_templates WHERE code='2X2' AND version=1" | Out-Null
     Invoke-PsqlScalar "INSERT INTO role_permissions(role_id,module_code,action_code,allowed) SELECT id,'SCHEDULING','CONFIGURE',TRUE FROM roles WHERE code='TH'" | Out-Null
     Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\009_i9_scheduling.sql")
+    Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\010_i9_schedule_versions.sql")
     Invoke-PsqlFile (Join-Path $workspaceRoot "db\seeds\009_i9_scheduling_permissions.sql")
     Invoke-PsqlFile (Join-Path $workspaceRoot "db\seeds\010_i9_shift_templates.sql")
     $stepIdsAfter = Invoke-PsqlScalar "SELECT string_agg(sts.id::text, ',' ORDER BY st.code, sts.step_order) FROM shift_template_steps sts JOIN shift_templates st ON st.id=sts.template_id WHERE st.code IN ('2X2','4X2','6X1')"
