@@ -1,7 +1,7 @@
 # Execution Log I9 - Gate 0 - Programacion Asistida De Turnos
 
 > Tipo: **Execution log documental de Gate 0**
-> Estado general: **Gate 0 cerrado - Tasks 2 a 9 completadas - Task 10 pendiente**
+> Estado general: **Gate 0 cerrado - Tasks 2 a 10 completadas - Task 11 pendiente**
 > Gate 0: **Cerrado**
 > Fecha de apertura: 2026-07-29
 > SPEC: `docs/specs/2026-07-29-sg-superapp-spec-i9-programacion-turnos.md`
@@ -14,7 +14,7 @@ Este artefacto registra la apertura documental de I9. No sustituye el plan
 tecnico exacto
 `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`.
 Estado del plan tecnico: **APROBADO COMO HOJA DE RUTA DOCUMENTAL**.
-Estado de ejecucion: **TASK 9 COMPLETADA - TASK 10 PENDIENTE**.
+Estado de ejecucion: **TASK 10 COMPLETADA - TASK 11 PENDIENTE**.
 
 Las tres condiciones de Gate 0 estan satisfechas desde el 2026-07-29: SPEC
 aprobada, catalogo aprobado para parametrizacion y cierre ejecutivo explicito.
@@ -23,7 +23,7 @@ permanezcan incompletos o sin validar.
 
 El catalogo conserva estado `APROBADO_PARA_PARAMETRIZACION`; las decisiones constan como
 `Aprobada`. Gate 0 permanece cerrado; Tasks 2, 3, 4, 5, 6 y 7 estan
-completadas junto con Tasks 8 y 9. Task 10 permanece pendiente.
+completadas junto con Tasks 8, 9 y 10. Task 11 permanece pendiente.
 
 ## Ruta De Validacion Del Catalogo
 
@@ -191,7 +191,17 @@ notificacion deduplicadas segun condiciones existentes. El commit tecnico es
 `6a31fad`. El verificador aislado y la compilacion terminaron en verde; la
 regresion disponible registro `I9 PERSISTENCE PASS`.
 
-Task 10 permanece pendiente y no iniciada. Gate 2 continua bloqueado hasta
+### Cierre Task 10
+
+Task 10 queda completada con exportaciones de versiones publicadas a PDF y
+Excel, filtros por puesto y guarda, nombres trazables y auditoria
+`SCHEDULE_EXPORTED`. El commit tecnico es `7e3313a`. La prueba integral aislada
+valido cabecera y cierre del PDF, estructura OpenXML del XLSX, metadatos de
+cliente, proyecto, periodo, version, estado y responsable, y dos eventos de
+auditoria; termino con `I9 EXPORTS PASS`. El build concluyo con cero
+advertencias y cero errores.
+
+Task 11 permanece pendiente y no iniciada. Gate 2 continua bloqueado hasta
 completar y validar los parametros del catalogo; esta implementacion no vuelve
 ejecutables las siete reglas normativas pendientes. Los verificadores nominales
 I6/I7 del plan no existen en este checkout; esta ausencia preexistente queda
