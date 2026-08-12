@@ -5,6 +5,7 @@ import { CoursesPage } from "../courses/CoursesPage";
 import { EmployeesPage } from "../employees/EmployeesPage";
 import { ImportsPage } from "../imports/ImportsPage";
 import { PositionsPage } from "../positions/PositionsPage";
+import { SchedulingPage } from "../scheduling/SchedulingPage";
 
 interface ModuleWorkspaceProps {
   user: CurrentUser;
@@ -31,6 +32,10 @@ export function ModuleWorkspace({ user }: ModuleWorkspaceProps) {
 
   if (moduleCode === "courses") {
     return <CoursesPage user={user} />;
+  }
+
+  if (moduleCode === "scheduling") {
+    return <SchedulingPage user={user} />;
   }
 
   return <div className="panel-empty">Modulo pendiente del siguiente incremento.</div>;

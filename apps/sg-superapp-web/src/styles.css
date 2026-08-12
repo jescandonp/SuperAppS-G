@@ -858,3 +858,118 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+
+/* I9 · Programación asistida — identidad Sentinel */
+.scheduling-workspace {
+  --sentinel-blue: #003366;
+  --sentinel-yellow: #FFC700;
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.scheduling-hero,
+.scheduling-control-bar,
+.scheduling-section,
+.scheduling-matrix-card,
+.assignment-detail,
+.schedule-summary {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.scheduling-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-top: 4px solid var(--sentinel-yellow);
+  background: linear-gradient(120deg, var(--sentinel-blue), #001d3a 72%);
+}
+
+.scheduling-hero h1, .scheduling-hero p, .scheduling-section h2 { margin: 0; }
+.scheduling-hero h1 { font-size: clamp(1.6rem, 3vw, 2.35rem); }
+.scheduling-hero > div:first-child { display: grid; gap: 0.35rem; }
+.hero-status { display: grid; gap: 0.5rem; align-content: start; justify-items: end; text-align: right; }
+.schedule-badge { display: inline-flex; width: fit-content; padding: 0.25rem 0.55rem; border: 1px solid var(--sentinel-yellow); border-radius: 999px; color: var(--sentinel-yellow); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; }
+.schedule-badge.is-ok { color: #9ce7c6; border-color: #2fa578; }
+.schedule-badge.is-muted { color: var(--text-muted); border-color: var(--border); }
+
+.scheduling-control-bar { display: grid; grid-template-columns: minmax(220px, 1.4fr) repeat(2, minmax(150px, 0.7fr)) auto; gap: 0.75rem; padding: 1rem; align-items: end; }
+.scheduling-control-bar label, .exception-form label { display: grid; gap: 0.35rem; color: var(--sentinel-yellow); font-size: 0.78rem; font-weight: 700; text-transform: uppercase; }
+.scheduling-control-bar select, .scheduling-control-bar input, .exception-form textarea { min-height: 42px; border: 1px solid var(--border); border-radius: 6px; padding: 0.55rem 0.7rem; background: #0f1116; color: #f3f1ea; text-transform: none; }
+.schedule-primary, .schedule-secondary, .summary-actions button, .scheduling-tabs button { min-height: 40px; border: 1px solid var(--sentinel-yellow); border-radius: 6px; padding: 0.55rem 0.85rem; font-weight: 700; cursor: pointer; }
+.schedule-primary { background: var(--sentinel-yellow); color: #101820; }
+.schedule-secondary, .summary-actions button, .scheduling-tabs button { background: transparent; color: #f3f1ea; }
+.schedule-primary:disabled, .schedule-secondary:disabled, .summary-actions button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.schedule-live-region:empty { display: none; }
+.schedule-alert { display: flex; gap: 0.55rem; padding: 0.75rem 1rem; margin: 0; border-radius: 6px; }
+.schedule-alert.is-error { border: 1px solid #ba5454; background: rgba(186,84,84,.16); color: #ffd1d1; }
+.schedule-alert.is-success { border: 1px solid #2fa578; background: rgba(47,165,120,.16); color: #baf1d8; }
+
+.schedule-summary { display: grid; grid-template-columns: repeat(4, minmax(90px, 1fr)) minmax(250px, auto); gap: 0.75rem; padding: 0.85rem 1rem; }
+.schedule-summary > div:not(.summary-actions) { display: grid; gap: 0.15rem; border-left: 3px solid var(--sentinel-yellow); padding-left: 0.65rem; }
+.schedule-summary span { color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; }
+.schedule-summary strong { font-size: 1.25rem; }
+.summary-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 0.4rem; }
+
+.scheduling-tabs { display: flex; gap: 0.45rem; overflow-x: auto; padding-bottom: 0.15rem; }
+.scheduling-tabs button[aria-pressed="true"] { color: #101820; background: var(--sentinel-yellow); }
+.scheduling-section, .scheduling-matrix-card, .assignment-detail { padding: 1rem; }
+.scheduling-section { display: grid; gap: 1rem; }
+.scheduling-section-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.scheduling-section-heading > .muted { max-width: 560px; margin: 0; text-align: right; }
+
+.template-grid, .comparison-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.85rem; }
+.template-card, .comparison-card, .exception-card { border: 1px solid var(--border); border-radius: 6px; padding: 1rem; background: var(--surface-alt); }
+.template-card-heading, .exception-card > div { display: flex; justify-content: space-between; gap: 0.5rem; align-items: center; }
+.template-card h3 { min-height: 2.8rem; font-size: 1rem; }
+.template-sequence { padding: 0.65rem; border-radius: 4px; background: #0f1116; color: var(--sentinel-yellow); font-weight: 700; letter-spacing: 0.08em; }
+.mandatory-label { display: inline-block; border-left: 3px solid var(--sentinel-yellow); padding-left: 0.5rem; font-size: 0.82rem; }
+
+.scheduling-matrix-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 1rem; align-items: start; min-width: 0; }
+.scheduling-table-scroll { max-width: 100%; overflow-x: auto; margin-top: 1rem; }
+.scheduling-table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; }
+.scheduling-table caption { text-align: left; color: var(--text-muted); padding: 0 0 0.75rem; }
+.scheduling-table th { position: sticky; top: 0; z-index: 2; background: var(--sentinel-blue); color: #fff; }
+.scheduling-table th, .scheduling-table td { min-width: 74px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 0.35rem; text-align: center; }
+.scheduling-table th:first-child { left: 0; z-index: 3; min-width: 128px; }
+.scheduling-table tbody th { background: #17283a; }
+.shift-cell { width: 100%; min-height: 42px; border: 1px solid transparent; border-radius: 4px; font-weight: 800; cursor: pointer; }
+.shift-d { background: #f1c84a; color: #15202b; }.shift-n { background: #315f8f; color: white; }.shift-x { background: #39414c; color: white; }.shift-vacante { background: #7c3434; color: white; font-size: 0.68rem; }
+.shift-cell:focus-visible { outline: 3px solid white; outline-offset: 2px; }
+.shift-cell:disabled { opacity: 0.35; cursor: default; }
+.schedule-legend { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.65rem; color: var(--text-muted); font-size: 0.78rem; }
+.schedule-legend b { color: var(--sentinel-yellow); }
+.assignment-detail { position: sticky; top: 1rem; display: grid; gap: 0.65rem; }
+.assignment-detail h3, .assignment-detail h4, .assignment-detail p { margin: 0; }
+.assignment-detail dl, .comparison-card dl { display: grid; gap: 0.45rem; margin: 0; }
+.assignment-detail dl div, .comparison-card dl div { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.35rem; }
+.assignment-detail dd, .comparison-card dd { margin: 0; font-weight: 700; }
+.assignment-detail ul { padding-left: 1.1rem; margin: 0; }
+.read-only-note { padding: 0.65rem; border-left: 3px solid var(--sentinel-yellow); background: rgba(255,199,0,.08); }
+.scheduling-mobile-list { display: none; }
+
+.comparison-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.comparison-card { display: grid; gap: 0.75rem; }
+.comparison-card h3, .comparison-card p { margin: 0; }
+.exception-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, .7fr); gap: 1rem; align-items: start; }
+.exception-list, .exception-form { display: grid; gap: 0.75rem; }
+.exception-card p { margin: 0.55rem 0; }
+.exception-form { border: 1px solid var(--border); border-radius: 6px; padding: 1rem; background: var(--surface-alt); }
+.exception-form h3 { margin: 0; }
+
+@media (max-width: 899px) {
+  .scheduling-hero, .scheduling-section-heading { flex-direction: column; }
+  .hero-status { justify-items: start; text-align: left; }
+  .scheduling-control-bar, .schedule-summary, .template-grid, .comparison-grid, .scheduling-matrix-layout, .exception-layout { grid-template-columns: 1fr; }
+  .summary-actions { justify-content: flex-start; }
+  .scheduling-section-heading > .muted { text-align: left; }
+  .scheduling-table-scroll { display: none; }
+  .scheduling-mobile-list { display: grid; gap: 0.75rem; margin-top: 1rem; }
+  .scheduling-mobile-list article { display: grid; gap: 0.35rem; padding: 0.75rem; border: 1px solid var(--border); border-radius: 6px; }
+  .scheduling-mobile-list button { display: flex; justify-content: space-between; gap: 1rem; min-height: 40px; align-items: center; border: 0; border-radius: 4px; background: var(--surface-alt); color: #fff; padding: 0.55rem 0.7rem; }
+  .assignment-detail { position: static; }
+}
