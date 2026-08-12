@@ -2,6 +2,7 @@ using Npgsql;
 using NpgsqlTypes;
 using System.Text;
 using System.Text.Json;
+using System.Data;
 using Sg.SuperApp.Api.Configuration;
 using Sg.SuperApp.Api.Contracts.Auth;
 using Sg.SuperApp.Api.Contracts.Portal;
@@ -3075,6 +3076,64 @@ public sealed class PostgresPortalRepository
     public Task<bool> InactivateCoverageRuleAsync(long id, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) => InactivateSchedulingConfigurationAsync("position_coverage_rules", "COVERAGE_RULE_INACTIVATED", "POSITION_COVERAGE_RULE", id, actorUserId, actorUsername, cancellationToken);
     public Task<bool> InactivateAvailabilityExceptionAsync(long id, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) => InactivateSchedulingConfigurationAsync("employee_availability_exceptions", "AVAILABILITY_INACTIVATED", "EMPLOYEE_AVAILABILITY_EXCEPTION", id, actorUserId, actorUsername, cancellationToken);
     public Task<bool> InactivatePositionRequirementAsync(long id, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) => InactivateSchedulingConfigurationAsync("position_requirements", "POSITION_REQUIREMENT_INACTIVATED", "POSITION_REQUIREMENT", id, actorUserId, actorUsername, cancellationToken);
+
+    public async Task<ScheduleWorkflowResponse> CreateScheduleProposalAsync(long projectId, DateOnly from, DateOnly to, bool acceptedVacancy, long actorId, string actor, CancellationToken ct = default)
+    {
+        await using var cn = new NpgsqlConnection(_connectionString); await cn.OpenAsync(ct); await using var tx = await cn.BeginTransactionAsync(ct);
+        long scheduleId;
+        await using (var cmd = new NpgsqlCommand("insert into schedules(project_id,period_start,period_end,created_by) values(@p,@f,@t,@a) on conflict(project_id,period_start,period_end) do update set project_id=excluded.project_id returning id", cn, tx))
+        { cmd.Parameters.AddWithValue("p", projectId); cmd.Parameters.AddWithValue("f", from); cmd.Parameters.AddWithValue("t", to); cmd.Parameters.AddWithValue("a", actor); scheduleId=(long)(await cmd.ExecuteScalarAsync(ct) ?? throw new InvalidOperationException("No fue posible crear la programacion.")); }
+        long versionId;
+        await using (var cmd = new NpgsqlCommand("insert into schedule_versions(schedule_id,version_number,status,source_snapshot,created_by) select @s,coalesce(max(version_number),0)+1,'PROPUESTA',jsonb_build_object('acceptedVacancy',@v),@a from schedule_versions where schedule_id=@s returning id", cn, tx))
+        { cmd.Parameters.AddWithValue("s",scheduleId); cmd.Parameters.AddWithValue("v",acceptedVacancy); cmd.Parameters.AddWithValue("a",actor); versionId=(long)(await cmd.ExecuteScalarAsync(ct) ?? throw new InvalidOperationException("No fue posible crear la propuesta.")); }
+        await InsertAuditLogAsync(cn,tx,actorId,actor,"SCHEDULE_PROPOSAL_CREATED","SCHEDULE_VERSION",versionId.ToString(),"jsonb_build_object('acceptedVacancy',@vacancy)",c=>c.Parameters.AddWithValue("vacancy",acceptedVacancy),ct);
+        await tx.CommitAsync(ct); return (await GetScheduleVersionAsync(versionId,ct))!;
+    }
+
+    public Task<ScheduleWorkflowResponse?> GetScheduleVersionAsync(long id, CancellationToken ct=default) => QueryScheduleAsync("sv.id=@id",id,null,ct);
+    public Task<ScheduleWorkflowResponse?> GetScheduleByProjectPeriodAsync(long projectId, DateOnly period, CancellationToken ct=default) => QueryScheduleAsync("s.project_id=@id and s.period_start=@period order by sv.version_number desc limit 1",projectId,period,ct);
+
+    public async Task<ScheduleWorkflowResponse> UpdateScheduleAssignmentAsync(long versionId,long assignmentId,UpdateScheduleAssignmentRequest request,long actorId,string actor,CancellationToken ct=default)
+    {
+        var status=request.Status.Trim().ToUpperInvariant();
+        await using var cn=new NpgsqlConnection(_connectionString); await cn.OpenAsync(ct); await using var tx=await cn.BeginTransactionAsync(ct);
+        await RequireScheduleStateAsync(cn,tx,versionId,request.ExpectedVersion,"PROPUESTA",ct);
+        await using (var cmd=new NpgsqlCommand("update schedule_assignments set employee_id=@e,status=@s,reasons=@r::jsonb,updated_at=now() where id=@id and schedule_version_id=@v",cn,tx))
+        { cmd.Parameters.Add("e",NpgsqlDbType.Bigint).Value=request.EmployeeId.HasValue?request.EmployeeId.Value:DBNull.Value; cmd.Parameters.AddWithValue("s",status); cmd.Parameters.AddWithValue("r",JsonSerializer.Serialize(request.Reasons??Array.Empty<string>())); cmd.Parameters.AddWithValue("id",assignmentId); cmd.Parameters.AddWithValue("v",versionId); if(await cmd.ExecuteNonQueryAsync(ct)!=1) throw new KeyNotFoundException("La asignacion no existe."); }
+        await RefreshScheduleMetricsAsync(cn,tx,versionId,ct);
+        await InsertAuditLogAsync(cn,tx,actorId,actor,"SCHEDULE_ASSIGNMENT_REVALIDATED","SCHEDULE_VERSION",versionId.ToString(),"jsonb_build_object('assignmentId',@id,'status',@status)",c=>{c.Parameters.AddWithValue("id",assignmentId);c.Parameters.AddWithValue("status",status);},ct);
+        await tx.CommitAsync(ct); return (await GetScheduleVersionAsync(versionId,ct))!;
+    }
+
+    public async Task<ScheduleWorkflowResponse> CreateScheduleExceptionAsync(long versionId,CreateScheduleExceptionRequest request,DateOnly resolutionDate,long actorId,string actor,CancellationToken ct=default)
+    {
+        await using var cn=new NpgsqlConnection(_connectionString); await cn.OpenAsync(ct); await using var tx=await cn.BeginTransactionAsync(ct);
+        await RequireScheduleStateAsync(cn,tx,versionId,request.ExpectedVersion,"PROPUESTA",ct);
+        await using (var cmd=new NpgsqlCommand("insert into schedule_exceptions(schedule_version_id,assignment_id,exception_type,reason,responsible) values(@v,@a,@t,@r,@p)",cn,tx))
+        { cmd.Parameters.AddWithValue("v",versionId);cmd.Parameters.Add("a",NpgsqlDbType.Bigint).Value=request.AssignmentId.HasValue?request.AssignmentId.Value:DBNull.Value;cmd.Parameters.AddWithValue("t",request.ExceptionType.Trim());cmd.Parameters.AddWithValue("r",request.Reason.Trim());cmd.Parameters.AddWithValue("p",request.Responsible.Trim());await cmd.ExecuteNonQueryAsync(ct); }
+        await RefreshScheduleMetricsAsync(cn,tx,versionId,ct);
+        await InsertAuditLogAsync(cn,tx,actorId,actor,"SCHEDULE_EXCEPTION_REGISTERED","SCHEDULE_VERSION",versionId.ToString(),"jsonb_build_object('reason',@reason,'responsible',@responsible,'resolutionDate',@date)",c=>{c.Parameters.AddWithValue("reason",request.Reason.Trim());c.Parameters.AddWithValue("responsible",request.Responsible.Trim());c.Parameters.AddWithValue("date",resolutionDate.ToString("yyyy-MM-dd"));},ct);
+        await tx.CommitAsync(ct); return (await GetScheduleVersionAsync(versionId,ct))!;
+    }
+
+    public Task<ScheduleWorkflowResponse> ApproveScheduleAsync(long id,int expected,long actorId,string actor,CancellationToken ct=default)=>TransitionScheduleAsync(id,expected,"PROPUESTA","APROBADA","SCHEDULE_APPROVED",actorId,actor,ct);
+    public Task<ScheduleWorkflowResponse> PublishScheduleAsync(long id,int expected,long actorId,string actor,CancellationToken ct=default)=>TransitionScheduleAsync(id,expected,"APROBADA","PUBLICADA","SCHEDULE_PUBLISHED",actorId,actor,ct);
+
+    public async Task<IReadOnlyList<ScheduleAuditResponse>> GetScheduleAuditAsync(long id,CancellationToken ct=default)
+    { var items=new List<ScheduleAuditResponse>();await using var cn=new NpgsqlConnection(_connectionString);await cn.OpenAsync(ct);await using var cmd=new NpgsqlCommand("select id,event_type,actor_username,created_at,detail::text from audit_log where entity_type='SCHEDULE_VERSION' and entity_id=@id order by id",cn);cmd.Parameters.AddWithValue("id",id.ToString());await using var rd=await cmd.ExecuteReaderAsync(ct);while(await rd.ReadAsync(ct))items.Add(new(rd.GetInt64(0),rd.GetString(1),rd.GetString(2),rd.GetFieldValue<DateTime>(3).ToString("O"),rd.GetString(4)));return items; }
+
+    private async Task<ScheduleWorkflowResponse> TransitionScheduleAsync(long id,int expected,string from,string to,string eventType,long actorId,string actor,CancellationToken ct)
+    { await using var cn=new NpgsqlConnection(_connectionString);await cn.OpenAsync(ct);await using var tx=await cn.BeginTransactionAsync(ct);var current=await RequireScheduleStateAsync(cn,tx,id,expected,from,ct);if(to=="PUBLICADA"){await using var replace=new NpgsqlCommand("update schedule_versions set status='REEMPLAZADA' where schedule_id=@s and status='PUBLICADA'",cn,tx);replace.Parameters.AddWithValue("s",current.ScheduleId);await replace.ExecuteNonQueryAsync(ct);}var sql=to=="APROBADA"?"update schedule_versions set status='APROBADA',approved_by=@a,approved_at=now() where id=@id":"update schedule_versions set status='PUBLICADA',published_by=@a,published_at=now() where id=@id";await using(var cmd=new NpgsqlCommand(sql,cn,tx)){cmd.Parameters.AddWithValue("a",actor);cmd.Parameters.AddWithValue("id",id);await cmd.ExecuteNonQueryAsync(ct);}var self=to=="PUBLICADA"&&current.CreatedBy==actor&&current.ApprovedBy==actor;await InsertAuditLogAsync(cn,tx,actorId,actor,eventType,"SCHEDULE_VERSION",id.ToString(),"jsonb_build_object('from',@from,'to',@to,'selfManaged',@self)",c=>{c.Parameters.AddWithValue("from",from);c.Parameters.AddWithValue("to",to);c.Parameters.AddWithValue("self",self);},ct);await tx.CommitAsync(ct);return(await GetScheduleVersionAsync(id,ct))!; }
+
+    private async Task<ScheduleWorkflowResponse> RequireScheduleStateAsync(NpgsqlConnection cn,NpgsqlTransaction tx,long id,int expected,string status,CancellationToken ct)
+    { await using var cmd=new NpgsqlCommand("select sv.id,sv.schedule_id,s.project_id,sv.version_number,sv.status,s.period_start,s.period_end,sv.coverage_percent,sv.vacancy_count,sv.exception_count,coalesce((sv.source_snapshot->>'acceptedVacancy')::boolean,false),sv.created_by,sv.approved_by,sv.published_by from schedule_versions sv join schedules s on s.id=sv.schedule_id where sv.id=@id for update of sv",cn,tx);cmd.Parameters.AddWithValue("id",id);await using var rd=await cmd.ExecuteReaderAsync(ct);if(!await rd.ReadAsync(ct))throw new KeyNotFoundException("La propuesta no existe.");var item=ReadScheduleWorkflow(rd);if(item.VersionNumber!=expected)throw new DBConcurrencyException("La version esperada no coincide.");if(item.Status!=status)throw new InvalidOperationException($"La transicion requiere estado {status}.");return item; }
+
+    private async Task RefreshScheduleMetricsAsync(NpgsqlConnection cn,NpgsqlTransaction tx,long id,CancellationToken ct)
+    { await using var cmd=new NpgsqlCommand("update schedule_versions sv set vacancy_count=(select count(*) from schedule_assignments where schedule_version_id=sv.id and status='VACANTE'),exception_count=(select count(*) from schedule_exceptions where schedule_version_id=sv.id),coverage_percent=coalesce((select round(100.0*count(*) filter(where status='ASIGNADA')/nullif(count(*),0),2) from schedule_assignments where schedule_version_id=sv.id),0) where sv.id=@id",cn,tx);cmd.Parameters.AddWithValue("id",id);await cmd.ExecuteNonQueryAsync(ct); }
+
+    private async Task<ScheduleWorkflowResponse?> QueryScheduleAsync(string filter,long id,DateOnly? period,CancellationToken ct)
+    { await using var cn=new NpgsqlConnection(_connectionString);await cn.OpenAsync(ct);await using var cmd=new NpgsqlCommand($"select sv.id,sv.schedule_id,s.project_id,sv.version_number,sv.status,s.period_start,s.period_end,sv.coverage_percent,sv.vacancy_count,sv.exception_count,coalesce((sv.source_snapshot->>'acceptedVacancy')::boolean,false),sv.created_by,sv.approved_by,sv.published_by from schedule_versions sv join schedules s on s.id=sv.schedule_id where {filter}",cn);cmd.Parameters.AddWithValue("id",id);if(period.HasValue)cmd.Parameters.AddWithValue("period",period.Value);await using var rd=await cmd.ExecuteReaderAsync(ct);return await rd.ReadAsync(ct)?ReadScheduleWorkflow(rd):null; }
+    private static ScheduleWorkflowResponse ReadScheduleWorkflow(NpgsqlDataReader r){var created=r.GetString(11);var approved=r.IsDBNull(12)?null:r.GetString(12);var published=r.IsDBNull(13)?null:r.GetString(13);return new(r.GetInt64(0),r.GetInt64(1),r.GetInt64(2),r.GetInt32(3),r.GetString(4),r.GetFieldValue<DateOnly>(5).ToString("yyyy-MM-dd"),r.GetFieldValue<DateOnly>(6).ToString("yyyy-MM-dd"),r.GetDecimal(7),r.GetInt32(8),r.GetInt32(9),r.GetBoolean(10),created,approved,published,published is not null&&created==approved&&approved==published);}
 
     private async Task<bool> UpdateSchedulingConfigurationAsync(string sql, string eventType, string entityType, long id, Action<NpgsqlCommand> addParameters, long actorUserId, string actorUsername, CancellationToken cancellationToken)
     {

@@ -123,6 +123,25 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
     IF OLD.status = 'PUBLICADA' THEN
+        IF TG_OP = 'UPDATE'
+           AND NEW.status = 'REEMPLAZADA'
+           AND NEW.id IS NOT DISTINCT FROM OLD.id
+           AND NEW.schedule_id IS NOT DISTINCT FROM OLD.schedule_id
+           AND NEW.version_number IS NOT DISTINCT FROM OLD.version_number
+           AND NEW.source_snapshot IS NOT DISTINCT FROM OLD.source_snapshot
+           AND NEW.rules_snapshot IS NOT DISTINCT FROM OLD.rules_snapshot
+           AND NEW.parameters_snapshot IS NOT DISTINCT FROM OLD.parameters_snapshot
+           AND NEW.coverage_percent IS NOT DISTINCT FROM OLD.coverage_percent
+           AND NEW.vacancy_count IS NOT DISTINCT FROM OLD.vacancy_count
+           AND NEW.exception_count IS NOT DISTINCT FROM OLD.exception_count
+           AND NEW.created_by IS NOT DISTINCT FROM OLD.created_by
+           AND NEW.created_at IS NOT DISTINCT FROM OLD.created_at
+           AND NEW.approved_by IS NOT DISTINCT FROM OLD.approved_by
+           AND NEW.approved_at IS NOT DISTINCT FROM OLD.approved_at
+           AND NEW.published_by IS NOT DISTINCT FROM OLD.published_by
+           AND NEW.published_at IS NOT DISTINCT FROM OLD.published_at THEN
+            RETURN NEW;
+        END IF;
         RAISE EXCEPTION USING
             ERRCODE = '55000',
             MESSAGE = 'published schedule version is immutable';

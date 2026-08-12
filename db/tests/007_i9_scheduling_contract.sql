@@ -508,6 +508,15 @@ BEGIN
         ) VALUES (schedule_id, 2, 'PUBLICADA', 'test.i9', 'test.i9', NOW());
         RAISE EXCEPTION 'schedule accepted more than one published version';
     EXCEPTION WHEN unique_violation THEN NULL; END;
+
+    UPDATE schedule_versions SET status = 'REEMPLAZADA' WHERE id = version_id;
+    IF (SELECT status FROM schedule_versions WHERE id = version_id) <> 'REEMPLAZADA' THEN
+        RAISE EXCEPTION 'published schedule version was not replaced';
+    END IF;
+
+    INSERT INTO schedule_versions (
+        schedule_id, version_number, status, created_by, approved_by, approved_at, published_by, published_at
+    ) VALUES (schedule_id, 2, 'PUBLICADA', 'test.i9', 'test.i9', NOW(), 'test.i9', NOW());
 END
 $$;
 
