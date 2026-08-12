@@ -381,17 +381,18 @@ git commit -m "feat: add I9 project coverage configuration"
 - Modify: `apps/sg-superapp-api/Domain/SchedulingModels.cs`
 - Create: `apps/sg-superapp-api/Services/SchedulingEligibilityService.cs`
 - Modify: `apps/sg-superapp-api/Program.cs`
+- Modify: `apps/sg-superapp-api/Endpoints/PortalEndpoints.cs`
 - Create: `scripts/dev/Verify-SgSuperAppI9Eligibility.ps1`
 
-- [ ] **Step 1: Escribir matriz RED**
+- [x] **Step 1: Escribir matriz RED**
 
 El script envía candidatos con: activo, retirado, incapacidad, cruce, descanso insuficiente, requisito vencido bloqueante, subsanable e informativo. Debe comprobar `Eligible`, `RequiresException` y códigos de razón estables.
 
-- [ ] **Step 2: Ejecutar RED**
+- [x] **Step 2: Ejecutar RED**
 
 Expected: servicio/endpoint ausente.
 
-- [ ] **Step 3: Implementar evaluación pura y ordenada**
+- [x] **Step 3: Implementar evaluación pura y ordenada**
 
 ```csharp
 public sealed record EligibilityReason(string Code, string Severity, string Message);
@@ -413,13 +414,13 @@ public EligibilityResult Evaluate(GuardSchedulingFacts facts)
 
 La ubicación produce razón bloqueante solo cuando la regla versionada lo determine; no codificar distancias fijas.
 
-- [ ] **Step 4: Ejecutar GREEN y determinismo**
+- [x] **Step 4: Ejecutar GREEN y determinismo**
 
 Ejecutar dos veces el mismo payload y comparar JSON normalizado.
 
 Expected: `I9 ELIGIBILITY PASS`.
 
-- [ ] **Step 5: Build y commit**
+- [x] **Step 5: Build y commit**
 
 ```powershell
 C:\tmp\dotnet6\dotnet.exe build apps/sg-superapp-api/sg-superapp-api.csproj --no-restore

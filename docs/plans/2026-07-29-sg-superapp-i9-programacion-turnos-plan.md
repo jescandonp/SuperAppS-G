@@ -1,7 +1,7 @@
 # Execution Log I9 - Gate 0 - Programacion Asistida De Turnos
 
 > Tipo: **Execution log documental de Gate 0**
-> Estado general: **Gate 0 cerrado - Tasks 2, 3 y 4 completadas - Task 5 pendiente**
+> Estado general: **Gate 0 cerrado - Tasks 2, 3, 4 y 5 completadas - Task 6 pendiente**
 > Gate 0: **Cerrado**
 > Fecha de apertura: 2026-07-29
 > SPEC: `docs/specs/2026-07-29-sg-superapp-spec-i9-programacion-turnos.md`
@@ -14,7 +14,7 @@ Este artefacto registra la apertura documental de I9. No sustituye el plan
 tecnico exacto
 `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`.
 Estado del plan tecnico: **APROBADO COMO HOJA DE RUTA DOCUMENTAL**.
-Estado de ejecucion: **TASK 4 COMPLETADA - TASK 5 PENDIENTE**.
+Estado de ejecucion: **TASK 5 COMPLETADA - TASK 6 PENDIENTE**.
 
 Las tres condiciones de Gate 0 estan satisfechas desde el 2026-07-29: SPEC
 aprobada, catalogo aprobado para parametrizacion y cierre ejecutivo explicito.
@@ -22,8 +22,8 @@ El catalogo no es ejecutable por el motor mientras sus campos obligatorios
 permanezcan incompletos o sin validar.
 
 El catalogo conserva estado `APROBADO_PARA_PARAMETRIZACION`; las decisiones constan como
-`Aprobada`. Gate 0 permanece cerrado; Tasks 2, 3 y 4 estan completadas. Task 5
-permanece pendiente.
+`Aprobada`. Gate 0 permanece cerrado; Tasks 2, 3, 4 y 5 estan completadas. Task
+6 permanece pendiente.
 
 ## Ruta De Validacion Del Catalogo
 
@@ -65,8 +65,9 @@ Estado: **Cerrado**.
 
 Tasks 2, 3 y 4 se completaron con sus verificaciones. El usuario aprobo el
 2026-08-11 la enmienda del modelo persistente requerida para coberturas,
-disponibilidad y requisitos de puesto. La Task 4 cerro el CRUD con permisos y
-auditoria; esta actualizacion no habilita reglas normativas ni inicia Task 5.
+disponibilidad y requisitos de puesto. La Task 4 fue completada con CRUD,
+permisos y auditoria; Task 5 fue completada con elegibilidad explicable. Esta
+actualizacion no habilita reglas normativas ni inicia Task 6.
 
 ## Evidencia TDD Documental
 
@@ -157,6 +158,6 @@ Las mutaciones no tocaron el repositorio ni crearon worktrees registrados.
 
 ## Retake
 
-Task 4 queda completada. Task 5 permanece pendiente en el orden del plan
-tecnico. Gate 0 permanece cerrado; Gate 2 continua bloqueado hasta completar y
-validar los parametros del catalogo.
+Task 5 queda completada con evaluacion explicable y deterministica. Task 6
+permanece pendiente. Gate 0 permanece cerrado; Gate 2 continua bloqueado hasta
+completar y validar los parametros del catalogo.
