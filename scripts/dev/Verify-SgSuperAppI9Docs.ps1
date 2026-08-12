@@ -133,8 +133,8 @@ $specPath = 'docs/specs/2026-07-29-sg-superapp-spec-i9-programacion-turnos.md'
 Assert-DocumentContains $specPath @(
     '(?m)^> Estado: \*\*Aprobada\*\*\s*$',
     '(?is)aprobada.*2026-07-29.*usuario.*patrocinador funcional',
-    '(?m)^> Gate: 0 cerrado; Tasks 2 y 3 completadas; Task 4 autorizada\s*$',
-    '(?m)^Estado de aplicacion: \*\*TASK_4_AUTORIZADA_EN_EJECUCION\*\*\s*$',
+    '(?m)^> Gate: 0 cerrado; Tasks 2, 3 y 4 completadas; Task 5 pendiente\s*$',
+    '(?m)^Estado de aplicacion: \*\*TASK_4_COMPLETADA_TASK_5_PENDIENTE\*\*\s*$',
     '(?i)alcance',
     '(?i)contratos funcionales',
     '(?i)estados',
@@ -180,22 +180,22 @@ $planPath = 'docs/plans/2026-07-29-sg-superapp-i9-programacion-turnos-plan.md'
 Assert-DocumentContains $planPath @(
     '(?m)^# Execution Log I9 - Gate 0 - Programacion Asistida De Turnos\s*$',
     '(?m)^> Tipo: \*\*Execution log documental de Gate 0\*\*\s*$',
-    '(?m)^> Estado general: \*\*Gate 0 cerrado - Tasks 2 y 3 completadas - Task 4 en ejecucion\*\*\s*$',
+    '(?m)^> Estado general: \*\*Gate 0 cerrado - Tasks 2, 3 y 4 completadas - Task 5 pendiente\*\*\s*$',
     '(?m)^> Gate 0: \*\*Cerrado\*\*\s*$',
-    '(?i)Task 4.*autorizada',
-    '(?i)en ejecucion',
-    '(?is)Tasks 2 y 3.*completaron.*Task 4',
+    '(?i)Task 4.*completada',
+    '(?i)Task 5.*pendiente',
+    '(?is)Tasks 2, 3 y 4.*completadas',
     'docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan\.md',
     '(?i)APROBADO COMO HOJA DE RUTA DOCUMENTAL',
-    '(?i)TASK 4 AUTORIZADA',
-    '(?i)EN EJECUCION',
+    '(?i)TASK 4 COMPLETADA',
+    '(?i)TASK 5 PENDIENTE',
     '(?is)SPEC.*aprobada.*2026-07-29.*usuario.*patrocinador funcional',
     '(?is)catalogo.*APROBADO_PARA_PARAMETRIZACION.*decisiones.*Aprobada',
     '(?m)^\| Gate / Retake \| Estado \| Condiciones cumplidas / proxima condicion \|\s*$',
     '(?m)^\| Gate 0 - autoridad documental \| Cerrado \| Catalogo aprobado para parametrizacion y firmado; no ejecutable; cierre ejecutivo registrado \|\s*$',
-    '(?m)^\| Gate 1 / Tasks 2-4 - persistencia/configuracion \| En_ejecucion \| Tasks 2 y 3 completadas; Task 4 autorizada bajo SDD/TDD \|\s*$',
+    '(?m)^\| Gate 1 / Tasks 2-4 - persistencia/configuracion \| Completado \| Persistencia, ciclos y CRUD de configuracion verificados bajo SDD/TDD \|\s*$',
     '(?m)^\| Gate 2 - reglas/motor \| Bloqueado \| Proxima condicion: completar y validar parametros de las 7 reglas \|\s*$',
-    '(?is)Task 4.*autorizada.*SDD/TDD',
+    '(?is)Task 4.*completada.*Task 5.*pendiente',
     '(?is)Camilo\s+Piedrahita.*Gerente\s+General.*cierre',
     '(?i)GH-DE-01',
     '24/07/2025',
@@ -223,7 +223,7 @@ Assert-DocumentDoesNotContain $planPath @(
     '(?im)^\s*Task 2\s+(esta|queda|fue|se encuentra)\s+(iniciada|en ejecucion)'
 )
 Assert-PatternCount $planPath '(?m)^> Estado general:' 1
-Assert-PatternCount $planPath '(?m)^> Estado general: \*\*Gate 0 cerrado - Tasks 2 y 3 completadas - Task 4 en ejecucion\*\*\s*$' 1
+Assert-PatternCount $planPath '(?m)^> Estado general: \*\*Gate 0 cerrado - Tasks 2, 3 y 4 completadas - Task 5 pendiente\*\*\s*$' 1
 Assert-PatternCount $planPath '(?m)^> Gate 0:' 1
 Assert-PatternCount $planPath '(?m)^> Gate 0: \*\*Cerrado\*\*\s*$' 1
 

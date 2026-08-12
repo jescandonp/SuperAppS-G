@@ -1,7 +1,7 @@
 # Execution Log I9 - Gate 0 - Programacion Asistida De Turnos
 
 > Tipo: **Execution log documental de Gate 0**
-> Estado general: **Gate 0 cerrado - Tasks 2 y 3 completadas - Task 4 en ejecucion**
+> Estado general: **Gate 0 cerrado - Tasks 2, 3 y 4 completadas - Task 5 pendiente**
 > Gate 0: **Cerrado**
 > Fecha de apertura: 2026-07-29
 > SPEC: `docs/specs/2026-07-29-sg-superapp-spec-i9-programacion-turnos.md`
@@ -14,7 +14,7 @@ Este artefacto registra la apertura documental de I9. No sustituye el plan
 tecnico exacto
 `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`.
 Estado del plan tecnico: **APROBADO COMO HOJA DE RUTA DOCUMENTAL**.
-Estado de ejecucion: **TASK 4 AUTORIZADA - EN EJECUCION**.
+Estado de ejecucion: **TASK 4 COMPLETADA - TASK 5 PENDIENTE**.
 
 Las tres condiciones de Gate 0 estan satisfechas desde el 2026-07-29: SPEC
 aprobada, catalogo aprobado para parametrizacion y cierre ejecutivo explicito.
@@ -22,8 +22,8 @@ El catalogo no es ejecutable por el motor mientras sus campos obligatorios
 permanezcan incompletos o sin validar.
 
 El catalogo conserva estado `APROBADO_PARA_PARAMETRIZACION`; las decisiones constan como
-`Aprobada`. Gate 0 permanece cerrado; Tasks 2 y 3 estan completadas y Task 4
-esta autorizada en ejecucion.
+`Aprobada`. Gate 0 permanece cerrado; Tasks 2, 3 y 4 estan completadas. Task 5
+permanece pendiente.
 
 ## Ruta De Validacion Del Catalogo
 
@@ -42,7 +42,7 @@ Piedrahita, Gerente General, realiza el cierre ejecutivo.
 | Gate / Retake | Estado | Condiciones cumplidas / proxima condicion |
 |---|---|---|
 | Gate 0 - autoridad documental | Cerrado | Catalogo aprobado para parametrizacion y firmado; no ejecutable; cierre ejecutivo registrado |
-| Gate 1 / Tasks 2-4 - persistencia/configuracion | En_ejecucion | Tasks 2 y 3 completadas; Task 4 autorizada bajo SDD/TDD |
+| Gate 1 / Tasks 2-4 - persistencia/configuracion | Completado | Persistencia, ciclos y CRUD de configuracion verificados bajo SDD/TDD |
 | Gate 2 - reglas/motor | Bloqueado | Proxima condicion: completar y validar parametros de las 7 reglas |
 | Gate 3 - workflow/seguridad | Bloqueado | Proxima condicion: cerrar Gate 2 |
 | Gate 4 - exportaciones/UI | Bloqueado | Proxima condicion: cerrar Gate 3 |
@@ -63,10 +63,10 @@ Estado: **Cerrado**.
 
 ## Avance Tecnico Autorizado
 
-Tasks 2 y 3 se completaron con sus verificaciones. El usuario autorizo la Task 4
-y aprobo el 2026-08-11 la enmienda del modelo persistente requerida para
-coberturas, disponibilidad y requisitos de puesto. La Task 4 se ejecuta bajo
-SDD/TDD; esta actualizacion no cierra Gate 1 ni habilita reglas normativas.
+Tasks 2, 3 y 4 se completaron con sus verificaciones. El usuario aprobo el
+2026-08-11 la enmienda del modelo persistente requerida para coberturas,
+disponibilidad y requisitos de puesto. La Task 4 cerro el CRUD con permisos y
+auditoria; esta actualizacion no habilita reglas normativas ni inicia Task 5.
 
 ## Evidencia TDD Documental
 
@@ -157,6 +157,6 @@ Las mutaciones no tocaron el repositorio ni crearon worktrees registrados.
 
 ## Retake
 
-Continuar la Task 4 bajo TDD y el plan tecnico enmendado. Gate 0 permanece
-cerrado; Gate 2 continua bloqueado hasta completar y validar los parametros del
-catalogo.
+Task 4 queda completada. Task 5 permanece pendiente en el orden del plan
+tecnico. Gate 0 permanece cerrado; Gate 2 continua bloqueado hasta completar y
+validar los parametros del catalogo.

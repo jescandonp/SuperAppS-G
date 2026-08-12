@@ -319,7 +319,7 @@ git commit -m "feat: add deterministic I9 shift cycle projection"
 - Modify: `apps/sg-superapp-api/Endpoints/PortalEndpoints.cs`
 - Create: `scripts/dev/Verify-SgSuperAppI9Configuration.ps1`
 
-- [ ] **Step 1: Escribir pruebas RED del modelo persistente corregido**
+- [x] **Step 1: Escribir pruebas RED del modelo persistente corregido**
 
 El contrato SQL debe exigir `weekday_scope`, `starts_at` y `ends_at` en
 `position_coverage_rules`; `kind` y `blocking` en
@@ -328,20 +328,20 @@ relacione puesto y tipo de requisito con severidad y fecha opcional de
 subsanacion. La migracion debe converger instalaciones parciales con las mismas
 garantias de tipos, secuencias, claves y checks ya aprobadas para Task 2.
 
-- [ ] **Step 2: Ejecutar RED persistente y luego GREEN**
+- [x] **Step 2: Ejecutar RED persistente y luego GREEN**
 
 Expected RED: faltan columnas y tabla del modelo corregido. Expected GREEN:
 verificador hermetico I9, doble ejecucion y regresiones I3/I5 pasan.
 
-- [ ] **Step 3: Escribir pruebas RED de configuración**
+- [x] **Step 3: Escribir pruebas RED de configuración**
 
 Validar CRUD de cliente/proyecto, asociación de puesto, cobertura por franja, clasificación de requisito y disponibilidad excepcional; debe rechazarse cobertura fuera de vigencia y requisito sin severidad válida.
 
-- [ ] **Step 4: Ejecutar RED de API**
+- [x] **Step 4: Ejecutar RED de API**
 
 Expected: endpoints `/api/portal/scheduling/projects` retornan 404.
 
-- [ ] **Step 5: Implementar contratos explícitos**
+- [x] **Step 5: Implementar contratos explícitos**
 
 ```csharp
 public sealed record UpsertSchedulingProjectRequest(long ClientId, string Code, string Name, string EffectiveFrom, string? EffectiveTo, string Status);
@@ -352,11 +352,11 @@ public sealed record UpsertPositionRequirementRequest(long PositionId, long Requ
 
 Los endpoints usan `DateOnly.TryParse`, `TimeOnly.TryParse`, checks de `ACTIVO/INACTIVO` y severidades `BLOQUEANTE/SUBSANABLE/INFORMATIVA` antes de llamar al repositorio.
 
-- [ ] **Step 6: Implementar transacciones y auditoría**
+- [x] **Step 6: Implementar transacciones y auditoría**
 
 Cada escritura llama `InsertAuditLogAsync` dentro de la misma transacción con eventos `SCHEDULING_PROJECT_*`, `COVERAGE_RULE_*`, `AVAILABILITY_*` o `POSITION_REQUIREMENT_*`.
 
-- [ ] **Step 7: Ejecutar GREEN, seguridad y build**
+- [x] **Step 7: Ejecutar GREEN, seguridad y build**
 
 Run:
 
@@ -368,7 +368,7 @@ C:\tmp\dotnet6\dotnet.exe build apps/sg-superapp-api/sg-superapp-api.csproj --no
 
 Expected: PASS y build sin errores.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```powershell
 git add apps/sg-superapp-api/Contracts/Portal/SchedulingContracts.cs apps/sg-superapp-api/Services/PostgresPortalRepository.cs apps/sg-superapp-api/Endpoints/PortalEndpoints.cs scripts/dev/Verify-SgSuperAppI9Configuration.ps1
