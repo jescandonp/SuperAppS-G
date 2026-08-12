@@ -1,7 +1,7 @@
 # Execution Log I9 - Gate 0 - Programacion Asistida De Turnos
 
 > Tipo: **Execution log documental de Gate 0**
-> Estado general: **Gate 0 cerrado - Tasks 2, 3, 4, 5 y 6 completadas - Task 7 pendiente**
+> Estado general: **Gate 0 cerrado - Tasks 2, 3, 4, 5, 6 y 7 completadas - Task 8 pendiente**
 > Gate 0: **Cerrado**
 > Fecha de apertura: 2026-07-29
 > SPEC: `docs/specs/2026-07-29-sg-superapp-spec-i9-programacion-turnos.md`
@@ -14,7 +14,7 @@ Este artefacto registra la apertura documental de I9. No sustituye el plan
 tecnico exacto
 `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`.
 Estado del plan tecnico: **APROBADO COMO HOJA DE RUTA DOCUMENTAL**.
-Estado de ejecucion: **TASK 6 COMPLETADA - TASK 7 PENDIENTE**.
+Estado de ejecucion: **TASK 7 COMPLETADA - TASK 8 PENDIENTE**.
 
 Las tres condiciones de Gate 0 estan satisfechas desde el 2026-07-29: SPEC
 aprobada, catalogo aprobado para parametrizacion y cierre ejecutivo explicito.
@@ -22,8 +22,8 @@ El catalogo no es ejecutable por el motor mientras sus campos obligatorios
 permanezcan incompletos o sin validar.
 
 El catalogo conserva estado `APROBADO_PARA_PARAMETRIZACION`; las decisiones constan como
-`Aprobada`. Gate 0 permanece cerrado; Tasks 2, 3, 4, 5 y 6 estan completadas.
-Task 7 permanece pendiente.
+`Aprobada`. Gate 0 permanece cerrado; Tasks 2, 3, 4, 5, 6 y 7 estan
+completadas. Task 8 permanece pendiente.
 
 ## Ruta De Validacion Del Catalogo
 
@@ -164,5 +164,16 @@ asignaciones son inmutables; solo puede existir una version publicada por
 proyecto y periodo. El commit tecnico es `d1cfa8f` y la verificacion hermetica
 termino con `I9 PERSISTENCE PASS` en Windows PowerShell 5.1 y PowerShell 7.
 
-Task 7 permanece pendiente y no iniciada. Gate 0 permanece cerrado; Gate 2
-continua bloqueado hasta completar y validar los parametros del catalogo.
+### Cierre Task 7
+
+Task 7 queda completada con motor heuristico deterministico, score ponderado,
+desempate estable por empleado, actualizacion acumulada de carga, vacantes
+explicitas y razones de ranking. La corrida persiste estados, snapshots y
+asignaciones; el reintento con la misma clave retorna la corrida existente.
+El commit tecnico es `0759678`. El dataset fijo produjo seis resultados, cinco
+asignaciones y una vacante con `I9 RECOMMENDATIONS PASS`; el build termino con
+cero advertencias y cero errores.
+
+Task 8 permanece pendiente y no iniciada. Gate 2 continua bloqueado hasta
+completar y validar los parametros del catalogo; esta implementacion no vuelve
+ejecutables las siete reglas normativas pendientes.
