@@ -96,6 +96,8 @@ public static class PortalEndpoints
         {var denied=await authorization.RequireAsync("SCHEDULING","AUDIT",ct);if(denied is not null)return denied;return Results.Ok(await repository.GetScheduleAuditAsync(versionId,ct));});
         app.MapPost("/api/portal/scheduling/versions/{versionId:long}/replan",async(long versionId,ScheduleReplanningRequest request,PortalAuthorizationService authorization,PostgresPortalRepository repository,SchedulingRecommendationEngine engine,RequestUserContext userContext,CancellationToken ct)=>
         {var denied=await authorization.RequireAsync("SCHEDULING","GENERATE",ct);if(denied is not null)return denied;try{return Results.Ok(await repository.ReplanScheduleAsync(versionId,request,engine,userContext.User!.Id,userContext.User.Username,ct));}catch(ArgumentException ex){return Results.BadRequest(new{message=ex.Message});}catch(InvalidOperationException ex){return Results.Conflict(new{message=ex.Message});}});
+        app.MapGet("/api/portal/scheduling/versions/{versionId:long}/export.pdf",async(long versionId,long? positionId,long? employeeId,PortalAuthorizationService authorization,SchedulingExportService exporter,RequestUserContext userContext,CancellationToken ct)=>await ExportScheduleAsync(versionId,"pdf",positionId,employeeId,authorization,exporter,userContext,ct));
+        app.MapGet("/api/portal/scheduling/versions/{versionId:long}/export.xlsx",async(long versionId,long? positionId,long? employeeId,PortalAuthorizationService authorization,SchedulingExportService exporter,RequestUserContext userContext,CancellationToken ct)=>await ExportScheduleAsync(versionId,"xlsx",positionId,employeeId,authorization,exporter,userContext,ct));
 
         app.MapPost("/api/portal/scheduling/clients", async (UpsertSchedulingClientRequest request,
             PortalAuthorizationService authorization, PostgresPortalRepository repository,
@@ -1282,5 +1284,14 @@ public static class PortalEndpoints
             { CertificateType: "MISSING_ACTIVE_SIGNER" } => Results.Conflict(new { message = "No existe firmante activo y vigente para la fecha de expedicion." }),
             _ => null
         };
+    }
+
+    private static async Task<IResult> ExportScheduleAsync(long versionId,string format,long? positionId,long? employeeId,PortalAuthorizationService authorization,SchedulingExportService exporter,RequestUserContext userContext,CancellationToken ct)
+    {
+        var denied=await authorization.RequireAsync("SCHEDULING","EXPORT",ct);if(denied is not null)return denied;
+        var model=await exporter.LoadAsync(versionId,positionId,employeeId,userContext.User!.Username,ct);if(model is null)return Results.NotFound();
+        var bytes=format=="pdf"?exporter.BuildPdf(model):exporter.BuildXlsx(model);await exporter.AuditAsync(versionId,userContext.User.Username,format,positionId,employeeId,ct);
+        var safe=new string(model.Project.ToLowerInvariant().Select(c=>char.IsLetterOrDigit(c)?c:'-').ToArray()).Trim('-');
+        return Results.File(bytes,format=="pdf"?"application/pdf":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",$"programacion-{safe}-{model.Period[..10]}-v{model.VersionNumber}.{format}");
     }
 }

@@ -13,6 +13,7 @@ builder.Services.AddSingleton<EmployeeXlsxPrevalidationService>();
 builder.Services.AddSingleton<ShiftCycleProjector>();
 builder.Services.AddSingleton<SchedulingEligibilityService>();
 builder.Services.AddSingleton<SchedulingRecommendationEngine>();
+builder.Services.AddSingleton<SchedulingExportService>();
 builder.Services.AddScoped<RequestUserContext>();
 builder.Services.AddScoped<PortalAuthorizationService>();
 builder.Services.AddCors(options =>
