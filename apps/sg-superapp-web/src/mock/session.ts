@@ -13,6 +13,7 @@ const baseModules: AppModule[] = [
   { code: "dashboard", label: "Dashboard", description: "Vista inicial del piloto.", enabled: true, status: "Disponible" },
   { code: "employees", label: "Empleados / Guardas", description: "Pendiente implementacion en I2.", enabled: true, status: "Pendiente" },
   { code: "positions", label: "Puestos de Servicio", description: "Pendiente implementacion en I3.", enabled: true, status: "Pendiente" },
+  { code: "scheduling", label: "Programacion de Turnos", description: "Programacion asistida, explicable y auditable.", enabled: true, status: "Disponible" },
   { code: "courses", label: "Cursos y Acreditaciones", description: "Pendiente implementacion en I5.", enabled: true, status: "Pendiente" },
   { code: "certifications", label: "Certificaciones", description: "Pendiente implementacion en I4.", enabled: true, status: "Pendiente" },
   { code: "alerts", label: "Alertas", description: "Pendiente implementacion en I6.", enabled: true, status: "Pendiente" },

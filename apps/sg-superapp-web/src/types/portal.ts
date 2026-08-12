@@ -1,5 +1,90 @@
 export type RoleCode = "ADMIN" | "TH" | "GERENCIA" | "OPERACIONES";
 
+export type ScheduleStatus = "BORRADOR" | "PROPUESTA" | "APROBADA" | "PUBLICADA" | "REEMPLAZADA" | "CANCELADA";
+export type ShiftCode = "D" | "N" | "X";
+export type RequirementSeverity = "BLOQUEANTE" | "SUBSANABLE" | "INFORMATIVA";
+
+export interface ShiftTemplate {
+  id: number;
+  code: string;
+  name: string;
+  version: number;
+  mandatoryByDefault: boolean;
+  status: "ACTIVO" | "INACTIVO";
+  steps: Array<{ order: number; shiftCode: ShiftCode }>;
+}
+
+export interface SchedulingProject {
+  id: number;
+  clientId: number;
+  code: string;
+  name: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  status: "ACTIVO" | "INACTIVO";
+}
+
+export interface ScheduleAssignment {
+  id: number;
+  date: string;
+  startsAt: string;
+  endsAt: string;
+  positionId: number;
+  employeeId?: number;
+  shiftCode: ShiftCode;
+  status: "ASIGNADA" | "VACANTE";
+  score?: number;
+  reasons: Array<{ code: string; severity: string; message: string }>;
+}
+
+export interface ScheduleException {
+  id: number;
+  assignmentId?: number;
+  exceptionType: string;
+  reason: string;
+  responsible: string;
+  resolutionDate: string;
+  status: "REGISTRADA" | "APROBADA" | "RECHAZADA" | "CANCELADA";
+}
+
+export interface ScheduleProposal {
+  versionId: number;
+  scheduleId: number;
+  projectId: number;
+  versionNumber: number;
+  status: ScheduleStatus;
+  periodStart: string;
+  periodEnd: string;
+  coveragePercent: number;
+  vacancyCount: number;
+  exceptionCount: number;
+  acceptedVacancy: boolean;
+  createdBy: string;
+  approvedBy: string | null;
+  publishedBy: string | null;
+  selfManaged: boolean;
+  assignments?: ScheduleAssignment[];
+  exceptions?: ScheduleException[];
+}
+
+export interface ScheduleComparison {
+  mode: "MINIMUM_IMPACT" | "GLOBAL";
+  changedAssignments: number;
+  additionalHours: number;
+  vacancies: number;
+  exceptions: number;
+}
+
+export interface SchedulingCapabilities {
+  view: boolean;
+  configure: boolean;
+  generate: boolean;
+  approveException: boolean;
+  approve: boolean;
+  publish: boolean;
+  export: boolean;
+}
+
 export interface CurrentUser {
   id: number;
   fullName: string;

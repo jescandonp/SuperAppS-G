@@ -1,5 +1,6 @@
 import { API_BASE_URL } from "../config";
 import type { AnnulCertificateRequest, AppModule, CertificatePreview, CertificatePreviewRequest, CertificateSigner, CertificateSignerRequest, CertificateSignerStatus, CertificateStatus, CertificateType, CreatePositionAssignmentRequest, CreateTrainingRecordRequest, CurrentUser, EmployeeDetail, EmployeeSummary, FinalizePositionAssignmentRequest, ImportBatchError, ImportBatchRow, ImportBatchSummary, ImportColumnMapping, ImportPrevalidationResponse, ImportRowClassification, LaborCertificate, LaborCertificateHistoryItem, LoginRequest, LoginResponse, NotificationItem, PositionAssignment, RoleCode, ServicePosition, ServicePositionRequest, ServicePositionStatus, TrainingComplianceDetail, TrainingComplianceStatus, TrainingComplianceSummary, TrainingRecord, TrainingRequirementCategory, TrainingRequirementStatus, TrainingRequirementType, TrainingServiceEnablement, TrainingServiceEnablementStatus, UpsertTrainingRequirementTypeRequest } from "../types/portal";
+import type { ScheduleComparison, ScheduleProposal, SchedulingCapabilities, SchedulingProject, ShiftTemplate } from "../types/portal";
 
 const SESSION_TOKEN_KEY = "sg.superapp.sessionToken";
 
@@ -51,6 +52,76 @@ async function sendJson<T>(path: string, method: "POST" | "PUT", body?: unknown)
   }
 
   return response.json() as Promise<T>;
+}
+
+async function downloadSchedulingExport(path: string, fileName: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}${path}`, { headers: getSessionHeaders() });
+  if (!response.ok) {
+    let message: string | undefined;
+    try {
+      const data = (await response.json()) as { message?: string };
+      message = data.message;
+    } catch {
+      message = undefined;
+    }
+    throw new Error(message || `API request failed: ${response.status}`);
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function fetchSchedulingCapabilities(): Promise<SchedulingCapabilities> {
+  return getJson<SchedulingCapabilities>("/portal/scheduling/capabilities");
+}
+
+export async function fetchSchedulingProjects(): Promise<SchedulingProject[]> {
+  return getJson<SchedulingProject[]>("/portal/scheduling/projects");
+}
+
+export async function fetchShiftTemplates(): Promise<ShiftTemplate[]> {
+  return getJson<ShiftTemplate[]>("/portal/scheduling/shift-templates");
+}
+
+export async function generateScheduleProposal(projectId: number, request: { periodStart: string; periodEnd: string; acceptedVacancy?: boolean }): Promise<ScheduleProposal> {
+  return sendJson<ScheduleProposal>(`/portal/scheduling/projects/${projectId}/proposals`, "POST", request);
+}
+
+export async function fetchScheduleProposal(versionId: number): Promise<ScheduleProposal> {
+  return getJson<ScheduleProposal>(`/portal/scheduling/proposals/${versionId}`);
+}
+
+export async function updateScheduleAssignment(versionId: number, assignmentId: number, request: { employeeId?: number; status: "ASIGNADA" | "VACANTE"; reasons?: string[]; expectedVersion: number }): Promise<ScheduleProposal> {
+  return sendJson<ScheduleProposal>(`/portal/scheduling/proposals/${versionId}/assignments/${assignmentId}`, "PUT", request);
+}
+
+export async function approveScheduleException(versionId: number, request: { assignmentId?: number; exceptionType: string; reason: string; responsible: string; resolutionDate: string; expectedVersion: number }): Promise<ScheduleProposal> {
+  return sendJson<ScheduleProposal>(`/portal/scheduling/proposals/${versionId}/exceptions`, "POST", request);
+}
+
+export async function approveSchedule(versionId: number, expectedVersion: number): Promise<ScheduleProposal> {
+  return sendJson<ScheduleProposal>(`/portal/scheduling/proposals/${versionId}/approve`, "POST", { expectedVersion });
+}
+
+export async function publishSchedule(versionId: number, expectedVersion: number): Promise<ScheduleProposal> {
+  return sendJson<ScheduleProposal>(`/portal/scheduling/proposals/${versionId}/publish`, "POST", { expectedVersion });
+}
+
+export async function replanSchedule(versionId: number, request: { triggerType: string; triggerId: string; modes: Array<"MINIMUM_IMPACT" | "GLOBAL"> }): Promise<{ versionId: number; triggerType: string; triggerId: string; scenarios: ScheduleComparison[] }> {
+  return sendJson(`/portal/scheduling/versions/${versionId}/replan`, "POST", request);
+}
+
+export async function downloadSchedulePdf(versionId: number, filters: { positionId?: number; employeeId?: number } = {}): Promise<void> {
+  const query = new URLSearchParams(Object.entries(filters).filter((entry) => entry[1] !== undefined).map(([key, value]) => [key, String(value)]));
+  return downloadSchedulingExport(`/portal/scheduling/versions/${versionId}/export.pdf${query.size ? `?${query}` : ""}`, `programacion-v${versionId}.pdf`);
+}
+
+export async function downloadScheduleXlsx(versionId: number, filters: { positionId?: number; employeeId?: number } = {}): Promise<void> {
+  const query = new URLSearchParams(Object.entries(filters).filter((entry) => entry[1] !== undefined).map(([key, value]) => [key, String(value)]));
+  return downloadSchedulingExport(`/portal/scheduling/versions/${versionId}/export.xlsx${query.size ? `?${query}` : ""}`, `programacion-v${versionId}.xlsx`);
 }
 
 export async function fetchCurrentUser(): Promise<CurrentUser> {

@@ -73,6 +73,22 @@ public static class PortalEndpoints
             }
         });
 
+        app.MapGet("/api/portal/scheduling/capabilities", async (PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken ct) =>
+        {
+            if (userContext.User is null) return Results.Unauthorized();
+            var userId = userContext.User.Id;
+            return Results.Ok(new
+            {
+                view = await repository.HasPermissionAsync(userId, "SCHEDULING", "VIEW", ct),
+                configure = await repository.HasPermissionAsync(userId, "SCHEDULING", "CONFIGURE", ct),
+                generate = await repository.HasPermissionAsync(userId, "SCHEDULING", "GENERATE", ct),
+                approveException = await repository.HasPermissionAsync(userId, "SCHEDULING", "APPROVE_EXCEPTION", ct),
+                approve = await repository.HasPermissionAsync(userId, "SCHEDULING", "APPROVE", ct),
+                publish = await repository.HasPermissionAsync(userId, "SCHEDULING", "PUBLISH", ct),
+                export = await repository.HasPermissionAsync(userId, "SCHEDULING", "EXPORT", ct)
+            });
+        });
+
         app.MapPost("/api/portal/scheduling/projects/{projectId:long}/proposals", async (long projectId, CreateScheduleProposalRequest request,
             PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken ct) =>
         {
