@@ -54,6 +54,81 @@ public static class PortalEndpoints
             }
         });
 
+        app.MapPost("/api/portal/scheduling/clients", async (UpsertSchedulingClientRequest request,
+            PortalAuthorizationService authorization, PostgresPortalRepository repository,
+            RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await RequireSchedulingConfigurationAsync(authorization, userContext, cancellationToken);
+            if (denied is not null) return denied;
+            if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.Name) || !IsActiveStatus(request.Status))
+                return Results.BadRequest(new { message = "Codigo, nombre y estado ACTIVO/INACTIVO son obligatorios." });
+            return await CreateSchedulingResultAsync(
+                () => repository.CreateSchedulingClientAsync(request, userContext.User!.Id, userContext.User.Username, cancellationToken));
+        });
+
+        app.MapPost("/api/portal/scheduling/projects", async (UpsertSchedulingProjectRequest request,
+            PortalAuthorizationService authorization, PostgresPortalRepository repository,
+            RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await RequireSchedulingConfigurationAsync(authorization, userContext, cancellationToken);
+            if (denied is not null) return denied;
+            if (request.ClientId <= 0 || string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.Name)
+                || !IsActiveStatus(request.Status) || !DateOnly.TryParse(request.EffectiveFrom, out var effectiveFrom)
+                || (!string.IsNullOrWhiteSpace(request.EffectiveTo) && !DateOnly.TryParse(request.EffectiveTo, out _)))
+                return Results.BadRequest(new { message = "Los datos y la vigencia del proyecto no son validos." });
+            DateOnly? effectiveTo = string.IsNullOrWhiteSpace(request.EffectiveTo) ? null : DateOnly.Parse(request.EffectiveTo);
+            if (effectiveTo < effectiveFrom) return Results.BadRequest(new { message = "La vigencia final no puede ser anterior a la inicial." });
+            return await CreateSchedulingResultAsync(
+                () => repository.CreateSchedulingProjectAsync(request, effectiveFrom, effectiveTo, userContext.User!.Id, userContext.User.Username, cancellationToken));
+        });
+
+        app.MapPost("/api/portal/scheduling/coverage-rules", async (UpsertCoverageRuleRequest request,
+            PortalAuthorizationService authorization, PostgresPortalRepository repository,
+            RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await RequireSchedulingConfigurationAsync(authorization, userContext, cancellationToken);
+            if (denied is not null) return denied;
+            if (request.PositionId <= 0 || request.TemplateId <= 0 || request.RequiredGuards <= 0
+                || string.IsNullOrWhiteSpace(request.WeekdayScope) || !IsActiveStatus(request.Status)
+                || !TimeOnly.TryParse(request.StartsAt, out var startsAt) || !TimeOnly.TryParse(request.EndsAt, out var endsAt)
+                || startsAt == endsAt || !DateOnly.TryParse(request.EffectiveFrom, out var effectiveFrom)
+                || (!string.IsNullOrWhiteSpace(request.EffectiveTo) && !DateOnly.TryParse(request.EffectiveTo, out _)))
+                return Results.BadRequest(new { message = "La cobertura, franja o vigencia no es valida." });
+            DateOnly? effectiveTo = string.IsNullOrWhiteSpace(request.EffectiveTo) ? null : DateOnly.Parse(request.EffectiveTo);
+            if (effectiveTo < effectiveFrom) return Results.BadRequest(new { message = "La vigencia final no puede ser anterior a la inicial." });
+            return await CreateSchedulingResultAsync(
+                () => repository.CreateCoverageRuleAsync(request, startsAt, endsAt, effectiveFrom, effectiveTo, userContext.User!.Id, userContext.User.Username, cancellationToken));
+        });
+
+        app.MapPost("/api/portal/scheduling/availability-exceptions", async (UpsertAvailabilityExceptionRequest request,
+            PortalAuthorizationService authorization, PostgresPortalRepository repository,
+            RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("SCHEDULING", "APPROVE_EXCEPTION", cancellationToken);
+            if (denied is not null) return denied;
+            if (request.EmployeeId <= 0 || string.IsNullOrWhiteSpace(request.Kind) || string.IsNullOrWhiteSpace(request.Reason)
+                || !DateTimeOffset.TryParse(request.From, out var from) || !DateTimeOffset.TryParse(request.To, out var to) || to <= from)
+                return Results.BadRequest(new { message = "La excepcion de disponibilidad no es valida." });
+            return await CreateSchedulingResultAsync(
+                () => repository.CreateAvailabilityExceptionAsync(request, from, to, userContext.User!.Id, userContext.User.Username, cancellationToken));
+        });
+
+        app.MapPost("/api/portal/scheduling/position-requirements", async (UpsertPositionRequirementRequest request,
+            PortalAuthorizationService authorization, PostgresPortalRepository repository,
+            RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await RequireSchedulingConfigurationAsync(authorization, userContext, cancellationToken);
+            if (denied is not null) return denied;
+            var severity = request.Severity?.Trim().ToUpperInvariant();
+            if (request.PositionId <= 0 || request.RequirementTypeId <= 0
+                || severity is not ("BLOQUEANTE" or "SUBSANABLE" or "INFORMATIVA")
+                || (!string.IsNullOrWhiteSpace(request.ResolutionDueDate) && !DateOnly.TryParse(request.ResolutionDueDate, out _)))
+                return Results.BadRequest(new { message = "El requisito o su severidad no es valido." });
+            DateOnly? dueDate = string.IsNullOrWhiteSpace(request.ResolutionDueDate) ? null : DateOnly.Parse(request.ResolutionDueDate);
+            return await CreateSchedulingResultAsync(
+                () => repository.CreatePositionRequirementAsync(request, dueDate, userContext.User!.Id, userContext.User.Username, cancellationToken));
+        });
+
         app.MapGet("/api/portal/modules/{role}", async (string role, MockPortalQueryService portalService, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
         {
             if (!TryParseRole(role, out var parsedRole))
@@ -872,6 +947,36 @@ public static class PortalEndpoints
         });
 
         return app;
+    }
+
+    private static async Task<IResult?> RequireSchedulingConfigurationAsync(
+        PortalAuthorizationService authorization,
+        RequestUserContext userContext,
+        CancellationToken cancellationToken)
+    {
+        if (userContext.User is null) return Results.Unauthorized();
+        var action = userContext.User.Role.Equals("ADMIN", StringComparison.OrdinalIgnoreCase) ? "CONFIGURE" : "GENERATE";
+        return await authorization.RequireAsync("SCHEDULING", action, cancellationToken);
+    }
+
+    private static bool IsActiveStatus(string? status) =>
+        status?.Trim().ToUpperInvariant() is "ACTIVO" or "INACTIVO";
+
+    private static async Task<IResult> CreateSchedulingResultAsync(Func<Task<long>> create)
+    {
+        try
+        {
+            var id = await create();
+            return Results.Created($"/api/portal/scheduling/configuration/{id}", new SchedulingConfigurationResponse(id, "ACTIVO"));
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            return Results.Conflict(new { message = "La configuracion ya existe." });
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            return Results.BadRequest(new { message = "La configuracion referencia un registro inexistente." });
+        }
     }
 
     private static bool TryParseRole(string role, out RoleCode parsedRole)

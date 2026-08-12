@@ -2835,6 +2835,97 @@ public sealed class PostgresPortalRepository
         };
     }
 
+    public Task<long> CreateSchedulingClientAsync(UpsertSchedulingClientRequest request, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        InsertSchedulingConfigurationAsync(
+            "insert into clients(code,name,status) values (@code,@name,@status) returning id",
+            "SCHEDULING_CLIENT_CREATED", "SCHEDULING_CLIENT",
+            command =>
+            {
+                command.Parameters.AddWithValue("code", request.Code.Trim());
+                command.Parameters.AddWithValue("name", request.Name.Trim());
+                command.Parameters.AddWithValue("status", request.Status.Trim().ToUpperInvariant());
+            }, actorUserId, actorUsername, cancellationToken);
+
+    public Task<long> CreateSchedulingProjectAsync(UpsertSchedulingProjectRequest request, DateOnly effectiveFrom, DateOnly? effectiveTo, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        InsertSchedulingConfigurationAsync(
+            "insert into service_projects(client_id,code,name,effective_from,effective_to,status) values (@clientId,@code,@name,@effectiveFrom,@effectiveTo,@status) returning id",
+            "SCHEDULING_PROJECT_CREATED", "SCHEDULING_PROJECT",
+            command =>
+            {
+                command.Parameters.AddWithValue("clientId", request.ClientId);
+                command.Parameters.AddWithValue("code", request.Code.Trim());
+                command.Parameters.AddWithValue("name", request.Name.Trim());
+                command.Parameters.AddWithValue("effectiveFrom", effectiveFrom);
+                command.Parameters.Add("effectiveTo", NpgsqlDbType.Date).Value = effectiveTo.HasValue ? effectiveTo.Value : DBNull.Value;
+                command.Parameters.AddWithValue("status", request.Status.Trim().ToUpperInvariant());
+            }, actorUserId, actorUsername, cancellationToken);
+
+    public Task<long> CreateCoverageRuleAsync(UpsertCoverageRuleRequest request, TimeOnly startsAt, TimeOnly endsAt, DateOnly effectiveFrom, DateOnly? effectiveTo, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        InsertSchedulingConfigurationAsync(
+            "insert into position_coverage_rules(position_id,template_id,weekday_scope,starts_at,ends_at,required_quantity,effective_from,effective_to,status) values (@positionId,@templateId,@weekdayScope,@startsAt,@endsAt,@quantity,@effectiveFrom,@effectiveTo,@status) returning id",
+            "COVERAGE_RULE_CREATED", "POSITION_COVERAGE_RULE",
+            command =>
+            {
+                command.Parameters.AddWithValue("positionId", request.PositionId);
+                command.Parameters.AddWithValue("templateId", request.TemplateId);
+                command.Parameters.AddWithValue("weekdayScope", request.WeekdayScope.Trim());
+                command.Parameters.AddWithValue("startsAt", startsAt);
+                command.Parameters.AddWithValue("endsAt", endsAt);
+                command.Parameters.AddWithValue("quantity", request.RequiredGuards);
+                command.Parameters.AddWithValue("effectiveFrom", effectiveFrom);
+                command.Parameters.Add("effectiveTo", NpgsqlDbType.Date).Value = effectiveTo.HasValue ? effectiveTo.Value : DBNull.Value;
+                command.Parameters.AddWithValue("status", request.Status.Trim().ToUpperInvariant());
+            }, actorUserId, actorUsername, cancellationToken);
+
+    public Task<long> CreateAvailabilityExceptionAsync(UpsertAvailabilityExceptionRequest request, DateTimeOffset startsAt, DateTimeOffset endsAt, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        InsertSchedulingConfigurationAsync(
+            "insert into employee_availability_exceptions(employee_id,starts_at,ends_at,kind,blocking,reason,created_by) values (@employeeId,@startsAt,@endsAt,@kind,@blocking,@reason,@createdBy) returning id",
+            "AVAILABILITY_CREATED", "EMPLOYEE_AVAILABILITY_EXCEPTION",
+            command =>
+            {
+                command.Parameters.AddWithValue("employeeId", request.EmployeeId);
+                command.Parameters.AddWithValue("startsAt", startsAt.ToUniversalTime());
+                command.Parameters.AddWithValue("endsAt", endsAt.ToUniversalTime());
+                command.Parameters.AddWithValue("kind", request.Kind.Trim());
+                command.Parameters.AddWithValue("blocking", request.Blocking);
+                command.Parameters.AddWithValue("reason", request.Reason.Trim());
+                command.Parameters.AddWithValue("createdBy", actorUsername);
+            }, actorUserId, actorUsername, cancellationToken);
+
+    public Task<long> CreatePositionRequirementAsync(UpsertPositionRequirementRequest request, DateOnly? resolutionDueDate, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        InsertSchedulingConfigurationAsync(
+            "insert into position_requirements(position_id,requirement_type_id,severity,resolution_due_date) values (@positionId,@requirementTypeId,@severity,@resolutionDueDate) returning id",
+            "POSITION_REQUIREMENT_CREATED", "POSITION_REQUIREMENT",
+            command =>
+            {
+                command.Parameters.AddWithValue("positionId", request.PositionId);
+                command.Parameters.AddWithValue("requirementTypeId", request.RequirementTypeId);
+                command.Parameters.AddWithValue("severity", request.Severity.Trim().ToUpperInvariant());
+                command.Parameters.Add("resolutionDueDate", NpgsqlDbType.Date).Value = resolutionDueDate.HasValue ? resolutionDueDate.Value : DBNull.Value;
+            }, actorUserId, actorUsername, cancellationToken);
+
+    private async Task<long> InsertSchedulingConfigurationAsync(
+        string insertSql,
+        string eventType,
+        string entityType,
+        Action<NpgsqlCommand> addParameters,
+        long actorUserId,
+        string actorUsername,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(insertSql, connection, transaction);
+        addParameters(command);
+        var id = (long)(await command.ExecuteScalarAsync(cancellationToken)
+            ?? throw new InvalidOperationException("No fue posible guardar la configuracion I9."));
+        await InsertAuditLogAsync(connection, transaction, actorUserId, actorUsername, eventType, entityType,
+            id.ToString(System.Globalization.CultureInfo.InvariantCulture), "'{}'::jsonb", null, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return id;
+    }
+
     private static void AddTrainingRequirementTypeParameters(NpgsqlCommand command, UpsertTrainingRequirementTypeRequest request)
     {
         command.Parameters.Add("code", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(request.Code) ? DBNull.Value : request.Code.Trim();
