@@ -43,6 +43,7 @@ function Initialize-I9Base([string]$Schema) {
     Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\001_identity_and_access.sql")
     Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\002_employee_master.sql")
     Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\005_i3_service_positions_assignments.sql")
+    Invoke-PsqlFile (Join-Path $workspaceRoot "db\migrations\007_i5_training_accreditations.sql")
 }
 
 try {
@@ -142,3 +143,5 @@ finally {
     $env:PGPASSWORD = $originalPassword
     $env:PGOPTIONS = $originalPgOptions
 }
+
+Write-Host "I9 PERSISTENCE PASS"

@@ -305,21 +305,43 @@ git commit -m "feat: add deterministic I9 shift cycle projection"
 
 ### Task 4: Persistir proyectos, cobertura, reglas y disponibilidad
 
+> Enmienda aprobada por el usuario el 2026-08-11: antes de implementar la API,
+> el modelo persistente debe incorporar franja/ambito semanal de cobertura,
+> tipo/carácter bloqueante de disponibilidad y requisitos propios del puesto.
+> Esta correccion no autoriza reglas normativas ejecutables.
+
 **Files:**
+- Modify: `db/migrations/009_i9_scheduling.sql`
+- Modify: `db/tests/007_i9_scheduling_contract.sql`
+- Modify: `scripts/dev/Verify-SgSuperAppI9Persistence.ps1`
 - Create: `apps/sg-superapp-api/Contracts/Portal/SchedulingContracts.cs`
 - Modify: `apps/sg-superapp-api/Services/PostgresPortalRepository.cs`
 - Modify: `apps/sg-superapp-api/Endpoints/PortalEndpoints.cs`
 - Create: `scripts/dev/Verify-SgSuperAppI9Configuration.ps1`
 
-- [ ] **Step 1: Escribir pruebas RED de configuración**
+- [ ] **Step 1: Escribir pruebas RED del modelo persistente corregido**
+
+El contrato SQL debe exigir `weekday_scope`, `starts_at` y `ends_at` en
+`position_coverage_rules`; `kind` y `blocking` en
+`employee_availability_exceptions`; y una tabla `position_requirements` que
+relacione puesto y tipo de requisito con severidad y fecha opcional de
+subsanacion. La migracion debe converger instalaciones parciales con las mismas
+garantias de tipos, secuencias, claves y checks ya aprobadas para Task 2.
+
+- [ ] **Step 2: Ejecutar RED persistente y luego GREEN**
+
+Expected RED: faltan columnas y tabla del modelo corregido. Expected GREEN:
+verificador hermetico I9, doble ejecucion y regresiones I3/I5 pasan.
+
+- [ ] **Step 3: Escribir pruebas RED de configuración**
 
 Validar CRUD de cliente/proyecto, asociación de puesto, cobertura por franja, clasificación de requisito y disponibilidad excepcional; debe rechazarse cobertura fuera de vigencia y requisito sin severidad válida.
 
-- [ ] **Step 2: Ejecutar RED**
+- [ ] **Step 4: Ejecutar RED de API**
 
 Expected: endpoints `/api/portal/scheduling/projects` retornan 404.
 
-- [ ] **Step 3: Implementar contratos explícitos**
+- [ ] **Step 5: Implementar contratos explícitos**
 
 ```csharp
 public sealed record UpsertSchedulingProjectRequest(long ClientId, string Code, string Name, string EffectiveFrom, string? EffectiveTo, string Status);
@@ -330,11 +352,11 @@ public sealed record UpsertPositionRequirementRequest(long PositionId, long Requ
 
 Los endpoints usan `DateOnly.TryParse`, `TimeOnly.TryParse`, checks de `ACTIVO/INACTIVO` y severidades `BLOQUEANTE/SUBSANABLE/INFORMATIVA` antes de llamar al repositorio.
 
-- [ ] **Step 4: Implementar transacciones y auditoría**
+- [ ] **Step 6: Implementar transacciones y auditoría**
 
 Cada escritura llama `InsertAuditLogAsync` dentro de la misma transacción con eventos `SCHEDULING_PROJECT_*`, `COVERAGE_RULE_*`, `AVAILABILITY_*` o `POSITION_REQUIREMENT_*`.
 
-- [ ] **Step 5: Ejecutar GREEN, seguridad y build**
+- [ ] **Step 7: Ejecutar GREEN, seguridad y build**
 
 Run:
 
@@ -346,7 +368,7 @@ C:\tmp\dotnet6\dotnet.exe build apps/sg-superapp-api/sg-superapp-api.csproj --no
 
 Expected: PASS y build sin errores.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 8: Commit**
 
 ```powershell
 git add apps/sg-superapp-api/Contracts/Portal/SchedulingContracts.cs apps/sg-superapp-api/Services/PostgresPortalRepository.cs apps/sg-superapp-api/Endpoints/PortalEndpoints.cs scripts/dev/Verify-SgSuperAppI9Configuration.ps1

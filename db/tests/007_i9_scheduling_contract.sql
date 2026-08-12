@@ -10,6 +10,7 @@ DECLARE
     template_id BIGINT;
     position_id BIGINT;
     employee_id BIGINT;
+    requirement_type_id BIGINT;
 BEGIN
     FOREACH required_table IN ARRAY ARRAY[
         'clients',
@@ -18,7 +19,8 @@ BEGIN
         'shift_template_steps',
         'position_coverage_rules',
         'scheduling_rules',
-        'employee_availability_exceptions'
+        'employee_availability_exceptions',
+        'position_requirements'
     ]
     LOOP
         IF to_regclass(required_table) IS NULL THEN
@@ -54,9 +56,10 @@ BEGIN
             ('service_projects','client_id'),('service_projects','code'),('service_projects','name'),('service_projects','effective_from'),('service_projects','status'),('service_projects','created_at'),('service_projects','updated_at'),
             ('shift_templates','code'),('shift_templates','name'),('shift_templates','version'),('shift_templates','effective_from'),('shift_templates','mandatory_by_default'),('shift_templates','status'),('shift_templates','created_at'),('shift_templates','updated_at'),
             ('shift_template_steps','template_id'),('shift_template_steps','step_order'),('shift_template_steps','shift_code'),
-            ('position_coverage_rules','position_id'),('position_coverage_rules','template_id'),('position_coverage_rules','required_quantity'),('position_coverage_rules','effective_from'),('position_coverage_rules','status'),('position_coverage_rules','created_at'),('position_coverage_rules','updated_at'),
+            ('position_coverage_rules','position_id'),('position_coverage_rules','template_id'),('position_coverage_rules','weekday_scope'),('position_coverage_rules','starts_at'),('position_coverage_rules','ends_at'),('position_coverage_rules','required_quantity'),('position_coverage_rules','effective_from'),('position_coverage_rules','status'),('position_coverage_rules','created_at'),('position_coverage_rules','updated_at'),
             ('scheduling_rules','source_level'),('scheduling_rules','scope_type'),('scheduling_rules','severity'),('scheduling_rules','effective_from'),('scheduling_rules','parameters'),('scheduling_rules','status'),('scheduling_rules','created_at'),('scheduling_rules','updated_at'),
-            ('employee_availability_exceptions','employee_id'),('employee_availability_exceptions','starts_at'),('employee_availability_exceptions','ends_at'),('employee_availability_exceptions','reason'),('employee_availability_exceptions','created_by'),('employee_availability_exceptions','status'),('employee_availability_exceptions','created_at'),('employee_availability_exceptions','updated_at')
+            ('employee_availability_exceptions','employee_id'),('employee_availability_exceptions','starts_at'),('employee_availability_exceptions','ends_at'),('employee_availability_exceptions','kind'),('employee_availability_exceptions','blocking'),('employee_availability_exceptions','reason'),('employee_availability_exceptions','created_by'),('employee_availability_exceptions','status'),('employee_availability_exceptions','created_at'),('employee_availability_exceptions','updated_at'),
+            ('position_requirements','position_id'),('position_requirements','requirement_type_id'),('position_requirements','severity'),('position_requirements','status'),('position_requirements','created_at'),('position_requirements','updated_at')
         ) expected(table_name,column_name)
         LEFT JOIN information_schema.columns c
           ON c.table_schema=current_schema() AND c.table_name=expected.table_name AND c.column_name=expected.column_name
@@ -72,9 +75,10 @@ BEGIN
             ('service_positions','project_id','bigint'),
             ('shift_templates','id','bigint'),('shift_templates','code','character varying(30)'),('shift_templates','name','character varying(180)'),('shift_templates','version','integer'),('shift_templates','effective_from','date'),('shift_templates','effective_to','date'),('shift_templates','mandatory_by_default','boolean'),('shift_templates','status','character varying(20)'),('shift_templates','created_at','timestamp with time zone'),('shift_templates','updated_at','timestamp with time zone'),
             ('shift_template_steps','id','bigint'),('shift_template_steps','template_id','bigint'),('shift_template_steps','step_order','integer'),('shift_template_steps','shift_code','character(1)'),
-            ('position_coverage_rules','id','bigint'),('position_coverage_rules','position_id','bigint'),('position_coverage_rules','template_id','bigint'),('position_coverage_rules','required_quantity','integer'),('position_coverage_rules','effective_from','date'),('position_coverage_rules','effective_to','date'),('position_coverage_rules','status','character varying(20)'),('position_coverage_rules','created_at','timestamp with time zone'),('position_coverage_rules','updated_at','timestamp with time zone'),
+            ('position_coverage_rules','id','bigint'),('position_coverage_rules','position_id','bigint'),('position_coverage_rules','template_id','bigint'),('position_coverage_rules','weekday_scope','character varying(80)'),('position_coverage_rules','starts_at','time without time zone'),('position_coverage_rules','ends_at','time without time zone'),('position_coverage_rules','required_quantity','integer'),('position_coverage_rules','effective_from','date'),('position_coverage_rules','effective_to','date'),('position_coverage_rules','status','character varying(20)'),('position_coverage_rules','created_at','timestamp with time zone'),('position_coverage_rules','updated_at','timestamp with time zone'),
             ('scheduling_rules','id','bigint'),('scheduling_rules','source_level','character varying(50)'),('scheduling_rules','scope_type','character varying(50)'),('scheduling_rules','scope_id','bigint'),('scheduling_rules','severity','character varying(30)'),('scheduling_rules','effective_from','date'),('scheduling_rules','effective_to','date'),('scheduling_rules','parameters','jsonb'),('scheduling_rules','status','character varying(20)'),('scheduling_rules','created_at','timestamp with time zone'),('scheduling_rules','updated_at','timestamp with time zone'),
-            ('employee_availability_exceptions','id','bigint'),('employee_availability_exceptions','employee_id','bigint'),('employee_availability_exceptions','starts_at','timestamp with time zone'),('employee_availability_exceptions','ends_at','timestamp with time zone'),('employee_availability_exceptions','reason','character varying(500)'),('employee_availability_exceptions','created_by','character varying(80)'),('employee_availability_exceptions','status','character varying(20)'),('employee_availability_exceptions','created_at','timestamp with time zone'),('employee_availability_exceptions','updated_at','timestamp with time zone')
+            ('employee_availability_exceptions','id','bigint'),('employee_availability_exceptions','employee_id','bigint'),('employee_availability_exceptions','starts_at','timestamp with time zone'),('employee_availability_exceptions','ends_at','timestamp with time zone'),('employee_availability_exceptions','kind','character varying(50)'),('employee_availability_exceptions','blocking','boolean'),('employee_availability_exceptions','reason','character varying(500)'),('employee_availability_exceptions','created_by','character varying(80)'),('employee_availability_exceptions','status','character varying(20)'),('employee_availability_exceptions','created_at','timestamp with time zone'),('employee_availability_exceptions','updated_at','timestamp with time zone'),
+            ('position_requirements','id','bigint'),('position_requirements','position_id','bigint'),('position_requirements','requirement_type_id','bigint'),('position_requirements','severity','character varying(20)'),('position_requirements','resolution_due_date','date'),('position_requirements','status','character varying(20)'),('position_requirements','created_at','timestamp with time zone'),('position_requirements','updated_at','timestamp with time zone')
         ) expected(table_name,column_name,expected_type)
         JOIN pg_attribute a ON a.attrelid=expected.table_name::regclass AND a.attname=expected.column_name AND NOT a.attisdropped
         WHERE format_type(a.atttypid,a.atttypmod) <> expected.expected_type
@@ -86,7 +90,7 @@ BEGIN
         SELECT 1
         FROM unnest(ARRAY[
             'clients','service_projects','shift_templates','shift_template_steps',
-            'position_coverage_rules','scheduling_rules','employee_availability_exceptions'
+            'position_coverage_rules','scheduling_rules','employee_availability_exceptions','position_requirements'
         ]) AS expected(table_name)
         WHERE pg_get_serial_sequence(format('%I.%I', current_schema(), expected.table_name), 'id') IS NULL
     ) THEN
@@ -197,15 +201,17 @@ BEGIN
     END;
 
     INSERT INTO position_coverage_rules (
-        position_id, template_id, required_quantity, effective_from
+        position_id, template_id, weekday_scope, starts_at, ends_at,
+        required_quantity, effective_from
     )
-    VALUES (position_id, template_id, 1, CURRENT_DATE);
+    VALUES (position_id, template_id, 'TODOS', '06:00', '18:00', 1, CURRENT_DATE);
 
     BEGIN
         INSERT INTO position_coverage_rules (
-            position_id, template_id, required_quantity, effective_from
+            position_id, template_id, weekday_scope, starts_at, ends_at,
+            required_quantity, effective_from
         )
-        VALUES (position_id, template_id, 0, CURRENT_DATE);
+        VALUES (position_id, template_id, 'TODOS', '06:00', '18:00', 0, CURRENT_DATE);
         RAISE EXCEPTION 'position_coverage_rules accepted non-positive quantity';
     EXCEPTION
         WHEN check_violation THEN NULL;
@@ -241,19 +247,39 @@ BEGIN
     RETURNING id INTO employee_id;
 
     INSERT INTO employee_availability_exceptions (
-        employee_id, starts_at, ends_at, reason, created_by
+        employee_id, starts_at, ends_at, kind, blocking, reason, created_by
     )
-    VALUES (employee_id, NOW(), NOW() + INTERVAL '1 day', 'Contrato I9', 'test.i9');
+    VALUES (employee_id, NOW(), NOW() + INTERVAL '1 day', 'NOVEDAD', TRUE, 'Contrato I9', 'test.i9');
 
     BEGIN
         INSERT INTO employee_availability_exceptions (
-            employee_id, starts_at, ends_at, reason, created_by
+            employee_id, starts_at, ends_at, kind, blocking, reason, created_by
         )
-        VALUES (employee_id, NOW(), NOW() - INTERVAL '1 minute', 'Rango invalido', 'test.i9');
+        VALUES (employee_id, NOW(), NOW() - INTERVAL '1 minute', 'NOVEDAD', TRUE, 'Rango invalido', 'test.i9');
         RAISE EXCEPTION 'employee_availability_exceptions accepted invalid range';
     EXCEPTION
         WHEN check_violation THEN NULL;
     END;
+
+    INSERT INTO training_requirement_types (code, name, category)
+    VALUES ('I9-REQ', 'Requisito contrato I9', 'CURSO')
+    RETURNING id INTO requirement_type_id;
+
+    INSERT INTO position_requirements (
+        position_id, requirement_type_id, severity, resolution_due_date
+    ) VALUES (position_id, requirement_type_id, 'SUBSANABLE', CURRENT_DATE + 30);
+
+    BEGIN
+        INSERT INTO position_requirements (position_id, requirement_type_id, severity)
+        VALUES (position_id, requirement_type_id + 999999999, 'BLOQUEANTE');
+        RAISE EXCEPTION 'position_requirements accepted missing requirement type';
+    EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+
+    BEGIN
+        UPDATE position_requirements SET severity = 'OPCIONAL'
+        WHERE id = (SELECT min(id) FROM position_requirements);
+        RAISE EXCEPTION 'position_requirements accepted invalid severity';
+    EXCEPTION WHEN check_violation THEN NULL; END;
 
     IF (SELECT count(*) FROM shift_templates WHERE code IN ('2X2', '4X2', '6X1') AND status = 'ACTIVO' AND mandatory_by_default) <> 3 THEN
         RAISE EXCEPTION 'Missing active I9 shift template seeds';

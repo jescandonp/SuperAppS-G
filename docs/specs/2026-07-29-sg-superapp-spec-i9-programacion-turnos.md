@@ -2,19 +2,20 @@
 
 > Estado: **Aprobada**
 > Fecha: 2026-07-29
-> Gate: 0 cerrado; Task 2 autorizada no iniciada
+> Gate: 0 cerrado; Tasks 2 y 3 completadas; Task 4 autorizada
 > Fuentes: Constitucion, Arquitectura, Tecnologia, Design y diseño funcional del 2026-07-19.
 > Plan tecnico: `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`
 > Aprobacion: aprobada el 2026-07-29 por el usuario, en calidad de patrocinador funcional.
 
 Estado del plan tecnico: **APROBADO COMO HOJA DE RUTA DOCUMENTAL** por decision
 del usuario.
-Estado de aplicacion: **TASK_2_AUTORIZADA_NO_INICIADA**
+Estado de aplicacion: **TASK_4_AUTORIZADA_EN_EJECUCION**
 
 Las tres condiciones estan satisfechas. El catalogo queda
 `APROBADO_PARA_PARAMETRIZACION`; Gate 0 queda cerrado por Camilo Piedrahita, Gerente
 General, segun confirmacion explicita del usuario. Task 2 queda autorizada y no
-iniciada.
+iniciada. Las Tasks 2 y 3 fueron completadas posteriormente y el usuario
+autorizo avanzar con la Task 4.
 
 El catalogo no es ejecutable por el motor hasta completar y validar valores,
 unidades, vigencia, alcance, mensajes, responsable y pruebas de cada regla.
@@ -91,6 +92,27 @@ I9 posee plantillas, proyectos, turnos requeridos, corridas, versiones,
 asignaciones y excepciones. Consume I2 (empleados), I3 (puestos/asignaciones),
 I5 (habilitacion), I6 (notificaciones) e I7 (auditoria/dashboard) mediante
 identificadores y snapshots. No reasigna propiedad de esos datos.
+
+### 7.1 Enmienda aprobada para configuracion (2026-08-11)
+
+Por aprobacion explicita del usuario, la configuracion previa a la generacion
+debe persistir los siguientes datos, sin convertir por ello el catalogo de
+reglas en ejecutable:
+
+- cada cobertura de puesto identifica plantilla, cantidad requerida, vigencia,
+  ambito semanal y franja horaria de inicio y fin;
+- cada excepcion de disponibilidad identifica tipo, periodo, motivo y si es
+  bloqueante;
+- cada requisito de puesto relaciona el puesto con el tipo de curso,
+  acreditacion o requisito, y lo clasifica como `BLOQUEANTE`, `SUBSANABLE` o
+  `INFORMATIVA`; la fecha de subsanacion es opcional;
+- la configuracion rechaza periodos invertidos, cantidades no positivas,
+  textos obligatorios vacios y clasificaciones fuera del catalogo anterior;
+- toda mutacion queda auditada en la misma transaccion.
+
+Esta enmienda define estructura y validaciones de integridad. No fija jornadas,
+umbrales legales, dias de la semana concretos ni valores regulatorios que no
+hayan sido validados por las areas responsables.
 
 ## 8. API Conceptual
 
