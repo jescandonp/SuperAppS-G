@@ -15,3 +15,18 @@ public sealed record ShiftCycleRequest(
     int PhaseOffset);
 
 public sealed record ProjectedShiftDay(DateOnly Date, string ShiftCode, int StepIndex);
+
+public sealed record EligibilityReason(string Code, string Severity, string Message);
+
+public sealed record GuardSchedulingFacts(
+    bool Active,
+    bool HasBlockingAbsence,
+    bool HasOverlap,
+    bool RestRuleSatisfied,
+    bool HasBlockingLocationMismatch,
+    IReadOnlyList<EligibilityReason>? RequirementReasons);
+
+public sealed record EligibilityResult(
+    bool Eligible,
+    bool RequiresException,
+    IReadOnlyList<EligibilityReason> Reasons);

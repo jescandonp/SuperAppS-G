@@ -11,6 +11,7 @@ builder.Services.AddSingleton<PostgresPortalRepository>();
 builder.Services.AddSingleton<EmployeeCsvPrevalidationService>();
 builder.Services.AddSingleton<EmployeeXlsxPrevalidationService>();
 builder.Services.AddSingleton<ShiftCycleProjector>();
+builder.Services.AddSingleton<SchedulingEligibilityService>();
 builder.Services.AddScoped<RequestUserContext>();
 builder.Services.AddScoped<PortalAuthorizationService>();
 builder.Services.AddCors(options =>

@@ -54,6 +54,25 @@ public static class PortalEndpoints
             }
         });
 
+        app.MapPost("/api/portal/scheduling/eligibility/evaluate", async (
+            GuardSchedulingFacts facts,
+            SchedulingEligibilityService eligibilityService,
+            PortalAuthorizationService authorization,
+            CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("SCHEDULING", "GENERATE", cancellationToken);
+            if (denied is not null) return denied;
+
+            try
+            {
+                return Results.Ok(eligibilityService.Evaluate(facts));
+            }
+            catch (ArgumentException exception)
+            {
+                return Results.BadRequest(new { message = exception.Message });
+            }
+        });
+
         app.MapPost("/api/portal/scheduling/clients", async (UpsertSchedulingClientRequest request,
             PortalAuthorizationService authorization, PostgresPortalRepository repository,
             RequestUserContext userContext, CancellationToken cancellationToken) =>
