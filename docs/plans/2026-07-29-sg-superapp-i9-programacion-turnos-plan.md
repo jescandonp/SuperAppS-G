@@ -1,7 +1,7 @@
 # Execution Log I9 - Gate 0 - Programacion Asistida De Turnos
 
 > Tipo: **Execution log documental de Gate 0**
-> Estado general: **Gate 0 cerrado - Tasks 2, 3, 4, 5, 6 y 7 completadas - Task 8 pendiente**
+> Estado general: **Gate 0 cerrado - Tasks 2, 3, 4, 5, 6, 7 y 8 completadas - Task 9 pendiente**
 > Gate 0: **Cerrado**
 > Fecha de apertura: 2026-07-29
 > SPEC: `docs/specs/2026-07-29-sg-superapp-spec-i9-programacion-turnos.md`
@@ -14,7 +14,7 @@ Este artefacto registra la apertura documental de I9. No sustituye el plan
 tecnico exacto
 `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`.
 Estado del plan tecnico: **APROBADO COMO HOJA DE RUTA DOCUMENTAL**.
-Estado de ejecucion: **TASK 7 COMPLETADA - TASK 8 PENDIENTE**.
+Estado de ejecucion: **TASK 8 COMPLETADA - TASK 9 PENDIENTE**.
 
 Las tres condiciones de Gate 0 estan satisfechas desde el 2026-07-29: SPEC
 aprobada, catalogo aprobado para parametrizacion y cierre ejecutivo explicito.
@@ -23,7 +23,7 @@ permanezcan incompletos o sin validar.
 
 El catalogo conserva estado `APROBADO_PARA_PARAMETRIZACION`; las decisiones constan como
 `Aprobada`. Gate 0 permanece cerrado; Tasks 2, 3, 4, 5, 6 y 7 estan
-completadas. Task 8 permanece pendiente.
+completadas junto con Task 8. Task 9 permanece pendiente.
 
 ## Ruta De Validacion Del Catalogo
 
@@ -174,6 +174,18 @@ El commit tecnico es `0759678`. El dataset fijo produjo seis resultados, cinco
 asignaciones y una vacante con `I9 RECOMMENDATIONS PASS`; el build termino con
 cero advertencias y cero errores.
 
-Task 8 permanece pendiente y no iniciada. Gate 2 continua bloqueado hasta
+### Cierre Task 8
+
+Task 8 queda completada con workflow transaccional de propuesta, ajuste manual,
+excepcion documentada, aprobacion, publicacion, reemplazo controlado y auditoria.
+El commit tecnico es `ef77715`. La prueba aislada verifico `I9 WORKFLOW PASS` e
+`I9 SECURITY PASS`, incluido rechazo 401/403, conflicto por version esperada,
+vacante aceptada preservada y detalle `selfManaged`. Persistencia termino con
+`I9 PERSISTENCE PASS`; el build concluyo con cero advertencias y cero errores.
+
+Task 9 permanece pendiente y no iniciada. Gate 2 continua bloqueado hasta
 completar y validar los parametros del catalogo; esta implementacion no vuelve
-ejecutables las siete reglas normativas pendientes.
+ejecutables las siete reglas normativas pendientes. Los verificadores nominales
+I6/I7 del plan no existen en este checkout; esta ausencia preexistente queda
+registrada y no se reemplaza por evidencia inferida. `graphify update .` no se
+ejecuto porque el comando no esta instalado en el entorno.
