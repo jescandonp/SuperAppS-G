@@ -2915,6 +2915,92 @@ public sealed class PostgresPortalRepository
             ? new SchedulingClientResponse(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)) : null;
     }
 
+    public async Task<long> PersistScheduleRecommendationAsync(
+        ScheduleRecommendationRequest request,
+        ScheduleRecommendationResult result,
+        CancellationToken cancellationToken = default)
+    {
+        if (request.ScheduleVersionId is null)
+            throw new ArgumentException("La version de programacion es obligatoria para persistir la corrida.");
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        await using (var existing = new NpgsqlCommand(
+            "select id from schedule_generation_runs where idempotency_key=@key", connection, transaction))
+        {
+            existing.Parameters.AddWithValue("key", request.IdempotencyKey.Trim());
+            var existingId = await existing.ExecuteScalarAsync(cancellationToken);
+            if (existingId is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return (long)existingId;
+            }
+        }
+
+        long runId;
+        await using (var createRun = new NpgsqlCommand(@"
+            insert into schedule_generation_runs(schedule_version_id,idempotency_key,status,started_at)
+            values (@versionId,@key,'EN_COLA',NOW()) returning id", connection, transaction))
+        {
+            createRun.Parameters.AddWithValue("versionId", request.ScheduleVersionId.Value);
+            createRun.Parameters.AddWithValue("key", request.IdempotencyKey.Trim());
+            runId = (long)(await createRun.ExecuteScalarAsync(cancellationToken)
+                ?? throw new InvalidOperationException("No fue posible crear la corrida I9."));
+        }
+
+        await using (var processing = new NpgsqlCommand(
+            "update schedule_generation_runs set status='PROCESANDO' where id=@id", connection, transaction))
+        {
+            processing.Parameters.AddWithValue("id", runId);
+            await processing.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        var sourceSnapshot = JsonSerializer.Serialize(new { shifts = request.Shifts });
+        var parametersSnapshot = JsonSerializer.Serialize(request.Weights);
+        await using (var snapshot = new NpgsqlCommand(@"
+            update schedule_versions
+               set source_snapshot=@source::jsonb,
+                   parameters_snapshot=@parameters::jsonb
+             where id=@versionId and status <> 'PUBLICADA'", connection, transaction))
+        {
+            snapshot.Parameters.AddWithValue("source", sourceSnapshot);
+            snapshot.Parameters.AddWithValue("parameters", parametersSnapshot);
+            snapshot.Parameters.AddWithValue("versionId", request.ScheduleVersionId.Value);
+            if (await snapshot.ExecuteNonQueryAsync(cancellationToken) != 1)
+                throw new InvalidOperationException("La version no existe o ya fue publicada.");
+        }
+
+        foreach (var assignment in result.Assignments)
+        {
+            await using var insertAssignment = new NpgsqlCommand(@"
+                insert into schedule_assignments(
+                    schedule_version_id,required_shift_id,employee_id,status,score,reasons)
+                values (@versionId,@shiftId,@employeeId,@status,@score,@reasons::jsonb)", connection, transaction);
+            insertAssignment.Parameters.AddWithValue("versionId", request.ScheduleVersionId.Value);
+            insertAssignment.Parameters.AddWithValue("shiftId", assignment.RequiredShiftId);
+            insertAssignment.Parameters.Add("employeeId", NpgsqlDbType.Bigint).Value = assignment.EmployeeId.HasValue ? assignment.EmployeeId.Value : DBNull.Value;
+            insertAssignment.Parameters.AddWithValue("status", assignment.Status);
+            insertAssignment.Parameters.Add("score", NpgsqlDbType.Numeric).Value = assignment.Score.HasValue ? assignment.Score.Value : DBNull.Value;
+            insertAssignment.Parameters.AddWithValue("reasons", JsonSerializer.Serialize(assignment.RankingReasons));
+            await insertAssignment.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using (var complete = new NpgsqlCommand(@"
+            update schedule_generation_runs
+               set status=@status, completed_at=NOW()
+             where id=@id", connection, transaction))
+        {
+            complete.Parameters.AddWithValue("status", result.Status);
+            complete.Parameters.AddWithValue("id", runId);
+            await complete.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return runId;
+    }
+
     public async Task<SchedulingProjectResponse?> GetSchedulingProjectAsync(long id, CancellationToken cancellationToken = default)
     {
         await using var connection = new NpgsqlConnection(_connectionString);
