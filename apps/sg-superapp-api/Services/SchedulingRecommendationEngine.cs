@@ -4,6 +4,14 @@ namespace Sg.SuperApp.Api.Services;
 
 public sealed class SchedulingRecommendationEngine
 {
+    public ScheduleReplanningResponse Replan(long versionId, string triggerType, string triggerId, IReadOnlyList<string> modes, int assignments, int vacancies, int exceptions)
+    {
+        if (string.IsNullOrWhiteSpace(triggerType) || string.IsNullOrWhiteSpace(triggerId)) throw new ArgumentException("Tipo e identificador de novedad son obligatorios.");
+        var normalized=modes.Select(x=>x.Trim().ToUpperInvariant()).Distinct().OrderBy(x=>x).ToArray();
+        if (normalized.Length==0 || normalized.Any(x=>x is not("MINIMUM_IMPACT" or "GLOBAL"))) throw new ArgumentException("Los modos de reprogramacion no son validos.");
+        var result=normalized.Select(mode=>new ScheduleReplanningScenario(mode,mode=="MINIMUM_IMPACT"?Math.Min(1,assignments):assignments,mode=="MINIMUM_IMPACT"?0:Math.Max(0,assignments-vacancies),vacancies,exceptions)).ToArray();
+        return new(versionId,triggerType.Trim().ToUpperInvariant(),triggerId.Trim(),result);
+    }
     public ScheduleRecommendationResult Generate(ScheduleRecommendationRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -78,3 +86,7 @@ public sealed class SchedulingRecommendationEngine
     private static TimeOnly ParseTime(RequiredShiftRecommendationInput shift) =>
         TimeOnly.TryParse(shift.StartsAt, out var value) ? value : throw new ArgumentException($"Hora invalida para turno {shift.RequiredShiftId}.");
 }
+
+public sealed record ScheduleReplanningRequest(string TriggerType,string TriggerId,IReadOnlyList<string>? Modes);
+public sealed record ScheduleReplanningScenario(string Mode,int ChangedAssignments,int AdditionalHours,int Vacancies,int Exceptions);
+public sealed record ScheduleReplanningResponse(long VersionId,string TriggerType,string TriggerId,IReadOnlyList<ScheduleReplanningScenario> Scenarios);
