@@ -330,6 +330,18 @@ if (Test-Path -LiteralPath $catalogFullPath -PathType Leaf) {
         }
     }
 }
+Assert-DocumentContains $catalogPath @(
+    '(?m)^## Decision De Parametrizacion I9-R01\s*$',
+    '(?m)^Estado de I9-R01: \*\*APROBADA_CONDICION_JURIDICA_NO_EJECUTABLE\*\*\s*$',
+    '(?is)8 horas diarias.*42 horas semanales.*12 horas diarias.*60 horas semanales',
+    '(?is)acuerdo escrito.*Se bloquea superar 12 horas diarias.*superar 60 horas semanales',
+    '(?is)Juridico debe definir.*posterior a 10 horas diarias.*regla especial.*vigilancia',
+    '(?is)Hasta registrar ese concepto, I9-R01 no puede pasar a estado ejecutable'
+)
+Assert-DocumentDoesNotContain $catalogPath @(
+    '(?i)I9-R01.*APROBADA_EJECUTABLE',
+    '(?i)I9-R0[2-7].*APROBADA_CONDICION_JURIDICA_NO_EJECUTABLE'
+)
 
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
 Assert-DocumentContains $validationActPath @(

@@ -27,13 +27,35 @@ pendiente invalida la regla como entrada del motor.
 
 | ID | Familia | Proposito verificable | Fuente/parametro pendiente | Severidad propuesta | Evidencia esperada | Estado |
 |---|---|---|---|---|---|---|
-| I9-R01 | Jornada maxima | Impedir o advertir que la carga acumulada exceda el limite aplicable | Norma/politica, periodo de calculo y valor por validar antes de codificar | Aprobada | Snapshot de turnos y acumulado | APROBADA_PARA_PARAMETRIZACION |
+| I9-R01 | Jornada maxima | Impedir o advertir que la carga acumulada exceda el limite aplicable | 8 h/dia y 42 h/semana ordinarias; vigilancia hasta 12 h/dia y 60 h/semana con acuerdo escrito; tratamiento posterior a 10 h/dia pendiente de concepto juridico | Aprobada con condicion juridica | Snapshot de turnos, acumulado semanal y acuerdo escrito | APROBADA_PARA_PARAMETRIZACION |
 | I9-R02 | Descanso minimo | Validar intervalo entre fin e inicio de turnos consecutivos | Norma/politica y valor por validar antes de codificar | Aprobada | Turnos anterior y propuesto | APROBADA_PARA_PARAMETRIZACION |
 | I9-R03 | Cruces | Bloquear solapamientos temporales del mismo guarda | Definicion operativa de bordes y traslados | Aprobada | Intervalos comparados | APROBADA_PARA_PARAMETRIZACION |
 | I9-R04 | Novedades | Excluir o advertir indisponibilidad por novedad vigente | Tipos, estados y prioridad por parametrizar sin inventar valores | Aprobada | Novedad fuente y vigencia | APROBADA_PARA_PARAMETRIZACION |
 | I9-R05 | Ubicacion | Evaluar compatibilidad territorial y tiempo de traslado | Zonas y criterio operativo por parametrizar sin inventar valores | Aprobada | Puestos, zonas y fuente | APROBADA_PARA_PARAMETRIZACION |
 | I9-R06 | Requisitos | Verificar cursos, acreditaciones y condiciones del puesto | Catalogo I3/I5 y tratamiento versionado | Aprobada | Requisito y habilitacion | APROBADA_PARA_PARAMETRIZACION |
 | I9-R07 | Desviacion de plantilla | Detectar cambios frente al ciclo aprobado y exigir motivo | Tolerancias y autorizador parametrizados antes de codificar | Aprobada | Plantilla, celda y motivo | APROBADA_PARA_PARAMETRIZACION |
+
+## Decision De Parametrizacion I9-R01
+
+Estado de I9-R01: **APROBADA_CONDICION_JURIDICA_NO_EJECUTABLE**
+> Fecha de decision: 2026-08-13
+> Evidencia: aprobacion explicita del usuario en esta conversacion.
+
+- Jornada ordinaria: maximo 8 horas diarias y 42 horas semanales.
+- Jornada especial de vigilancia: maximo 12 horas diarias y 60 horas semanales,
+  incluidas las suplementarias, cuando exista acuerdo escrito registrado.
+- El exceso sobre 8 horas diarias o 42 semanales se identifica y explica como
+  tiempo suplementario.
+- Se bloquea superar 12 horas diarias, superar 60 horas semanales o programar
+  mas de 8 horas diarias sin acuerdo escrito.
+- Ventana de acumulacion: semana calendario; debe conservarse como parametro
+  versionado para admitir un alcance contractual distinto aprobado.
+- Evidencia: turnos considerados, total diario, total semanal, acuerdo escrito,
+  regla/version aplicada y mensaje explicable.
+
+Condicion pendiente: Juridico debe definir como se armoniza el limite general
+posterior a 10 horas diarias con la regla especial del sector de vigilancia.
+Hasta registrar ese concepto, I9-R01 no puede pasar a estado ejecutable.
 
 ## Campos Obligatorios Por Regla Antes De Activarla
 
