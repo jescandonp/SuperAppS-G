@@ -292,3 +292,13 @@ maximos sectoriales de 12 horas diarias y 60 semanales sujetos a acuerdo escrito
 La regla permanece no ejecutable hasta que Juridico resuelva el tratamiento del
 limite general posterior a 10 horas diarias frente a la regla especial de
 vigilancia. La aprobacion de I9-R01 no aprueba I9-R02 a I9-R07.
+
+### Parametrizacion I9-R02
+
+El 2026-08-13 el usuario aprobo I9-R02 con un umbral preventivo S&G de 12
+horas, sin convertirlo en bloqueo de generacion. Un intervalo menor crea una
+excepcion pendiente: la propuesta puede generarse, pero no aprobarse ni
+publicarse hasta contar con motivo y aprobacion auditada de una persona con
+permiso `SCHEDULING/APPROVE_EXCEPTION`. I9-R02 permanece no ejecutable hasta
+completar mensajes, pruebas de borde y evidencia institucional. Esta decision no
+aprueba I9-R03 a I9-R07.

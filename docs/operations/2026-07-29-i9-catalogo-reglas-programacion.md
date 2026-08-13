@@ -28,7 +28,7 @@ pendiente invalida la regla como entrada del motor.
 | ID | Familia | Proposito verificable | Fuente/parametro pendiente | Severidad propuesta | Evidencia esperada | Estado |
 |---|---|---|---|---|---|---|
 | I9-R01 | Jornada maxima | Impedir o advertir que la carga acumulada exceda el limite aplicable | 8 h/dia y 42 h/semana ordinarias; vigilancia hasta 12 h/dia y 60 h/semana con acuerdo escrito; tratamiento posterior a 10 h/dia pendiente de concepto juridico | Aprobada con condicion juridica | Snapshot de turnos, acumulado semanal y acuerdo escrito | APROBADA_PARA_PARAMETRIZACION |
-| I9-R02 | Descanso minimo | Validar intervalo entre fin e inicio de turnos consecutivos | Norma/politica y valor por validar antes de codificar | Aprobada | Turnos anterior y propuesto | APROBADA_PARA_PARAMETRIZACION |
+| I9-R02 | Descanso minimo | Validar intervalo entre fin e inicio de turnos consecutivos | Umbral S&G de 12 horas; intervalo menor genera excepcion pendiente de aprobacion, no bloqueo de propuesta | Aprobada con excepcion | Turnos, intervalo, motivo y aprobacion | APROBADA_PARA_PARAMETRIZACION |
 | I9-R03 | Cruces | Bloquear solapamientos temporales del mismo guarda | Definicion operativa de bordes y traslados | Aprobada | Intervalos comparados | APROBADA_PARA_PARAMETRIZACION |
 | I9-R04 | Novedades | Excluir o advertir indisponibilidad por novedad vigente | Tipos, estados y prioridad por parametrizar sin inventar valores | Aprobada | Novedad fuente y vigencia | APROBADA_PARA_PARAMETRIZACION |
 | I9-R05 | Ubicacion | Evaluar compatibilidad territorial y tiempo de traslado | Zonas y criterio operativo por parametrizar sin inventar valores | Aprobada | Puestos, zonas y fuente | APROBADA_PARA_PARAMETRIZACION |
@@ -56,6 +56,30 @@ Estado de I9-R01: **APROBADA_CONDICION_JURIDICA_NO_EJECUTABLE**
 Condicion pendiente: Juridico debe definir como se armoniza el limite general
 posterior a 10 horas diarias con la regla especial del sector de vigilancia.
 Hasta registrar ese concepto, I9-R01 no puede pasar a estado ejecutable.
+
+## Decision De Parametrizacion I9-R02
+
+Estado de I9-R02: **APROBADA_COMO_EXCEPCION_NO_BLOQUEANTE**
+Fecha de decision: 2026-08-13
+Evidencia: aprobacion explicita del usuario en esta conversacion.
+
+- Umbral preventivo S&G: 12 horas continuas entre el fin de un turno y el
+  inicio del siguiente.
+- Un intervalo igual o superior a 12 horas cumple la regla.
+- Un intervalo inferior a 12 horas no bloquea la generacion de la propuesta;
+  crea una excepcion `PENDIENTE` y mantiene visible la advertencia.
+- La programacion que contiene la excepcion no puede aprobarse ni publicarse
+  hasta que una persona con permiso `SCHEDULING/APPROVE_EXCEPTION` la apruebe.
+- La aprobacion exige motivo, responsable, fecha, vigencia y auditoria. Un
+  rechazo mantiene la asignacion no publicable y obliga a reprogramar.
+- Cuando los turnos correspondan a puestos distintos, I9-R05 definira el tiempo
+  de traslado que debe considerarse; hasta aprobar I9-R05 no se infiere un valor.
+- El descanso semanal minimo se controla por separado y no se sustituye con esta
+  excepcion entre turnos.
+
+El umbral de 12 horas se registra como politica preventiva S&G aprobada por el
+usuario, no como valor legal atribuido. La regla no pasa a ejecutable hasta
+completar sus mensajes, pruebas de borde y evidencia de aprobacion institucional.
 
 ## Campos Obligatorios Por Regla Antes De Activarla
 

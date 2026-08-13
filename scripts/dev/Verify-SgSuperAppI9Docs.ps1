@@ -342,6 +342,19 @@ Assert-DocumentDoesNotContain $catalogPath @(
     '(?i)I9-R01.*APROBADA_EJECUTABLE',
     '(?i)I9-R0[2-7].*APROBADA_CONDICION_JURIDICA_NO_EJECUTABLE'
 )
+Assert-DocumentContains $catalogPath @(
+    '(?m)^## Decision De Parametrizacion I9-R02\s*$',
+    '(?m)^Estado de I9-R02: \*\*APROBADA_COMO_EXCEPCION_NO_BLOQUEANTE\*\*\s*$',
+    '(?is)12 horas continuas.*igual o superior a 12 horas cumple',
+    '(?is)inferior a 12 horas no bloquea la generacion.*excepcion `PENDIENTE`',
+    '(?is)no puede aprobarse ni publicarse.*SCHEDULING/APPROVE_EXCEPTION',
+    '(?is)motivo, responsable, fecha, vigencia y auditoria',
+    '(?is)politica preventiva S&G.*no como valor legal atribuido',
+    '(?is)I9-R05.*tiempo de traslado.*no se infiere un valor'
+)
+Assert-DocumentDoesNotContain $catalogPath @(
+    '(?i)I9-R02.*APROBADA_EJECUTABLE'
+)
 
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
 Assert-DocumentContains $validationActPath @(
