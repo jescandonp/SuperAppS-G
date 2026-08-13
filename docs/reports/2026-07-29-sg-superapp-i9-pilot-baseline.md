@@ -42,6 +42,48 @@ Ejecucion del 2026-08-12:
 Estos resultados no satisfacen Gate 5. No se infieren métricas ni aprobación a
 partir de verificadores parciales.
 
+## Retake Tecnico Hermetico
+
+Ejecucion del 2026-08-12, posterior al diagnostico inicial:
+
+- Se incorporo `Verify-SgSuperAppI9Integration.ps1`, que crea un esquema
+  PostgreSQL temporal, aplica migraciones y semillas autorizadas, usa datos
+  anonimizados, inicia una API local aislada y elimina sus artefactos al terminar.
+- PASS: configuracion, elegibilidad, recomendaciones, ciclos de turno, workflow,
+  seguridad, reprogramacion y exportaciones PDF/Excel.
+- PASS: documentos, contrato frontend, persistencia aislada e interfaz.
+- PASS: compilacion de la API .NET sin advertencias ni errores y build Vite de
+  produccion.
+- PASS: las reprogramaciones generaron cuatro notificaciones de scheduling con
+  claves unicas y las dos exportaciones dejaron sus eventos de auditoria.
+- La actualizacion `graphify update .` fue intentada, pero no produjo salida y
+  agoto el limite de 30 segundos; no se presenta como evidencia completada.
+
+El retake resuelve los cuatro FAIL tecnicos iniciales. No reemplaza la
+demostracion visual humana ni aporta el historico anonimizado requerido para
+calcular las metricas del piloto.
+
+## Retake Tecnico Hermetico
+
+Ejecucion del 2026-08-12, posterior al diagnostico inicial:
+
+- Se incorporo `Verify-SgSuperAppI9Integration.ps1`, que crea un esquema
+  PostgreSQL temporal, aplica migraciones y semillas autorizadas, usa datos
+  anonimizados, inicia una API local aislada y elimina sus artefactos al terminar.
+- PASS: configuracion, elegibilidad, recomendaciones, ciclos de turno, workflow,
+  seguridad, reprogramacion y exportaciones PDF/Excel.
+- PASS: documentos, contrato frontend, persistencia aislada e interfaz.
+- PASS: compilacion de la API .NET sin advertencias ni errores y build Vite de
+  produccion.
+- PASS: las reprogramaciones generaron cuatro notificaciones de scheduling con
+  claves unicas y las dos exportaciones dejaron sus eventos de auditoria.
+- La actualizacion `graphify update .` fue intentada, pero no produjo salida y
+  agoto el limite de 30 segundos; no se presenta como evidencia completada.
+
+El retake resuelve los cuatro FAIL tecnicos iniciales. No reemplaza la
+demostracion visual humana ni aporta el historico anonimizado requerido para
+calcular las metricas del piloto.
+
 ## Decision Pendiente
 
 La optimizacion avanzada solo podrá evaluarse después de completar esta tabla y

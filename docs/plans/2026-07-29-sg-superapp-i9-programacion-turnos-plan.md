@@ -242,7 +242,25 @@ por fixtures/estado operativo: exportacion sin version publicada (404),
 reprogramacion sin version elegible (409), generacion de seguridad con error
 500 y workflow sin snapshot esperado.
 
-Gate 5 permanece abierto. Para cerrarlo se requiere corregir o preparar de forma
-hermetica los cuatro recorridos, ejecutar los viewports y aportar el historico
+Gate 5 permanece abierto. Los cuatro recorridos tecnicos requerian un retake
+hermetico; adicionalmente, se deben ejecutar los viewports y aportar el historico
 anonimizado para medir la linea base. No se crea handoff de MVP cerrado mientras
 estas condiciones sigan pendientes.
+
+### Retake Tecnico Task 13
+
+El 2026-08-12 se incorporo y ejecuto una suite hermetica sobre un esquema
+PostgreSQL temporal y una API local aislada. Configuracion, elegibilidad,
+recomendaciones, ciclos, workflow, seguridad, reprogramacion y exportaciones
+terminaron en PASS; tambien pasaron documentos, contrato frontend, persistencia
+aislada, interfaz y las compilaciones .NET/Vite. La suite verifico deduplicacion
+de notificaciones y auditoria de PDF/Excel, y elimino los datos anonimizados de
+prueba al finalizar.
+
+Con este retake quedan resueltos los cuatro bloqueos tecnicos de fixtures/estado
+operativo registrados al abrir la tarea. Task 13 continua **EN EJECUCION - NO
+CERRADA**: faltan el recorrido visual humano en 320, 768, 1024 y 1440 px, el
+historico anonimizado y la medicion de la linea base. Tampoco se consideran
+ejecutables las siete reglas normativas mientras sus parametros no hayan sido
+completados y validados. `graphify update .` fue intentado y agoto 30 segundos
+sin producir salida; el grafo no se declara actualizado.
