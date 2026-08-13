@@ -1,7 +1,7 @@
 # Checklist De Demostracion I9
 
-> Estado: **PENDIENTE_DE_EJECUCION_HUMANA**
-> Fecha de preparacion: 2026-08-12
+> Estado: **VALIDACION_VISUAL_APROBADA_PILOTO_FUNCIONAL_PENDIENTE**
+> Fecha de actualizacion: 2026-08-13
 > Alcance: Programacion asistida de turnos, sin datos personales reales.
 
 ## Precondiciones
@@ -26,13 +26,17 @@
 
 ## Accesibilidad Y Responsive
 
-- [ ] 320 px: filtros y lista diaria sin desplazamiento horizontal de pagina.
-- [ ] 768 px: navegación, detalle y acciones operables por teclado.
-- [ ] 1024 px: matriz con scroll interno y encabezado sticky.
-- [ ] 1440 px: resumen, matriz y detalle legibles sin solapamientos.
-- [ ] El foco es visible; D/N/X/VACANTE tienen etiqueta textual además del color.
+- [x] 320 px: validacion visual aprobada por el usuario el 2026-08-13.
+- [x] 768 px: validacion visual aprobada por el usuario el 2026-08-13.
+- [x] 1024 px: validacion visual aprobada por el usuario el 2026-08-13.
+- [x] 1440 px: validacion visual aprobada por el usuario el 2026-08-13.
+- [x] Validacion visual general aprobada por el usuario el 2026-08-13.
+
+La aprobacion anterior es evidencia humana proporcionada por el usuario; no se
+presenta como captura o medicion automatizada de cada viewport.
 
 ## Criterio De Cierre
 
-Todos los puntos deben tener evidencia fechada. Un fallo funcional, la falta del
-piloto anonimizado o reglas sin parametros validados impide cerrar Gate 5.
+Todos los puntos deben tener evidencia fechada. Un fallo funcional, la falta de
+ejecucion/comparacion del piloto o reglas sin parametros validados impide cerrar
+Gate 5.

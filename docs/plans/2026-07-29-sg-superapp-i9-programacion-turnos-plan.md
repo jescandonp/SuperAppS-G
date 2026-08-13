@@ -264,3 +264,22 @@ historico anonimizado y la medicion de la linea base. Tampoco se consideran
 ejecutables las siete reglas normativas mientras sus parametros no hayan sido
 completados y validados. `graphify update .` fue intentado y agoto 30 segundos
 sin producir salida; el grafo no se declara actualizado.
+
+### Historico Simulado Y Aprobacion Visual
+
+El 2026-08-13 el usuario aprobo expresamente la validacion visual y aporto
+`BOTANIKA JULIO.pdf` y `BOTANIKA AGOSTO.pdf` como historico con datos simulados.
+La aprobacion se registra como evidencia humana, no como medicion automatizada.
+
+Los PDF tienen contenido visual identico y ambos estan rotulados julio de 2026;
+ademas, el encabezado declara 15 guardas mientras la grilla contiene 16 filas.
+Por trazabilidad solo se consolido un periodo: 496 celdas, 157 turnos D, 156 N,
+165 descansos X, 8 ausencias A, 8 incapacidades INC, una vacacion V y un turno
+adicional TA. No se reprodujeron nombres del documento fuente.
+
+Task 13 permanece **EN EJECUCION - NO CERRADA**. La validacion visual y la
+recepcion del historico simulado ya no son pendientes; faltan confirmar las
+inconsistencias de fuente, ejecutar la propuesta I9 sobre datos estructurados,
+comparar sus metricas y completar/validar los parametros de las siete reglas
+antes de declararlas ejecutables. En esta actualizacion se intento nuevamente
+`graphify update .`, pero el comando no esta instalado o disponible en PATH.

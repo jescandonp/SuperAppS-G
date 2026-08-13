@@ -226,6 +226,28 @@ Assert-PatternCount $planPath '(?m)^> Estado general:' 1
 Assert-PatternCount $planPath '(?m)^> Estado general: \*\*Gate 0 cerrado - Tasks 2 a 12 completadas - Task 13 en ejecucion\*\*\s*$' 1
 Assert-PatternCount $planPath '(?m)^> Gate 0:' 1
 Assert-PatternCount $planPath '(?m)^> Gate 0: \*\*Cerrado\*\*\s*$' 1
+Assert-DocumentContains $planPath @(
+    '(?is)2026-08-13.*aprobo expresamente la validacion visual',
+    '(?is)BOTANIKA JULIO\.pdf.*BOTANIKA AGOSTO\.pdf.*datos simulados',
+    '(?is)contenido visual identico.*ambos estan rotulados julio de 2026',
+    '(?is)Task 13 permanece \*\*EN EJECUCION - NO CERRADA\*\*',
+    '(?is)157 turnos D.*156 N.*165 descansos X.*8 ausencias A.*8 incapacidades INC.*una vacacion V.*un\s+turno\s+adicional TA'
+)
+
+$pilotPath = 'docs/reports/2026-07-29-sg-superapp-i9-pilot-baseline.md'
+Assert-DocumentContains $pilotPath @(
+    '(?m)^> Estado: \*\*HISTORICO_SIMULADO_RECIBIDO_PENDIENTE_DE_EJECUCION_I9\*\*\s*$',
+    '(?is)ambos documentos.*contenido visual es identico.*rotulados `Julio de 2026`',
+    '(?is)496 celdas.*157.*156.*165',
+    '(?is)historico simulado y la aprobacion visual.*no cierran Task 13 ni Gate 5',
+    '(?is)siete reglas normativas.*ejecutables'
+)
+Assert-DocumentDoesNotContain $pilotPath @(
+    '(?m)^> Estado: \*\*PENDIENTE_DE_DATOS_Y_EJECUCION\*\*\s*$',
+    '(?i)Gate 5 (esta|queda) (cerrado|aprobado)',
+    '(?i)Task 13 (esta|queda) (cerrada|completada)',
+    '(?i)reglas normativas (estan|quedan) ejecutables'
+)
 
 $catalogPath = 'docs/operations/2026-07-29-i9-catalogo-reglas-programacion.md'
 Assert-DocumentContains $catalogPath @(
