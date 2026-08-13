@@ -6,7 +6,7 @@ if($VerificationSchema){if($VerificationSchema-notmatch'^sg_i9_replan_[0-9]+_[0-
 $body=@{triggerType="ABSENCE";triggerId="absence-guard-1";modes=@("MINIMUM_IMPACT","GLOBAL")}
 $first=Call $body;if($first.Status-eq 404){throw "I9 replanning endpoint is missing (HTTP 404)."};if($first.Status-ne 200){throw "Replanning returned HTTP $($first.Status)."}
 $scenarios=@($first.Body.scenarios);if($scenarios.Count-ne 2){throw "Expected two replanning scenarios."}
-$minimum=$scenarios|Where-Object mode-eq"MINIMUM_IMPACT";$global=$scenarios|Where-Object mode-eq"GLOBAL"
+$minimum=$scenarios|Where-Object mode -eq "MINIMUM_IMPACT";$global=$scenarios|Where-Object mode -eq "GLOBAL"
 if($null-eq$minimum-or$null-eq$global){throw "Missing minimum/global scenario."};if($minimum.changedAssignments-gt$global.changedAssignments){throw "Minimum impact changed more assignments than global."}
 foreach($s in $scenarios){foreach($field in @('changedAssignments','additionalHours','vacancies','exceptions')){if($null-eq$s.$field){throw "Scenario missing $field."}}}
 $second=Call $body;if($second.Status-ne 200-or($first.Body|ConvertTo-Json -Depth 8 -Compress)-cne($second.Body|ConvertTo-Json -Depth 8 -Compress)){throw "Replanning is not deterministic/idempotent."}
