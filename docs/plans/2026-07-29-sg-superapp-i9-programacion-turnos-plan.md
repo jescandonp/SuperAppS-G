@@ -302,3 +302,13 @@ publicarse hasta contar con motivo y aprobacion auditada de una persona con
 permiso `SCHEDULING/APPROVE_EXCEPTION`. I9-R02 permanece no ejecutable hasta
 completar mensajes, pruebas de borde y evidencia institucional. Esta decision no
 aprueba I9-R03 a I9-R07.
+
+### Parametrizacion I9-R03
+
+El 2026-08-13 el usuario aprobo I9-R03 con tratamiento mixto. El solapamiento
+temporal real del mismo guarda es bloqueo absoluto sin excepcion. La frontera
+adyacente no es solapamiento; cuando intervienen puestos distintos, un posible
+conflicto de traslado genera excepcion pendiente y no permite aprobar/publicar
+hasta validar I9-R05 y obtener aprobacion auditada. I9-R03 permanece no
+ejecutable hasta completar sus pruebas e integracion con I9-R05. Esta decision
+no aprueba I9-R04 a I9-R07.

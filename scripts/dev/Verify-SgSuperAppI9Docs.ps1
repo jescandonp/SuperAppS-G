@@ -355,6 +355,19 @@ Assert-DocumentContains $catalogPath @(
 Assert-DocumentDoesNotContain $catalogPath @(
     '(?i)I9-R02.*APROBADA_EJECUTABLE'
 )
+Assert-DocumentContains $catalogPath @(
+    '(?m)^## Decision De Parametrizacion I9-R03\s*$',
+    '(?m)^Estado de I9-R03: \*\*APROBADA_MIXTA_NO_EJECUTABLE\*\*\s*$',
+    '(?is)inicio de un turno es anterior al fin.*solapamiento real',
+    '(?is)solapamiento real es bloqueante, no admite excepcion.*vacante',
+    '(?is)adyacentes.*exactamente al finalizar.*no constituye.*solapamiento',
+    '(?is)puestos distintos.*excepcion `PENDIENTE`.*no aprobarse ni publicarse',
+    '(?is)I9-R05.*SCHEDULING/APPROVE_EXCEPTION',
+    '(?is)fecha y hora completas.*turnos nocturnos.*cambios.*mes.*ano'
+)
+Assert-DocumentDoesNotContain $catalogPath @(
+    '(?i)I9-R03.*APROBADA_EJECUTABLE'
+)
 
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
 Assert-DocumentContains $validationActPath @(
