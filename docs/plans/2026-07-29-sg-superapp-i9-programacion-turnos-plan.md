@@ -1,7 +1,7 @@
 # Execution Log I9 - Gate 0 - Programacion Asistida De Turnos
 
 > Tipo: **Execution log documental de Gate 0**
-> Estado general: **Gate 0 cerrado - Tasks 2 a 11 completadas - Task 12 pendiente**
+> Estado general: **Gate 0 cerrado - Tasks 2 a 12 completadas - Task 13 pendiente**
 > Gate 0: **Cerrado**
 > Fecha de apertura: 2026-07-29
 > SPEC: `docs/specs/2026-07-29-sg-superapp-spec-i9-programacion-turnos.md`
@@ -14,7 +14,7 @@ Este artefacto registra la apertura documental de I9. No sustituye el plan
 tecnico exacto
 `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`.
 Estado del plan tecnico: **APROBADO COMO HOJA DE RUTA DOCUMENTAL**.
-Estado de ejecucion: **TASK 11 COMPLETADA - TASK 12 PENDIENTE**.
+Estado de ejecucion: **TASK 12 COMPLETADA - TASK 13 PENDIENTE**.
 
 Las tres condiciones de Gate 0 estan satisfechas desde el 2026-07-29: SPEC
 aprobada, catalogo aprobado para parametrizacion y cierre ejecutivo explicito.
@@ -23,7 +23,7 @@ permanezcan incompletos o sin validar.
 
 El catalogo conserva estado `APROBADO_PARA_PARAMETRIZACION`; las decisiones constan como
 `Aprobada`. Gate 0 permanece cerrado; Tasks 2, 3, 4, 5, 6 y 7 estan
-completadas junto con Tasks 8, 9, 10 y 11. Task 12 permanece pendiente.
+completadas junto con Tasks 8, 9, 10, 11 y 12. Task 13 permanece pendiente.
 
 ## Ruta De Validacion Del Catalogo
 
@@ -210,7 +210,22 @@ inferirlas por rol. El commit tecnico es `f62b047`. El verificador termino con
 `I9 FRONTEND API PASS`; los builds Vite y .NET concluyeron sin errores y el
 backend sin advertencias.
 
-Task 12 permanece pendiente y no iniciada. Gate 2 continua bloqueado hasta
+### Cierre Task 12
+
+Task 12 queda completada con la ruta de programacion, plantillas 2x2, 4x2 y
+6x1, matriz semantica D/N/X/VACANTE, detalle explicable, comparacion de
+escenarios, excepciones con motivo obligatorio, acciones por capacidades y
+presentacion responsive Sentinel. El commit tecnico es `6f1ed01`. El ciclo TDD
+registro RED por componentes ausentes y GREEN `I9 UI PASS`; el contrato de API
+frontend termino `I9 FRONTEND API PASS` y el build Vite concluyo sin errores.
+
+El modo demostrativo esta identificado y no representa datos reales. El
+recorrido autenticado en navegador quedo pendiente para Task 13: la API local
+respondio, pero el navegador integrado reporto `Failed to fetch` al iniciar
+sesion y no permitio verificar visualmente los cuatro viewports. Esta limitacion
+no se presenta como evidencia visual superada.
+
+Task 13 permanece pendiente y no iniciada. Gate 2 continua bloqueado hasta
 completar y validar los parametros del catalogo; esta implementacion no vuelve
 ejecutables las siete reglas normativas pendientes. Los verificadores nominales
 I6/I7 del plan no existen en este checkout; esta ausencia preexistente queda
