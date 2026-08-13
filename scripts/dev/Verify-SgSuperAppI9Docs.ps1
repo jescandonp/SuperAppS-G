@@ -368,6 +368,21 @@ Assert-DocumentContains $catalogPath @(
 Assert-DocumentDoesNotContain $catalogPath @(
     '(?i)I9-R03.*APROBADA_EJECUTABLE'
 )
+Assert-DocumentContains $catalogPath @(
+    '(?m)^## Decision De Parametrizacion I9-R04\s*$',
+    '(?m)^Estado de I9-R04: \*\*APROBADA_POR_CLASIFICACION_NO_EJECUTABLE\*\*\s*$',
+    '(?is)Incapacidad vigente \| Bloqueo absoluto.*Vacaciones aprobadas \| Bloqueo absoluto',
+    '(?is)Ausencia confirmada \| Bloqueo absoluto.*Ausencia reportada pendiente de confirmar \| Excepcion aprobable',
+    '(?is)Induccion o capacitacion coincidente \| Excepcion aprobable',
+    '(?is)Turno adicional \| Excepcion aprobable, sujeta a I9-R01 e I9-R02',
+    '(?is)Descuento o sancion administrativa \| Informativa, salvo indisponibilidad formal',
+    '(?is)tipo, inicio, fin, estado, fuente y responsable',
+    '(?is)prevalece: bloqueo absoluto, luego excepcion.*finalmente informativa',
+    '(?is)I9-R04 no pasa a ejecutable hasta mapear los codigos reales de novedades de S&G'
+)
+Assert-DocumentDoesNotContain $catalogPath @(
+    '(?i)I9-R04.*APROBADA_EJECUTABLE'
+)
 
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
 Assert-DocumentContains $validationActPath @(

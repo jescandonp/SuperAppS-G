@@ -312,3 +312,14 @@ conflicto de traslado genera excepcion pendiente y no permite aprobar/publicar
 hasta validar I9-R05 y obtener aprobacion auditada. I9-R03 permanece no
 ejecutable hasta completar sus pruebas e integracion con I9-R05. Esta decision
 no aprueba I9-R04 a I9-R07.
+
+### Parametrizacion I9-R04
+
+El 2026-08-13 el usuario aprobo la clasificacion de novedades de I9-R04.
+Incapacidad, vacaciones, licencias/calamidad, suspension/retiro y ausencia
+confirmada vigentes son bloqueos absolutos. Ausencia pendiente, induccion o
+capacitacion coincidente y turno adicional son excepciones aprobables. Disponible
+no bloquea; descuento o sancion son informativos salvo indisponibilidad formal.
+La regla permanece no ejecutable hasta mapear los codigos reales, completar
+mensajes, pruebas y evidencia institucional. Esta decision no aprueba I9-R05 a
+I9-R07.
