@@ -1,7 +1,7 @@
 # Execution Log I9 - Gate 0 - Programacion Asistida De Turnos
 
 > Tipo: **Execution log documental de Gate 0**
-> Estado general: **Gate 0 cerrado - Tasks 2 a 12 completadas - Task 13 pendiente**
+> Estado general: **Gate 0 cerrado - Tasks 2 a 12 completadas - Task 13 en ejecucion**
 > Gate 0: **Cerrado**
 > Fecha de apertura: 2026-07-29
 > SPEC: `docs/specs/2026-07-29-sg-superapp-spec-i9-programacion-turnos.md`
@@ -14,7 +14,7 @@ Este artefacto registra la apertura documental de I9. No sustituye el plan
 tecnico exacto
 `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`.
 Estado del plan tecnico: **APROBADO COMO HOJA DE RUTA DOCUMENTAL**.
-Estado de ejecucion: **TASK 12 COMPLETADA - TASK 13 PENDIENTE**.
+Estado de ejecucion: **TASK 12 COMPLETADA - TASK 13 EN EJECUCION**.
 
 Las tres condiciones de Gate 0 estan satisfechas desde el 2026-07-29: SPEC
 aprobada, catalogo aprobado para parametrizacion y cierre ejecutivo explicito.
@@ -23,7 +23,7 @@ permanezcan incompletos o sin validar.
 
 El catalogo conserva estado `APROBADO_PARA_PARAMETRIZACION`; las decisiones constan como
 `Aprobada`. Gate 0 permanece cerrado; Tasks 2, 3, 4, 5, 6 y 7 estan
-completadas junto con Tasks 8, 9, 10, 11 y 12. Task 13 permanece pendiente.
+completadas junto con Tasks 8, 9, 10, 11 y 12. Task 13 esta en ejecucion.
 
 ## Ruta De Validacion Del Catalogo
 
@@ -225,9 +225,24 @@ respondio, pero el navegador integrado reporto `Failed to fetch` al iniciar
 sesion y no permitio verificar visualmente los cuatro viewports. Esta limitacion
 no se presenta como evidencia visual superada.
 
-Task 13 permanece pendiente y no iniciada. Gate 2 continua bloqueado hasta
+Task 13 esta en ejecucion y no cerrada. Gate 2 continua bloqueado hasta
 completar y validar los parametros del catalogo; esta implementacion no vuelve
 ejecutables las siete reglas normativas pendientes. Los verificadores nominales
 I6/I7 del plan no existen en este checkout; esta ausencia preexistente queda
 registrada y no se reemplaza por evidencia inferida. `graphify update .` no se
 ejecuto porque el comando no esta instalado en el entorno.
+
+### Apertura Task 13
+
+Task 13 queda **EN EJECUCION - NO CERRADA** desde el 2026-08-12. Se prepararon
+el checklist de demostracion y la linea base sin inventar valores. La primera
+suite integral obtuvo ocho verificadores I9 en PASS y cuatro en FAIL. Tras
+aplicar las migraciones locales faltantes, los retakes continuaron bloqueados
+por fixtures/estado operativo: exportacion sin version publicada (404),
+reprogramacion sin version elegible (409), generacion de seguridad con error
+500 y workflow sin snapshot esperado.
+
+Gate 5 permanece abierto. Para cerrarlo se requiere corregir o preparar de forma
+hermetica los cuatro recorridos, ejecutar los viewports y aportar el historico
+anonimizado para medir la linea base. No se crea handoff de MVP cerrado mientras
+estas condiciones sigan pendientes.

@@ -2,20 +2,20 @@
 
 > Estado: **Aprobada**
 > Fecha: 2026-07-29
-> Gate: 0 cerrado; Tasks 2 a 12 completadas; Task 13 pendiente
+> Gate: 0 cerrado; Tasks 2 a 12 completadas; Task 13 en ejecucion
 > Fuentes: Constitucion, Arquitectura, Tecnologia, Design y diseño funcional del 2026-07-19.
 > Plan tecnico: `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`
 > Aprobacion: aprobada el 2026-07-29 por el usuario, en calidad de patrocinador funcional.
 
 Estado del plan tecnico: **APROBADO COMO HOJA DE RUTA DOCUMENTAL** por decision
 del usuario.
-Estado de aplicacion: **TASK_12_COMPLETADA_TASK_13_PENDIENTE**
+Estado de aplicacion: **TASK_12_COMPLETADA_TASK_13_EN_EJECUCION**
 
 Las tres condiciones estan satisfechas. El catalogo queda
 `APROBADO_PARA_PARAMETRIZACION`; Gate 0 queda cerrado por Camilo Piedrahita, Gerente
 General, segun confirmacion explicita del usuario. Las Tasks 2 a 7 fueron
 completadas posteriormente. Las Tasks 8, 9, 10, 11 y 12 tambien fueron
-completadas; la Task 13 de piloto y cierre permanece pendiente y no iniciada.
+completadas; la Task 13 de piloto y cierre esta en ejecucion y no cerrada.
 
 El catalogo no es ejecutable por el motor hasta completar y validar valores,
 unidades, vigencia, alcance, mensajes, responsable y pruebas de cada regla.
