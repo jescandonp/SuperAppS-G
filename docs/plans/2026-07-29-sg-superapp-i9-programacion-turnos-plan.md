@@ -416,9 +416,11 @@ Se preparo
 parametros, nueve mensajes y veinte casos de prueba. La propuesta explicita el
 rol aprobador, minutos enteros, filas direccionales, versiones vigentes,
 excepciones no reutilizables, tratamiento del mismo puesto, fronteras y
-prioridad frente a I9-R03. Su estado es
-`PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE`; no atribuye aprobacion al usuario, no
-activa I9-R05 y no cierra Gate 2.
+prioridad frente a I9-R03. El usuario aprobo explicitamente estos parametros,
+mensajes y casos de prueba. Su estado es
+`APROBADO_FUNCIONALMENTE_NO_EJECUTABLE`: no activa I9-R05 ni cierra Gate 2;
+continuan pendientes la matriz institucional real, fuente/version,
+implementacion TDD y evidencia.
 
 ### Parametrizacion I9-R06
 

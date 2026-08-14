@@ -618,8 +618,8 @@ Assert-DocumentDoesNotContain $r04TestProposalPath @(
 
 $r05ProposalPath = 'docs/operations/2026-08-13-i9-r05-parametros-mensajes-pruebas.md'
 Assert-DocumentContains $r05ProposalPath @(
-    '(?m)^> Estado: \*\*PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE\*\*\s*$',
-    '(?is)criterios base aprobados por el usuario.*parametros detallados pendientes de aprobacion',
+    '(?m)^> Estado: \*\*APROBADO_FUNCIONALMENTE_NO_EJECUTABLE\*\*\s*$',
+    '(?is)criterios y parametros detallados aprobados explicitamente por el usuario en esta conversacion',
     '(?is)Director de Operaciones.*SCHEDULING/APPROVE_EXCEPTION',
     '(?is)minutos enteros no negativos.*A -> B.*B -> A',
     '(?is)Excepcion no reutilizable.*guarda.*dos turnos.*origen.*destino',
@@ -631,13 +631,13 @@ Assert-DocumentContains $r05ProposalPath @(
     '(?is)Otro rol intenta aprobar.*Acceso denegado',
     '(?is)reutilizar aprobacion.*Rechaza reutilizacion',
     '(?is)Existe solapamiento.*I9-R03 mantiene bloqueo absoluto',
-    '(?is)propuesta para validacion.*no\s+activa I9-R05 ni cierra Gate 2.*implementacion mediante TDD'
+    '(?is)aprobacion funcional del usuario.*no activa I9-R05.*ni cierra Gate 2.*implementacion mediante TDD'
 )
 Assert-PatternCount $r05ProposalPath '(?m)^\| R05-T(?:0[1-9]|1[0-9]|20) \|' 20
 Assert-DocumentDoesNotContain $r05ProposalPath @(
     '(?i)I9-R05.*APROBADA_EJECUTABLE',
     '(?i)Gate 2.*Cerrado',
-    '(?m)^> Evidencia: aprobacion explicita del usuario en esta conversacion\.\s*$',
+    '(?m)^> Estado: \*\*PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE\*\*\s*$',
     '(?im)^(?!.*\bno\b).*combinacion.*prohibida.*(?:admite|permite).*excepcion'
 )
 

@@ -1,9 +1,9 @@
 # I9-R05 - Parametros, Mensajes Y Casos De Prueba
 
-> Estado: **PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE**
+> Estado: **APROBADO_FUNCIONALMENTE_NO_EJECUTABLE**
 > Fecha: 2026-08-13
 > Regla: ubicacion y tiempo de traslado entre puestos.
-> Evidencia: criterios base aprobados por el usuario; parametros detallados pendientes de aprobacion.
+> Evidencia: criterios y parametros detallados aprobados explicitamente por el usuario en esta conversacion.
 
 ## Criterios Base Ya Aprobados
 
@@ -90,7 +90,7 @@
 
 ## Condicion De Aprobacion
 
-Este documento es una propuesta para validacion. Su aprobacion funcional no
-activa I9-R05 ni cierra Gate 2. La regla requiere matriz institucional real,
+Este documento tiene aprobacion funcional del usuario, pero no activa I9-R05
+ni cierra Gate 2. La regla requiere matriz institucional real,
 implementacion mediante TDD, integracion comprobada con I9-R03, ejecucion
 satisfactoria de pruebas y evidencia antes de proponerse como ejecutable.
