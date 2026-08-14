@@ -755,6 +755,40 @@ Assert-DocumentSectionContains $planPath '(?ms)^### Apertura Subgate 2A.*$.*?(?=
     '(?is)no activa reglas y no\s+cierra Gate 2'
 )
 
+$wpI9ALegalFormPath = 'docs/operations/2026-08-14-i9-wp-a-formato-concepto-juridico-r01.md'
+Assert-DocumentContains $wpI9ALegalFormPath @(
+    '(?m)^> Estado: \*\*LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_JURIDICA_NO_EJECUTABLE\*\*\s*$',
+    '(?is)no constituye concepto, firma, aprobacion ni autorizacion de implementacion',
+    '(?is)Juridica verifica las fuentes oficiales.*fecha real de consulta',
+    '(?is)Ley 1920 de 2018.*suin-juriscol.*Ley 2101 de 2021.*funcionpublica.*articulo 167A.*secretariasenado',
+    '(?is)inclusion no certifica vigencia.*Juridica debe verificar texto, aplicabilidad.*modificaciones',
+    '(?is)J-R01-01.*J-R01-02.*J-R01-03.*J-R01-04.*J-R01-05.*J-R01-06.*J-R01-07.*J-R01-08.*J-R01-09.*J-R01-10',
+    '(?is)CONFIRMAR.*AJUSTAR.*RECHAZAR.*NO_APLICA_CON_FUNDAMENTO.*no anticipa ninguna decision',
+    '(?is)marca de I9 no reemplaza el documento escrito ni las firmas',
+    '(?is)8 horas exactas.*Mas de 8 y hasta 10 horas.*Mas de 10 y hasta 12 horas.*Mas de 12 horas.*42 horas semanales exactas.*Mas de 42 y hasta 60 horas.*Mas de 60 horas.*Acuerdo no marcado',
+    '(?is)Decision global: APROBADO / APROBADO_CON_AJUSTES / NO_APROBADO / REQUIERE_INFORMACION.*PENDIENTE',
+    '(?is)Checklist De Completitud.*J-R01-01 a J-R01-10.*decision global.*evidencia',
+    '(?is)WP-I9-A solo puede marcarse completado.*evidencia institucional.*no activa\s+I9-R01 ni autoriza implementacion'
+)
+Assert-PatternCount $wpI9ALegalFormPath '(?m)^\| J-R01-(?:0[1-9]|10) \|' 10
+Assert-PatternCount $wpI9ALegalFormPath '(?m)^- \[ \] ' 8
+Assert-DocumentDoesNotContain $wpI9ALegalFormPath @(
+    '(?i)CONCEPTO_JURIDICO_APROBADO',
+    '(?i)I9-R01.*APROBADA_EJECUTABLE',
+    '(?i)Gate 2.*(?:Cerrado|Aprobado)',
+    '(?im)^\| Decision global:.*\|\s*(?:APROBADO|APROBADO_CON_AJUSTES|NO_APROBADO|REQUIERE_INFORMACION)\s*\|',
+    '(?im)^\| (?:Nombre de quien analiza|Nombre de quien aprueba|Fecha de emision|Evidencia o ubicacion institucional) \| (?!PENDIENTE\s*\|).+$'
+)
+Assert-DocumentContains $subgate2APlanPath @(
+    'docs/operations/2026-08-14-i9-wp-a-formato-concepto-juridico-r01\.md',
+    'LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_JURIDICA_NO_EJECUTABLE',
+    '(?is)preparacion no completa WP-I9-A ni autoriza implementacion'
+)
+Assert-DocumentContains $parameterMatrixPath @(
+    'docs/operations/2026-08-14-i9-wp-a-formato-concepto-juridico-r01\.md',
+    '(?is)todos los campos de decision permanecen\s+`PENDIENTE`.*no constituye concepto ni cierre de WP-I9-A'
+)
+
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
 Assert-DocumentContains $validationActPath @(
     '(?m)^> Estado: \*\*APROBADA\*\*\s*$',

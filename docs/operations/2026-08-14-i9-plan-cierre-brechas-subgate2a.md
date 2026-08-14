@@ -42,6 +42,11 @@ activar reglas.
 **Criterio de salida:** documento identificado, versionado y aprobado por el
 rol competente; la marca del sistema no reemplaza escrito ni firmas.
 
+**Formato preparado:**
+`docs/operations/2026-08-14-i9-wp-a-formato-concepto-juridico-r01.md`, con
+estado `LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_JURIDICA_NO_EJECUTABLE`. Su
+preparacion no completa WP-I9-A ni autoriza implementacion.
+
 ### WP-I9-B - Catalogos Operativos R02 Y R07
 
 **Responsable de validacion:** Director de Operaciones.

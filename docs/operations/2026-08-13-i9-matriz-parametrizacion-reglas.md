@@ -50,6 +50,11 @@ Propuesta de referencia para revision:
 `docs/operations/2026-08-13-i9-propuesta-juridica-jornada.md`. Su revision no
 bloquea el desarrollo, pero I9-R01 permanece no ejecutable en produccion.
 
+Formato de concepto y checklist para Juridica:
+`docs/operations/2026-08-14-i9-wp-a-formato-concepto-juridico-r01.md`. Esta
+preparado para diligenciamiento; todos los campos de decision permanecen
+`PENDIENTE` y no constituye concepto ni cierre de WP-I9-A.
+
 ### I9-R02 - Descanso Minimo
 
 | Campo | Valor actual | Evidencia requerida |
