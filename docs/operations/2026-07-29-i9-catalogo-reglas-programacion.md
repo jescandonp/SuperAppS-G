@@ -60,7 +60,9 @@ Estado de I9-R01: **APROBADA_CONDICION_JURIDICA_NO_EJECUTABLE**
 La exigencia de aprobacion para toda jornada superior a 10 y hasta 12 horas
 proviene de la confirmacion del usuario, no de un concepto juridico aportado. El
 usuario confirmo al Director de Operaciones como rol aprobador. Permanecen
-pendientes la fuente y vigencia juridicas, el alcance y la evidencia exigible.
+pendientes la fuente y vigencia juridicas y la evidencia exigible. Por decision
+del usuario, el criterio aplica a todos los proyectos de vigilancia gestionados
+por I9, sin un valor distinto por proyecto o contrato.
 Hasta completarlos y validarlos, I9-R01 no
 puede pasar a estado ejecutable.
 
