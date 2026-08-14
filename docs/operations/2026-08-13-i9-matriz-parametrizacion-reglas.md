@@ -64,7 +64,7 @@ bloquea el desarrollo, pero I9-R01 permanece no ejecutable en produccion.
 | Motivo Otro | Descripcion obligatoria | Prueba de rechazo sin descripcion |
 | Efecto del motivo | No sustituye la aprobacion del Director de Operaciones | Prueba de workflow pendiente/aprobado |
 | Modo durante desarrollo | Desactivada o advertencia; no ejecutable en produccion | Prueba de configuration gate |
-| Mensajes y pruebas | PENDIENTE | Casos menor, igual y mayor a 12 h |
+| Mensajes y pruebas | PROPUESTA_PARA_VALIDACION | `docs/operations/2026-08-13-i9-r02-mensajes-pruebas.md`; casos R02-T01 a R02-T16 |
 
 ### I9-R03 - Cruces
 

@@ -321,6 +321,14 @@ no ejecutable hasta completar mensajes, pruebas de borde y evidencia
 institucional. Esta decision no
 aprueba I9-R03 a I9-R07.
 
+#### Propuesta De Mensajes Y Pruebas I9-R02
+
+Se preparo `docs/operations/2026-08-13-i9-r02-mensajes-pruebas.md` con siete
+mensajes funcionales y dieciseis casos de prueba que cubren las fronteras de 12
+horas, datos obligatorios, permisos, aprobacion, rechazo, reutilizacion,
+solapamiento e integracion con I9-R05. Su estado es
+`PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE`; no activa la regla ni cierra Gate 2.
+
 ### Parametrizacion I9-R03
 
 El 2026-08-13 el usuario aprobo I9-R03 con tratamiento mixto. El solapamiento
