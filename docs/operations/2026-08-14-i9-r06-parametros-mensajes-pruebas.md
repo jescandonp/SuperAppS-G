@@ -1,9 +1,9 @@
 # I9-R06 - Parametros, Mensajes Y Casos De Prueba
 
-> Estado: **PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE**
+> Estado: **APROBADO_FUNCIONALMENTE_NO_EJECUTABLE**
 > Fecha: 2026-08-14
 > Regla: cursos, acreditaciones y requisitos exigidos por el puesto.
-> Evidencia: criterio base aprobado por el usuario; parametros detallados pendientes de aprobacion.
+> Evidencia: criterios y parametros detallados aprobados explicitamente por el usuario en esta conversacion.
 
 ## Criterios Base Ya Aprobados
 
@@ -95,17 +95,17 @@
 - motivo, aprobador, decision y fecha de la excepcion; y
 - resultado, mensaje, snapshot y correlacion de auditoria.
 
-## Decisiones Pendientes De Aprobacion
+## Decisiones Aprobadas Funcionalmente
 
-1. confirmar la ruta Talento Humano valida / Director de Operaciones aprueba;
-2. confirmar vigencia obligatoria durante todo el turno;
-3. confirmar categorias canonicas y ausencia de periodo de gracia universal;
-4. confirmar condiciones del requisito subsanable informativo; y
-5. aprobar los nueve mensajes y veintitres casos de prueba.
+1. Talento Humano valida y el Director de Operaciones aprueba;
+2. la vigencia es obligatoria durante todo el turno;
+3. se aceptan las categorias canonicas y no existe periodo de gracia universal;
+4. el requisito subsanable informativo exige responsable y fecha limite; y
+5. quedan aprobados los nueve mensajes y veintitres casos de prueba.
 
 ## Condicion De Aprobacion
 
-Este documento es una propuesta para validacion. Su aprobacion funcional no
-activa I9-R06 ni cierra Gate 2. La regla requiere catalogos reales I3/I5,
+Este documento tiene aprobacion funcional del usuario, pero no activa I9-R06
+ni cierra Gate 2. La regla requiere catalogos reales I3/I5,
 mapeos institucionales, fuente/version, implementacion mediante TDD, ejecucion
 satisfactoria de pruebas y evidencia antes de proponerse como ejecutable.

@@ -368,17 +368,6 @@ La regla permanece no ejecutable hasta mapear los codigos reales, completar
 mensajes, pruebas y evidencia institucional. Esta decision no aprueba I9-R05 a
 I9-R07.
 
-#### Propuesta De Parametros, Mensajes Y Pruebas I9-R06
-
-El 2026-08-14 se preparo
-`docs/operations/2026-08-14-i9-r06-parametros-mensajes-pruebas.md` con diez
-parametros, nueve mensajes y veintitres casos de prueba. La propuesta distingue
-la validacion de Talento Humano de la aprobacion operativa, exige vigencia
-durante el turno, evita periodos de gracia inferidos y delimita las excepciones
-como no reutilizables. Su estado es
-`PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE`; estas decisiones detalladas aun no se
-atribuyen al usuario, no activan I9-R06 y no cierran Gate 2.
-
 El usuario aprobo despues el mapeo inicial visible en el historico simulado:
 `INC` incapacidad bloqueante, `V` vacaciones bloqueantes, `A` ausencia cuyo
 estado determina bloqueo o excepcion, y `TA` turno adicional como excepcion
@@ -443,6 +432,19 @@ configuracion explicita y versionada, y la falta de datos nunca acredita
 cumplimiento. I9-R06 permanece no ejecutable hasta mapear los catalogos reales
 de I3/I5, completar responsables, mensajes y pruebas. Esta decision no aprueba
 I9-R07.
+
+#### Parametros, Mensajes Y Pruebas I9-R06 Aprobados
+
+El 2026-08-14 se preparo
+`docs/operations/2026-08-14-i9-r06-parametros-mensajes-pruebas.md` con diez
+parametros, nueve mensajes y veintitres casos de prueba. La propuesta distingue
+la validacion de Talento Humano de la aprobacion del Director de Operaciones,
+exige vigencia durante todo el turno, evita periodos de gracia inferidos y
+delimita las excepciones como no reutilizables. El usuario aprobo explicitamente
+estas decisiones, mensajes y casos. Su estado es
+`APROBADO_FUNCIONALMENTE_NO_EJECUTABLE`: no activa I9-R06 ni cierra Gate 2;
+continuan pendientes los catalogos reales I3/I5, mapeos institucionales,
+fuente/version, implementacion TDD y evidencia.
 
 ### Parametrizacion I9-R07
 

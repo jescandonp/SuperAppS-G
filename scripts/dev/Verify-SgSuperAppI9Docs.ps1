@@ -643,8 +643,8 @@ Assert-DocumentDoesNotContain $r05ProposalPath @(
 
 $r06ProposalPath = 'docs/operations/2026-08-14-i9-r06-parametros-mensajes-pruebas.md'
 Assert-DocumentContains $r06ProposalPath @(
-    '(?m)^> Estado: \*\*PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE\*\*\s*$',
-    '(?is)criterio base aprobado por el usuario.*parametros detallados pendientes de aprobacion',
+    '(?m)^> Estado: \*\*APROBADO_FUNCIONALMENTE_NO_EJECUTABLE\*\*\s*$',
+    '(?is)criterios y parametros detallados aprobados explicitamente por el usuario en esta conversacion',
     '(?is)COURSE.*ACCREDITATION.*CERTIFICATION.*LICENSE_OR_PERMIT.*OTHER_REQUIREMENT',
     '(?is)vigente desde el\s+inicio hasta el fin completo del turno',
     '(?is)COMPLIANT.*MISSING.*EXPIRED.*UNVERIFIED.*INFORMATIVE_REMEDIABLE',
@@ -658,15 +658,26 @@ Assert-DocumentContains $r06ProposalPath @(
     '(?is)Director de Operaciones intenta aprobar sin validacion TH.*Rechaza flujo',
     '(?is)reutiliza aprobacion.*Rechaza reutilizacion',
     '(?is)bloqueo absoluto R01/R03/R05.*Mantiene el bloqueo absoluto',
-    '(?is)Decisiones Pendientes De Aprobacion.*ruta Talento Humano valida / Director de Operaciones aprueba',
-    '(?is)propuesta para validacion.*no\s+activa I9-R06 ni cierra Gate 2.*implementacion mediante TDD'
+    '(?is)Decisiones Aprobadas Funcionalmente.*Talento Humano valida.*Director de Operaciones aprueba',
+    '(?is)aprobacion funcional del usuario.*no activa I9-R06.*ni cierra Gate 2.*implementacion mediante TDD'
 )
 Assert-PatternCount $r06ProposalPath '(?m)^\| R06-T(?:0[1-9]|1[0-9]|2[0-3]) \|' 23
 Assert-DocumentDoesNotContain $r06ProposalPath @(
     '(?i)I9-R06.*APROBADA_EJECUTABLE',
     '(?i)Gate 2.*Cerrado',
-    '(?m)^> Evidencia: aprobacion explicita del usuario en esta conversacion\.\s*$',
+    '(?m)^> Estado: \*\*PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE\*\*\s*$',
     '(?im)^(?!.*\b(?:no|nunca)\b).*ausencia de informacion.*acredita.*cumplimiento'
+)
+Assert-DocumentSectionContains $planPath '(?ms)^### Parametrizacion I9-R06\s*$.*?(?=^### Parametrizacion I9-R07\s*$)' @(
+    '(?m)^#### Parametros, Mensajes Y Pruebas I9-R06 Aprobados\s*$',
+    'docs/operations/2026-08-14-i9-r06-parametros-mensajes-pruebas\.md',
+    '(?is)Talento Humano.*Director de Operaciones',
+    'APROBADO_FUNCIONALMENTE_NO_EJECUTABLE',
+    '(?is)no activa I9-R06 ni cierra Gate 2',
+    '(?is)catalogos reales I3/I5.*mapeos institucionales.*fuente/version.*implementacion TDD.*evidencia'
+)
+Assert-DocumentDoesNotContain $planPath @(
+    '(?ms)^### Parametrizacion I9-R04\s*$(?:(?!^### ).)*^#### (?:Propuesta De )?Parametros, Mensajes Y Pruebas I9-R06'
 )
 
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
