@@ -92,6 +92,15 @@ Evidencia: aprobacion explicita del usuario en esta conversacion.
   rechazo mantiene la asignacion no publicable y obliga a reprogramar.
 - La autorizacion se limita al turno y excepcion evaluados; no crea una
   autorizacion permanente ni se reutiliza en otra asignacion.
+- Catalogo inicial de motivos autorizados:
+  - reemplazo urgente por ausencia o incapacidad;
+  - continuidad temporal del servicio;
+  - contingencia operativa del proyecto;
+  - emergencia o fuerza mayor;
+  - ajuste excepcional solicitado por el cliente; y
+  - otro, con descripcion obligatoria.
+- El catalogo de motivos debe conservar version y vigencia. La seleccion de un
+  motivo no sustituye la aprobacion del Director de Operaciones.
 - Cuando los turnos correspondan a puestos distintos, I9-R05 definira el tiempo
   de traslado que debe considerarse; hasta aprobar I9-R05 no se infiere un valor.
 - El descanso semanal minimo se controla por separado y no se sustituye con esta
@@ -99,7 +108,7 @@ Evidencia: aprobacion explicita del usuario en esta conversacion.
 
 El umbral de 12 horas se registra como politica preventiva S&G aprobada por el
 usuario, no como valor legal atribuido. La regla no pasa a ejecutable hasta
-completar el catalogo de motivos, sus mensajes, pruebas de borde y evidencia de
+completar los mensajes, pruebas de borde y evidencia de
 aprobacion institucional. Mientras tanto permanece desactivada o en modo
 advertencia para el desarrollo.
 

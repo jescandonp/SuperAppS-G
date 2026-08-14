@@ -381,6 +381,8 @@ Assert-DocumentContains $catalogPath @(
     '(?is)todos los proyectos de vigilancia gestionados por I9.*sin un umbral distinto',
     '(?is)motivo obligatorio.*catalogo configurable.*responsable, fecha, vigencia y auditoria',
     '(?is)autorizacion se limita al turno y excepcion evaluados.*no crea una\s+autorizacion permanente',
+    '(?is)Catalogo inicial de motivos autorizados.*reemplazo urgente por ausencia o incapacidad.*continuidad temporal del servicio.*contingencia operativa del proyecto.*emergencia o fuerza mayor.*ajuste excepcional solicitado por el cliente.*otro, con descripcion obligatoria',
+    '(?is)catalogo de motivos debe conservar version y vigencia.*no sustituye la aprobacion del Director de Operaciones',
     '(?is)politica preventiva S&G.*no como valor legal atribuido.*desactivada o en modo\s+advertencia',
     '(?is)I9-R05.*tiempo de traslado.*no se infiere un valor'
 )
@@ -478,7 +480,9 @@ Assert-DocumentContains $parameterMatrixPath @(
     '(?is)Rol aprobador \| Director de Operaciones \| Confirmacion explicita del usuario',
     '(?is)Alcance \| Todos los proyectos de vigilancia gestionados por I9; umbral unico',
     '(?is)Vigencia de la autorizacion \| Solo el turno y excepcion evaluados; no reutilizable',
-    '(?is)Motivos autorizados \| Catalogo configurable y seleccion obligatoria; valores PENDIENTES',
+    '(?is)Motivos autorizados \| Reemplazo urgente; continuidad temporal; contingencia operativa; emergencia/fuerza mayor; solicitud excepcional del cliente; otro',
+    '(?is)Motivo Otro \| Descripcion obligatoria \| Prueba de rechazo sin descripcion',
+    '(?is)Efecto del motivo \| No sustituye la aprobacion del Director de Operaciones',
     '(?is)Modo durante desarrollo \| Desactivada o advertencia; no ejecutable en produccion',
     '(?is)Codigos que bloquean \| PENDIENTE',
     '(?is)Origen, destino y tiempo requerido \| PENDIENTE',

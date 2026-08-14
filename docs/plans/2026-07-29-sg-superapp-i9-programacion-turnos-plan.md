@@ -310,8 +310,13 @@ publicarse hasta contar con motivo y aprobacion auditada de una persona con
 permiso `SCHEDULING/APPROVE_EXCEPTION`. El usuario confirmo que aplica a todos
 los proyectos de vigilancia, que el Director de Operaciones es el aprobador y
 que la autorizacion solo cubre el turno y excepcion evaluados. El motivo es
-obligatorio y proviene de un catalogo configurable aun pendiente de definir.
-Durante el desarrollo queda desactivada o en modo advertencia. I9-R02 permanece
+obligatorio y proviene de un catalogo configurable. El usuario aprobo como
+catalogo inicial: reemplazo urgente por ausencia o
+incapacidad, continuidad temporal del servicio, contingencia operativa,
+emergencia o fuerza mayor, solicitud excepcional del cliente y Otro con
+descripcion obligatoria. El catalogo debe versionarse y su seleccion no
+sustituye la aprobacion. Durante el desarrollo queda desactivada o en modo
+advertencia. I9-R02 permanece
 no ejecutable hasta completar mensajes, pruebas de borde y evidencia
 institucional. Esta decision no
 aprueba I9-R03 a I9-R07.
