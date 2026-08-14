@@ -387,6 +387,14 @@ codigos no mapeados. El contrato es aditivo y no reutiliza identificadores. Su
 aprobacion funcional permite continuar el desarrollo sin inventar codigos
 institucionales, pero no activa I9-R04 ni cierra Gate 2.
 
+#### Propuesta De Mensajes Y Pruebas I9-R04
+
+Se preparo `docs/operations/2026-08-13-i9-r04-mensajes-pruebas.md` con nueve
+mensajes y veinticuatro casos de prueba para las categorias canonicas,
+prioridades, vigencias, datos incompletos, `UNKNOWN`, codigos D/N/X, permisos,
+no reutilizacion, snapshots y dependencias con I9-R01/I9-R02/I9-R03. Su estado
+es `PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE`; no activa I9-R04 ni cierra Gate 2.
+
 ### Parametrizacion I9-R05
 
 El 2026-08-13 el usuario aprobo I9-R05 con una matriz versionada de traslados
