@@ -383,6 +383,21 @@ Assert-DocumentContains $catalogPath @(
 Assert-DocumentDoesNotContain $catalogPath @(
     '(?i)I9-R04.*APROBADA_EJECUTABLE'
 )
+Assert-DocumentContains $catalogPath @(
+    '(?m)^## Decision De Parametrizacion I9-R05\s*$',
+    '(?m)^Estado de I9-R05: \*\*APROBADA_POR_CRITERIO_NO_EJECUTABLE\*\*\s*$',
+    '(?is)matriz versionada de traslados por.*proyecto o contrato.*no existe un tiempo universal',
+    '(?is)intervalo disponible es igual o mayor.*tiempo requerido',
+    '(?is)tiempo insuficiente genera una excepcion `PENDIENTE`.*no bloquea.*impide aprobarla o publicarla',
+    '(?is)no existe un valor en la matriz.*nunca se asume un traslado de cero minutos',
+    '(?is)combinacion.*expresamente prohibida.*bloqueo absoluto sin excepcion',
+    '(?is)origen, destino, tiempo requerido, tiempo disponible.*version de matriz.*aprobador',
+    '(?is)Trafico en tiempo real.*calculo dinamico de rutas.*fuera del MVP',
+    '(?is)I9-R05 no pasa a ejecutable hasta cargar y validar la matriz real'
+)
+Assert-DocumentDoesNotContain $catalogPath @(
+    '(?i)I9-R05.*APROBADA_EJECUTABLE'
+)
 
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
 Assert-DocumentContains $validationActPath @(

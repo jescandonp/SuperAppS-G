@@ -31,7 +31,7 @@ pendiente invalida la regla como entrada del motor.
 | I9-R02 | Descanso minimo | Validar intervalo entre fin e inicio de turnos consecutivos | Umbral S&G de 12 horas; intervalo menor genera excepcion pendiente de aprobacion, no bloqueo de propuesta | Aprobada con excepcion | Turnos, intervalo, motivo y aprobacion | APROBADA_PARA_PARAMETRIZACION |
 | I9-R03 | Cruces | Bloquear solapamientos temporales del mismo guarda | Solapamiento real bloqueante; conflicto de traslado entre puestos genera excepcion aprobable vinculada a I9-R05 | Aprobada mixta | Intervalos, puestos, traslado, decision y auditoria | APROBADA_PARA_PARAMETRIZACION |
 | I9-R04 | Novedades | Excluir o advertir indisponibilidad por novedad vigente | Confirmadas: bloqueo; pendientes/compatibles: excepcion aprobable; administrativas: informativas | Aprobada por clasificacion | Tipo, vigencia, estado, fuente, decision y auditoria | APROBADA_PARA_PARAMETRIZACION |
-| I9-R05 | Ubicacion | Evaluar compatibilidad territorial y tiempo de traslado | Zonas y criterio operativo por parametrizar sin inventar valores | Aprobada | Puestos, zonas y fuente | APROBADA_PARA_PARAMETRIZACION |
+| I9-R05 | Ubicacion | Evaluar compatibilidad territorial y tiempo de traslado | Matriz versionada por proyecto/contrato; insuficiencia genera excepcion y prohibicion expresa bloquea | Aprobada por criterio | Origen, destino, tiempos, version, decision y auditoria | APROBADA_PARA_PARAMETRIZACION |
 | I9-R06 | Requisitos | Verificar cursos, acreditaciones y condiciones del puesto | Catalogo I3/I5 y tratamiento versionado | Aprobada | Requisito y habilitacion | APROBADA_PARA_PARAMETRIZACION |
 | I9-R07 | Desviacion de plantilla | Detectar cambios frente al ciclo aprobado y exigir motivo | Tolerancias y autorizador parametrizados antes de codificar | Aprobada | Plantilla, celda y motivo | APROBADA_PARA_PARAMETRIZACION |
 
@@ -138,6 +138,32 @@ Evidencia: aprobacion explicita del usuario en esta conversacion.
 
 I9-R04 no pasa a ejecutable hasta mapear los codigos reales de novedades de S&G,
 completar mensajes, pruebas de prioridad y evidencia institucional.
+
+## Decision De Parametrizacion I9-R05
+
+Estado de I9-R05: **APROBADA_POR_CRITERIO_NO_EJECUTABLE**
+Fecha de decision: 2026-08-13
+Evidencia: aprobacion explicita del usuario en esta conversacion.
+
+- Cada puesto se relaciona con su proyecto, sede y zona operativa.
+- Los tiempos requeridos se obtienen de una matriz versionada de traslados por
+  proyecto o contrato; no existe un tiempo universal ni se infiere uno.
+- La compatibilidad se cumple cuando el intervalo disponible es igual o mayor
+  al tiempo requerido por la matriz vigente.
+- Un tiempo insuficiente genera una excepcion `PENDIENTE`: no bloquea la
+  generacion de la propuesta, pero impide aprobarla o publicarla hasta obtener
+  motivo y aprobacion auditada mediante `SCHEDULING/APPROVE_EXCEPTION`.
+- Si no existe un valor en la matriz, se genera advertencia y excepcion
+  pendiente; nunca se asume un traslado de cero minutos.
+- Una combinacion de origen y destino expresamente prohibida por el proyecto o
+  contrato constituye bloqueo absoluto sin excepcion.
+- La evidencia registra origen, destino, tiempo requerido, tiempo disponible,
+  version de matriz, motivo, aprobador y decision.
+- Trafico en tiempo real y calculo dinamico de rutas quedan fuera del MVP.
+
+I9-R05 no pasa a ejecutable hasta cargar y validar la matriz real aplicable,
+completar mensajes, pruebas de frontera e integracion con I9-R03 y aportar
+evidencia institucional.
 
 ## Campos Obligatorios Por Regla Antes De Activarla
 

@@ -323,3 +323,15 @@ no bloquea; descuento o sancion son informativos salvo indisponibilidad formal.
 La regla permanece no ejecutable hasta mapear los codigos reales, completar
 mensajes, pruebas y evidencia institucional. Esta decision no aprueba I9-R05 a
 I9-R07.
+
+### Parametrizacion I9-R05
+
+El 2026-08-13 el usuario aprobo I9-R05 con una matriz versionada de traslados
+por proyecto o contrato, sin definir tiempos universales. El intervalo
+disponible debe cubrir el tiempo requerido; si es insuficiente o falta el valor,
+se crea una excepcion pendiente que no bloquea la propuesta, pero impide su
+aprobacion/publicacion hasta ser autorizada y auditada. Una combinacion
+expresamente prohibida es bloqueo absoluto. Trafico en tiempo real y rutas
+dinamicas quedan fuera del MVP. I9-R05 permanece no ejecutable hasta cargar y
+validar la matriz real, completar pruebas e integrarla con I9-R03. Esta decision
+no aprueba I9-R06 ni I9-R07.
