@@ -78,7 +78,7 @@ bloquea el desarrollo, pero I9-R01 permanece no ejecutable en produccion.
 | Cambios manuales | Revalidacion obligatoria antes de guardar/aprobar/publicar | Prueba de edicion |
 | Prioridad frente a R05 | Excepcion de traslado nunca elude solapamiento | Prueba de precedencia absoluta |
 | Modo durante desarrollo | Desactivada o validacion simulada; no ejecutable | Prueba de configuration gate |
-| Mensajes y pruebas temporales | PENDIENTE | Nocturnos, cambio de mes/ano y zonas horarias aplicables |
+| Mensajes y pruebas temporales | PROPUESTA_PARA_VALIDACION | `docs/operations/2026-08-13-i9-r03-mensajes-pruebas.md`; casos R03-T01 a R03-T15 |
 
 ### I9-R04 - Novedades
 

@@ -347,6 +347,14 @@ intervalos son semiabiertos `[inicio, fin)`, los cambios manuales revalidan la
 regla y ninguna excepcion de traslado puede eludir un solapamiento. Durante el
 desarrollo permanece desactivada o en validacion simulada.
 
+#### Propuesta De Mensajes Y Pruebas I9-R03
+
+Se preparo `docs/operations/2026-08-13-i9-r03-mensajes-pruebas.md` con siete
+mensajes y quince casos que cubren intervalos adyacentes, solapamientos
+parciales/totales, nocturnos, cambios de mes/ano, borradores, programaciones
+aprobadas, edicion manual y precedencia sobre I9-R05. Su estado es
+`PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE`; no activa I9-R03 ni cierra Gate 2.
+
 ### Parametrizacion I9-R04
 
 El 2026-08-13 el usuario aprobo la clasificacion de novedades de I9-R04.
