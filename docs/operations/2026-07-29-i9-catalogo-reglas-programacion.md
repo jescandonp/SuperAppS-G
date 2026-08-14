@@ -48,7 +48,8 @@ Estado de I9-R01: **APROBADA_CONDICION_JURIDICA_NO_EJECUTABLE**
   tiempo suplementario.
 - Toda jornada superior a 10 y hasta 12 horas crea una excepcion `PENDIENTE`:
   no bloquea la generacion de la propuesta, pero esta no puede aprobarse ni
-  publicarse hasta registrar la aprobacion correspondiente.
+  publicarse hasta registrar la aprobacion del Director de Operaciones mediante
+  `SCHEDULING/APPROVE_EXCEPTION`.
 - Se bloquea superar 12 horas diarias, superar 60 horas semanales o programar
   mas de 8 horas diarias sin acuerdo escrito.
 - Ventana de acumulacion: semana calendario; debe conservarse como parametro
@@ -57,9 +58,10 @@ Estado de I9-R01: **APROBADA_CONDICION_JURIDICA_NO_EJECUTABLE**
   regla/version aplicada y mensaje explicable.
 
 La exigencia de aprobacion para toda jornada superior a 10 y hasta 12 horas
-proviene de la confirmacion del usuario, no de un concepto juridico aportado.
-Permanecen pendientes la fuente y vigencia juridicas, el alcance, el rol
-aprobador y la evidencia exigible. Hasta completarlos y validarlos, I9-R01 no
+proviene de la confirmacion del usuario, no de un concepto juridico aportado. El
+usuario confirmo al Director de Operaciones como rol aprobador. Permanecen
+pendientes la fuente y vigencia juridicas, el alcance y la evidencia exigible.
+Hasta completarlos y validarlos, I9-R01 no
 puede pasar a estado ejecutable.
 
 ## Decision De Parametrizacion I9-R02

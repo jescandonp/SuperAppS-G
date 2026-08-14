@@ -362,9 +362,9 @@ Assert-DocumentSectionContains $catalogPath '(?ms)^## Decision De Parametrizacio
     '(?m)^Estado de I9-R01: \*\*APROBADA_CONDICION_JURIDICA_NO_EJECUTABLE\*\*\s*$',
     '(?is)8 horas diarias.*42 horas semanales.*12 horas diarias.*60 horas semanales',
     '(?is)acuerdo escrito.*Se bloquea superar 12 horas diarias.*superar 60 horas semanales',
-    '(?is)superior a 10 y hasta 12 horas crea una excepcion `PENDIENTE`.*no bloquea.*no puede aprobarse ni\s+publicarse',
+    '(?is)superior a 10 y hasta 12 horas crea una excepcion `PENDIENTE`.*no bloquea.*no puede aprobarse ni\s+publicarse.*Director de Operaciones.*SCHEDULING/APPROVE_EXCEPTION',
     '(?is)confirmacion del usuario, no de un concepto juridico',
-    '(?is)pendientes la fuente y vigencia juridicas, el alcance, el rol\s+aprobador.*I9-R01 no\s+puede pasar a estado ejecutable'
+    '(?is)usuario confirmo al Director de Operaciones como rol aprobador.*pendientes la fuente y vigencia juridicas, el alcance.*I9-R01 no\s+puede pasar a estado ejecutable'
 )
 Assert-DocumentDoesNotContain $catalogPath @(
     '(?i)I9-R01.*APROBADA_EJECUTABLE',
@@ -466,6 +466,7 @@ Assert-DocumentContains $parameterMatrixPath @(
     '(?is)`PENDIENTE` nunca se\s+interpreta como cero, falso, vacio permitido o valor por defecto',
     '(?is)I9-R01.*I9-R02.*I9-R03.*I9-R04.*I9-R05.*I9-R06.*I9-R07',
     '(?is)Tratamiento mayor a 10 y hasta 12 h/dia \| Excepcion PENDIENTE con aprobacion obligatoria; no bloquea propuesta',
+    '(?is)Rol aprobador de 10 a 12 h/dia \| Director de Operaciones \| Confirmacion explicita del usuario; permiso SCHEDULING/APPROVE_EXCEPTION',
     '(?is)Tratamiento mayor a 12 h/dia \| Bloqueo absoluto',
     '(?is)Codigos que bloquean \| PENDIENTE',
     '(?is)Origen, destino y tiempo requerido \| PENDIENTE',
