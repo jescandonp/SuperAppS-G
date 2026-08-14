@@ -715,7 +715,8 @@ Assert-DocumentSectionContains $planPath '(?ms)^### Parametrizacion I9-R07\s*$.*
 
 $subgate2APlanPath = 'docs/operations/2026-08-14-i9-plan-cierre-brechas-subgate2a.md'
 Assert-DocumentContains $subgate2APlanPath @(
-    '(?m)^> Estado: \*\*PROPUESTA_PARA_APROBACION_NO_AUTORIZA_IMPLEMENTACION\*\*\s*$',
+    '(?m)^> Estado: \*\*APROBADO_COMO_RUTA_NO_AUTORIZA_IMPLEMENTACION\*\*\s*$',
+    '(?m)^> Aprobacion: confirmacion explicita del usuario en esta conversacion; no equivale a autorizacion de implementacion\.\s*$',
     '(?is)no completa los\s+insumos.*no presume su contenido.*no asigna fechas.*no autoriza implementar ni\s+activar reglas',
     '(?is)I9-R01.*I9-R02.*I9-R03.*I9-R04.*I9-R05.*I9-R06.*I9-R07',
     '(?m)^### WP-I9-A - Concepto Juridico R01\s*$',
@@ -730,27 +731,28 @@ Assert-DocumentContains $subgate2APlanPath @(
     '(?m)^### Checkpoint 3 - Reglas\s*$',
     '(?m)^### Checkpoint 4 - Gate 2\s*$',
     '(?is)Solo entonces puede proponerse el cierre de Gate 2; no es automatico',
-    '(?is)Decision Solicitada.*cinco paquetes institucionales.*orden tecnico.*cuatro checkpoints.*no autoriza implementar ni activar reglas'
+    '(?is)Decision Registrada.*aprobo explicitamente.*cinco paquetes institucionales.*orden tecnico.*cuatro checkpoints.*no autoriza implementar ni activar reglas',
+    '(?is)ninguna\s+tarea tecnica comienza sin autorizacion SDD posterior.*dependencia\s+institucional.*evidencia suficiente'
 )
 Assert-PatternCount $subgate2APlanPath '(?m)^### WP-I9-[A-E] - ' 5
 Assert-PatternCount $subgate2APlanPath '(?m)^\| [1-6] \| ' 6
 Assert-DocumentDoesNotContain $subgate2APlanPath @(
     '(?i)APROBADO_EJECUTABLE',
     '(?i)Gate 2.*(?:Cerrado|Aprobado)',
-    '(?im)^> Estado: \*\*APROBADO',
+    '(?im)^> Estado: \*\*APROBADO_EJECUTABLE',
     '(?im)^(?!.*\bno\b).*autoriza (?:la )?(?:implementacion|activacion)',
     '(?i)fecha (?:compromiso|limite):\s*\d{4}-\d{2}-\d{2}'
 )
 Assert-DocumentContains $parameterMatrixPath @(
     'docs/operations/2026-08-14-i9-plan-cierre-brechas-subgate2a\.md',
-    'PROPUESTA_PARA_APROBACION_NO_AUTORIZA_IMPLEMENTACION',
-    '(?is)no activa reglas y no cierra Gate 2'
+    'APROBADO_COMO_RUTA_NO_AUTORIZA_IMPLEMENTACION',
+    '(?is)no activa reglas y no\s+cierra Gate 2'
 )
 Assert-DocumentSectionContains $planPath '(?ms)^### Apertura Subgate 2A.*$.*?(?=^### Propuesta Juridica No Bloqueante I9-R01\s*$)' @(
     '(?m)^#### Propuesta De Cierre De Brechas Del Subgate 2A\s*$',
     'docs/operations/2026-08-14-i9-plan-cierre-brechas-subgate2a\.md',
-    'PROPUESTA_PARA_APROBACION_NO_AUTORIZA_IMPLEMENTACION',
-    '(?is)no activa reglas y no cierra Gate 2'
+    'APROBADO_COMO_RUTA_NO_AUTORIZA_IMPLEMENTACION',
+    '(?is)no activa reglas y no\s+cierra Gate 2'
 )
 
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'

@@ -151,5 +151,6 @@ bloqueado.
 El orden de recopilacion institucional, implementacion tecnica posterior y
 checkpoints se consolida en
 `docs/operations/2026-08-14-i9-plan-cierre-brechas-subgate2a.md`, con estado
-`PROPUESTA_PARA_APROBACION_NO_AUTORIZA_IMPLEMENTACION`. El plan no completa
+`APROBADO_COMO_RUTA_NO_AUTORIZA_IMPLEMENTACION` por confirmacion explicita del
+usuario. El plan no completa
 campos pendientes, no activa reglas y no cierra Gate 2.

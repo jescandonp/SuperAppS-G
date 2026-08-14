@@ -492,8 +492,11 @@ El 2026-08-14 se consolido
 `docs/operations/2026-08-14-i9-plan-cierre-brechas-subgate2a.md`. La propuesta
 organiza cinco paquetes institucionales, seis tareas tecnicas posteriores y
 cuatro checkpoints. Su estado es
-`PROPUESTA_PARA_APROBACION_NO_AUTORIZA_IMPLEMENTACION`: no completa fuentes,
-catalogos ni matrices, no activa reglas y no cierra Gate 2.
+`APROBADO_COMO_RUTA_NO_AUTORIZA_IMPLEMENTACION` por confirmacion explicita del
+usuario: no completa fuentes, catalogos ni matrices, no activa reglas y no
+cierra Gate 2. La recopilacion documental puede continuar; cada tarea tecnica
+requiere una autorizacion SDD posterior y su dependencia institucional
+satisfecha.
 
 ### Propuesta Juridica No Bloqueante I9-R01
 

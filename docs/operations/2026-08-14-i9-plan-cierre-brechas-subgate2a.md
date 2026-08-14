@@ -1,9 +1,10 @@
 # I9 - Plan De Cierre De Brechas Del Subgate 2A
 
-> Estado: **PROPUESTA_PARA_APROBACION_NO_AUTORIZA_IMPLEMENTACION**
+> Estado: **APROBADO_COMO_RUTA_NO_AUTORIZA_IMPLEMENTACION**
 > Fecha: 2026-08-14
 > Alcance: ordenar los insumos y verificaciones pendientes de I9-R01 a I9-R07.
 > Evidencia: consolidacion de la matriz de parametrizacion y decisiones funcionales aprobadas.
+> Aprobacion: confirmacion explicita del usuario en esta conversacion; no equivale a autorizacion de implementacion.
 
 ## Objetivo
 
@@ -156,11 +157,15 @@ humana antes de avanzar al siguiente checkpoint.
 | Cambiar historicos al actualizar catalogos | Alto | Versiones y snapshots; cambios solo en evaluaciones futuras |
 | Inventar fechas o responsables | Alto | Campos permanecen pendientes hasta evidencia explicita |
 
-## Decision Solicitada
+## Decision Registrada
 
-Se solicita aprobar o ajustar:
+El usuario aprobo explicitamente:
 
 1. los cinco paquetes institucionales y sus responsables;
 2. el orden tecnico posterior por dependencias;
 3. los cuatro checkpoints de control; y
 4. la regla de que esta aprobacion no autoriza implementar ni activar reglas.
+
+Los paquetes pueden recopilar insumos documentales en paralelo, pero ninguna
+tarea tecnica comienza sin autorizacion SDD posterior y sin que su dependencia
+institucional tenga evidencia suficiente.
