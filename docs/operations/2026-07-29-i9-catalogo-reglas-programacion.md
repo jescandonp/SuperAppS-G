@@ -27,7 +27,7 @@ pendiente invalida la regla como entrada del motor.
 
 | ID | Familia | Proposito verificable | Fuente/parametro pendiente | Severidad propuesta | Evidencia esperada | Estado |
 |---|---|---|---|---|---|---|
-| I9-R01 | Jornada maxima | Impedir o advertir que la carga acumulada exceda el limite aplicable | 8 h/dia y 42 h/semana ordinarias; vigilancia hasta 12 h/dia y 60 h/semana con acuerdo escrito; tratamiento posterior a 10 h/dia pendiente de concepto juridico | Aprobada con condicion juridica | Snapshot de turnos, acumulado semanal y acuerdo escrito | APROBADA_PARA_PARAMETRIZACION |
+| I9-R01 | Jornada maxima | Impedir o advertir que la carga acumulada exceda el limite aplicable | 8 h/dia y 42 h/semana ordinarias; vigilancia hasta 12 h/dia y 60 h/semana con acuerdo escrito; toda jornada mayor a 10 y hasta 12 h requiere aprobacion | Aprobada con condicion juridica | Snapshot de turnos, acumulado semanal, acuerdo escrito y aprobacion | APROBADA_PARA_PARAMETRIZACION |
 | I9-R02 | Descanso minimo | Validar intervalo entre fin e inicio de turnos consecutivos | Umbral S&G de 12 horas; intervalo menor genera excepcion pendiente de aprobacion, no bloqueo de propuesta | Aprobada con excepcion | Turnos, intervalo, motivo y aprobacion | APROBADA_PARA_PARAMETRIZACION |
 | I9-R03 | Cruces | Bloquear solapamientos temporales del mismo guarda | Solapamiento real bloqueante; conflicto de traslado entre puestos genera excepcion aprobable vinculada a I9-R05 | Aprobada mixta | Intervalos, puestos, traslado, decision y auditoria | APROBADA_PARA_PARAMETRIZACION |
 | I9-R04 | Novedades | Excluir o advertir indisponibilidad por novedad vigente | Confirmadas: bloqueo; pendientes/compatibles: excepcion aprobable; administrativas: informativas | Aprobada por clasificacion | Tipo, vigencia, estado, fuente, decision y auditoria | APROBADA_PARA_PARAMETRIZACION |
@@ -46,6 +46,9 @@ Estado de I9-R01: **APROBADA_CONDICION_JURIDICA_NO_EJECUTABLE**
   incluidas las suplementarias, cuando exista acuerdo escrito registrado.
 - El exceso sobre 8 horas diarias o 42 semanales se identifica y explica como
   tiempo suplementario.
+- Toda jornada superior a 10 y hasta 12 horas crea una excepcion `PENDIENTE`:
+  no bloquea la generacion de la propuesta, pero esta no puede aprobarse ni
+  publicarse hasta registrar la aprobacion correspondiente.
 - Se bloquea superar 12 horas diarias, superar 60 horas semanales o programar
   mas de 8 horas diarias sin acuerdo escrito.
 - Ventana de acumulacion: semana calendario; debe conservarse como parametro
@@ -53,9 +56,11 @@ Estado de I9-R01: **APROBADA_CONDICION_JURIDICA_NO_EJECUTABLE**
 - Evidencia: turnos considerados, total diario, total semanal, acuerdo escrito,
   regla/version aplicada y mensaje explicable.
 
-Condicion pendiente: Juridico debe definir como se armoniza el limite general
-posterior a 10 horas diarias con la regla especial del sector de vigilancia.
-Hasta registrar ese concepto, I9-R01 no puede pasar a estado ejecutable.
+La exigencia de aprobacion para toda jornada superior a 10 y hasta 12 horas
+proviene de la confirmacion del usuario, no de un concepto juridico aportado.
+Permanecen pendientes la fuente y vigencia juridicas, el alcance, el rol
+aprobador y la evidencia exigible. Hasta completarlos y validarlos, I9-R01 no
+puede pasar a estado ejecutable.
 
 ## Decision De Parametrizacion I9-R02
 

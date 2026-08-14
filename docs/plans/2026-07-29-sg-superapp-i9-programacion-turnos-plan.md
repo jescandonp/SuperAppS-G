@@ -289,9 +289,12 @@ antes de declararlas ejecutables. En esta actualizacion se intento nuevamente
 El 2026-08-13 el usuario aprobo I9-R01 Jornada maxima con condicion juridica.
 Quedaron definidos 8 horas diarias y 42 semanales como jornada ordinaria, y
 maximos sectoriales de 12 horas diarias y 60 semanales sujetos a acuerdo escrito.
-La regla permanece no ejecutable hasta que Juridico resuelva el tratamiento del
-limite general posterior a 10 horas diarias frente a la regla especial de
-vigilancia. La aprobacion de I9-R01 no aprueba I9-R02 a I9-R07.
+El usuario definio despues que toda jornada superior a 10 y hasta 12 horas
+requiere aprobacion: no bloquea generar la propuesta, pero impide aprobarla o
+publicarla mientras la excepcion este pendiente. Este criterio es una decision
+del usuario y no un concepto juridico aportado. La regla permanece no ejecutable
+hasta validar fuente/vigencia juridica, alcance, rol aprobador y evidencia. La
+aprobacion de I9-R01 no aprueba I9-R02 a I9-R07.
 
 ### Parametrizacion I9-R02
 
@@ -366,7 +369,8 @@ responsables, mensajes y pruebas. Su artefacto rector de trabajo es
 `docs/operations/2026-08-13-i9-matriz-parametrizacion-reglas.md`, con estado
 `BORRADOR_PARA_DILIGENCIAMIENTO_NO_EJECUTABLE`.
 
-La apertura no activa reglas ni cierra Gate 2. El primer bloqueo a resolver es
-el concepto juridico de I9-R01; en paralelo pueden recopilarse los catalogos de
+La apertura no activa reglas ni cierra Gate 2. Para I9-R01 ya se definio que
+toda jornada superior a 10 y hasta 12 horas requiere aprobacion, pero faltan su
+fuente/vigencia juridica, alcance, rol aprobador y evidencia. En paralelo pueden recopilarse los catalogos de
 novedades y requisitos, la matriz de traslados y los motivos de excepcion, sin
 convertir datos ausentes en valores por defecto.

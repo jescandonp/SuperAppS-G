@@ -52,6 +52,33 @@ function Assert-DocumentDoesNotContain {
     }
 }
 
+function Assert-DocumentSectionContains {
+    param(
+        [Parameter(Mandatory)][string]$RelativePath,
+        [Parameter(Mandatory)][string]$SectionPattern,
+        [Parameter(Mandatory)][string[]]$Patterns
+    )
+
+    $path = Join-Path $repoRoot $RelativePath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        $failures.Add("Missing document: $RelativePath")
+        return
+    }
+
+    $content = Get-Content -Raw -LiteralPath $path
+    $sectionMatch = [regex]::Match($content, $SectionPattern)
+    if (-not $sectionMatch.Success) {
+        $failures.Add("$RelativePath missing section: $SectionPattern")
+        return
+    }
+
+    foreach ($pattern in $Patterns) {
+        if ($sectionMatch.Value -notmatch $pattern) {
+            $failures.Add("$RelativePath section missing pattern: $pattern")
+        }
+    }
+}
+
 function Assert-PatternCount {
     param(
         [Parameter(Mandatory = $true)][string]$RelativePath,
@@ -330,13 +357,14 @@ if (Test-Path -LiteralPath $catalogFullPath -PathType Leaf) {
         }
     }
 }
-Assert-DocumentContains $catalogPath @(
+Assert-DocumentSectionContains $catalogPath '(?ms)^## Decision De Parametrizacion I9-R01\s*$.*?(?=^## Decision De Parametrizacion I9-R02\s*$)' @(
     '(?m)^## Decision De Parametrizacion I9-R01\s*$',
     '(?m)^Estado de I9-R01: \*\*APROBADA_CONDICION_JURIDICA_NO_EJECUTABLE\*\*\s*$',
     '(?is)8 horas diarias.*42 horas semanales.*12 horas diarias.*60 horas semanales',
     '(?is)acuerdo escrito.*Se bloquea superar 12 horas diarias.*superar 60 horas semanales',
-    '(?is)Juridico debe definir.*posterior a 10 horas diarias.*regla especial.*vigilancia',
-    '(?is)Hasta registrar ese concepto, I9-R01 no puede pasar a estado ejecutable'
+    '(?is)superior a 10 y hasta 12 horas crea una excepcion `PENDIENTE`.*no bloquea.*no puede aprobarse ni\s+publicarse',
+    '(?is)confirmacion del usuario, no de un concepto juridico',
+    '(?is)pendientes la fuente y vigencia juridicas, el alcance, el rol\s+aprobador.*I9-R01 no\s+puede pasar a estado ejecutable'
 )
 Assert-DocumentDoesNotContain $catalogPath @(
     '(?i)I9-R01.*APROBADA_EJECUTABLE',
@@ -437,7 +465,8 @@ Assert-DocumentContains $parameterMatrixPath @(
     '(?is)no autoriza ejecucion en el motor',
     '(?is)`PENDIENTE` nunca se\s+interpreta como cero, falso, vacio permitido o valor por defecto',
     '(?is)I9-R01.*I9-R02.*I9-R03.*I9-R04.*I9-R05.*I9-R06.*I9-R07',
-    '(?is)Tratamiento despues de 10 h/dia \| PENDIENTE',
+    '(?is)Tratamiento mayor a 10 y hasta 12 h/dia \| Excepcion PENDIENTE con aprobacion obligatoria; no bloquea propuesta',
+    '(?is)Tratamiento mayor a 12 h/dia \| Bloqueo absoluto',
     '(?is)Codigos que bloquean \| PENDIENTE',
     '(?is)Origen, destino y tiempo requerido \| PENDIENTE',
     '(?is)Catalogo de requisitos por puesto \| PENDIENTE',
