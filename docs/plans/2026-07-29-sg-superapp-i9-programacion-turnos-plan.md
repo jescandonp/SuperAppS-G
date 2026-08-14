@@ -464,9 +464,11 @@ El 2026-08-14 se preparo
 parametros, nueve mensajes y veintitres casos de prueba. La propuesta define al
 Director de Operaciones como aprobador, un catalogo inicial de motivos,
 agrupacion controlada por guarda y snapshot, no reutilizacion, comparacion
-deterministica e inmutabilidad de programaciones publicadas. Su estado es
-`PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE`; estas decisiones detalladas aun no se
-atribuyen al usuario, no activan I9-R07 y no cierran Gate 2.
+deterministica e inmutabilidad de programaciones publicadas. El usuario aprobo
+explicitamente los parametros, seis motivos, nueve mensajes y veintitres casos.
+Su estado es `APROBADO_FUNCIONALMENTE_NO_EJECUTABLE`: no activa I9-R07 ni
+cierra Gate 2; continuan pendientes el catalogo institucional de motivos,
+fuente/version, implementacion TDD y evidencia.
 
 ### Apertura Subgate 2A - Matriz De Parametrizacion
 

@@ -25,7 +25,7 @@ interpreta como cero, falso, vacio permitido o valor por defecto.
 | I9-R04 | Novedades clasificadas; mapeo inicial, contrato, mensajes y pruebas aprobados | Codigos institucionales restantes, fuente/version, implementacion TDD y evidencia | Talento Humano y Operaciones | PARAMETROS_FUNCIONALES_PARCIALES_APROBADOS_NO_EJECUTABLE |
 | I9-R05 | Matriz de traslados por proyecto/contrato; parametros, mensajes y pruebas aprobados | Matriz real, fuente/version, TDD y evidencia | Director de Operaciones | PARAMETROS_FUNCIONALES_APROBADOS_NO_EJECUTABLE |
 | I9-R06 | No bloquea propuesta; parametros, mensajes y pruebas aprobados | Catalogos reales I3/I5, fuente/version, TDD y evidencia | Talento Humano valida; Director de Operaciones aprueba | PARAMETROS_FUNCIONALES_APROBADOS_NO_EJECUTABLE |
-| I9-R07 | Plantilla obligatoria; propuesta detallada de motivos, parametros, mensajes y pruebas | Aprobacion de parametros; catalogo institucional de motivos, fuente/version, TDD y evidencia | Operaciones | PROPUESTA_DE_PARAMETROS_PARA_VALIDACION_NO_EJECUTABLE |
+| I9-R07 | Plantilla obligatoria; motivos, parametros, mensajes y pruebas aprobados | Catalogo institucional de motivos, fuente/version, TDD y evidencia | Director de Operaciones | PARAMETROS_FUNCIONALES_APROBADOS_NO_EJECUTABLE |
 
 ## Datos A Diligenciar
 
@@ -130,7 +130,7 @@ bloquea el desarrollo, pero I9-R01 permanece no ejecutable en produccion.
 | Rol aprobador | PENDIENTE | Permiso y responsable institucional |
 | Efecto de desviacion | Excepcion PENDIENTE; impide aprobar/publicar | Prueba de workflow |
 | Cambio de version | Solo borradores futuros | Prueba de inmutabilidad de programacion aprobada |
-| Propuesta detallada | PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE | `docs/operations/2026-08-14-i9-r07-parametros-mensajes-pruebas.md`; casos R07-T01 a R07-T23 |
+| Parametros, mensajes y pruebas | APROBADO_FUNCIONALMENTE_NO_EJECUTABLE | `docs/operations/2026-08-14-i9-r07-parametros-mensajes-pruebas.md`; casos R07-T01 a R07-T23; aprobacion explicita del usuario |
 
 ## Criterio De Salida Del Subgate 2A
 

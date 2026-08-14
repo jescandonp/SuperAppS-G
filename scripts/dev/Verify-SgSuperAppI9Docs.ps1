@@ -682,8 +682,8 @@ Assert-DocumentDoesNotContain $planPath @(
 
 $r07ProposalPath = 'docs/operations/2026-08-14-i9-r07-parametros-mensajes-pruebas.md'
 Assert-DocumentContains $r07ProposalPath @(
-    '(?m)^> Estado: \*\*PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE\*\*\s*$',
-    '(?is)criterio base aprobado por el usuario.*parametros detallados pendientes de aprobacion',
+    '(?m)^> Estado: \*\*APROBADO_FUNCIONALMENTE_NO_EJECUTABLE\*\*\s*$',
+    '(?is)criterios y parametros detallados aprobados explicitamente por el usuario en esta conversacion',
     '(?is)Director de Operaciones.*SCHEDULING/APPROVE_EXCEPTION',
     '(?is)OPERATIONAL_CONTINGENCY.*URGENT_REPLACEMENT.*EXCEPTIONAL_CLIENT_REQUEST.*TEMPORARY_TEMPLATE_TRANSITION.*SPECIAL_COVERAGE.*OTHER',
     '(?is)OTHER.*exige descripcion obligatoria.*nunca sustituye la aprobacion',
@@ -696,21 +696,21 @@ Assert-DocumentContains $r07ProposalPath @(
     '(?is)Rol sin permiso intenta aprobar.*Acceso denegado',
     '(?is)reutilizar aprobacion para otro guarda.*Rechaza reutilizacion',
     '(?is)bloqueo absoluto R01/R03/R05.*Mantiene bloqueo absoluto',
-    '(?is)Decisiones Pendientes De Aprobacion.*Director de Operaciones como aprobador',
-    '(?is)propuesta para validacion.*no\s+activa I9-R07 ni cierra Gate 2.*implementacion mediante TDD'
+    '(?is)Decisiones Aprobadas Funcionalmente.*Director de Operaciones es el aprobador',
+    '(?is)aprobacion funcional del usuario.*no activa I9-R07.*ni cierra Gate 2.*implementacion mediante TDD'
 )
 Assert-PatternCount $r07ProposalPath '(?m)^\| R07-T(?:0[1-9]|1[0-9]|2[0-3]) \|' 23
 Assert-DocumentDoesNotContain $r07ProposalPath @(
     '(?i)I9-R07.*APROBADA_EJECUTABLE',
     '(?i)Gate 2.*Cerrado',
-    '(?m)^> Evidencia: aprobacion explicita del usuario en esta conversacion\.\s*$',
+    '(?m)^> Estado: \*\*PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE\*\*\s*$',
     '(?im)^(?!.*\bno\b).*excepcion de plantilla.*elude.*bloqueo absoluto'
 )
 Assert-DocumentSectionContains $planPath '(?ms)^### Parametrizacion I9-R07\s*$.*?(?=^### Apertura Subgate 2A.*$)' @(
     '(?m)^#### Propuesta De Parametros, Mensajes Y Pruebas I9-R07\s*$',
     'docs/operations/2026-08-14-i9-r07-parametros-mensajes-pruebas\.md',
-    'PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE',
-    '(?is)no activan I9-R07 y no cierran Gate 2'
+    'APROBADO_FUNCIONALMENTE_NO_EJECUTABLE',
+    '(?is)no activa I9-R07.*cierra Gate 2'
 )
 
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'

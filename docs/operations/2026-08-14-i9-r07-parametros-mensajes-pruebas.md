@@ -1,9 +1,9 @@
 # I9-R07 - Parametros, Mensajes Y Casos De Prueba
 
-> Estado: **PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE**
+> Estado: **APROBADO_FUNCIONALMENTE_NO_EJECUTABLE**
 > Fecha: 2026-08-14
 > Regla: desviaciones frente a plantillas de turnos aprobadas.
-> Evidencia: criterio base aprobado por el usuario; parametros detallados pendientes de aprobacion.
+> Evidencia: criterios y parametros detallados aprobados explicitamente por el usuario en esta conversacion.
 
 ## Criterios Base Ya Aprobados
 
@@ -96,17 +96,17 @@
 - aprobador, decision, observaciones, fecha y evidencia; y
 - resultado, mensaje y correlacion de auditoria.
 
-## Decisiones Pendientes De Aprobacion
+## Decisiones Aprobadas Funcionalmente
 
-1. confirmar al Director de Operaciones como aprobador;
-2. aprobar el catalogo inicial de seis motivos, incluido `OTHER` con descripcion;
-3. confirmar agrupacion solo para celdas enumeradas del mismo guarda/version;
-4. confirmar no reutilizacion, comparacion deterministica e inmutabilidad; y
-5. aprobar los nueve mensajes y veintitres casos de prueba.
+1. el Director de Operaciones es el aprobador;
+2. se aprueba el catalogo inicial de seis motivos, incluido `OTHER` con descripcion;
+3. la agrupacion solo cubre celdas enumeradas del mismo guarda/version;
+4. se confirman no reutilizacion, comparacion deterministica e inmutabilidad; y
+5. quedan aprobados los nueve mensajes y veintitres casos de prueba.
 
 ## Condicion De Aprobacion
 
-Este documento es una propuesta para validacion. Su aprobacion funcional no
-activa I9-R07 ni cierra Gate 2. La regla requiere catalogo institucional de
+Este documento tiene aprobacion funcional del usuario, pero no activa I9-R07
+ni cierra Gate 2. La regla requiere catalogo institucional de
 motivos, fuente/version, implementacion mediante TDD, ejecucion satisfactoria de
 pruebas y evidencia antes de proponerse como ejecutable.
