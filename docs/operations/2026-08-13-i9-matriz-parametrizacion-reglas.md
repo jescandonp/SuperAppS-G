@@ -101,6 +101,7 @@ preparado para diligenciamiento; todos los campos de decision permanecen
 | Fuente y version | Historico simulado para mapeo inicial; catalogo institucional PENDIENTE | Validacion de Talento Humano y Operaciones |
 | Contrato interno desacoplado | APROBADO_FUNCIONALMENTE_NO_EJECUTABLE | `docs/operations/2026-08-13-i9-r04-contrato-categorias-novedad.md`; 12 categorias canonicas |
 | Mensajes y pruebas de prioridad | APROBADO_FUNCIONALMENTE_NO_EJECUTABLE | `docs/operations/2026-08-13-i9-r04-mensajes-pruebas.md`; casos R04-T01 a R04-T24 |
+| Formato de catalogo y mapeo institucional | LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_TH_OPERACIONES_NO_EJECUTABLE | `docs/operations/2026-08-14-i9-wp-c-formato-catalogo-mapeo-novedades-r04.md`; codigos reales, version, vigencia y decisiones permanecen PENDIENTE |
 
 ### I9-R05 - Ubicacion Y Traslado
 

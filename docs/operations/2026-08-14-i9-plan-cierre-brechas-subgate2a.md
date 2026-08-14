@@ -81,6 +81,13 @@ preparacion no completa WP-I9-B ni autoriza implementacion.
 **Criterio de salida:** mapeo completo, versionado, sin solapamientos activos y
 validado en la frontera con I3/I5.
 
+**Formato preparado:**
+`docs/operations/2026-08-14-i9-wp-c-formato-catalogo-mapeo-novedades-r04.md`,
+con estado
+`LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_TH_OPERACIONES_NO_EJECUTABLE`. Los
+codigos reales, versiones, vigencias y decisiones permanecen `PENDIENTE`; su
+preparacion no completa WP-I9-C ni autoriza implementacion.
+
 ### WP-I9-D - Matriz De Traslados R05
 
 **Responsable de validacion:** Director de Operaciones.

@@ -820,6 +820,42 @@ Assert-DocumentContains $parameterMatrixPath @(
     '(?is)codigos/version/vigencia permanecen PENDIENTE'
 )
 
+$wpI9CMappingFormPath = 'docs/operations/2026-08-14-i9-wp-c-formato-catalogo-mapeo-novedades-r04.md'
+Assert-DocumentContains $wpI9CMappingFormPath @(
+    '(?m)^> Estado: \*\*LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_TH_OPERACIONES_NO_EJECUTABLE\*\*\s*$',
+    '(?is)no constituye catalogo institucional aprobado ni autoriza implementacion, excepciones o activacion de I9-R04',
+    '(?is)sin inventar codigos institucionales.*Talento Humano y Operaciones',
+    '(?is)valor desconocido permanece `UNKNOWN`.*no se aproxima por texto, prefijo,\s+semejanza',
+    '(?is)`D`, `N` y `X` son codigos de programacion,\s+no codigos de novedades',
+    '(?is)sourceSystem.*sourceCode.*sourceStatus.*semanticCategory.*mappingVersion.*effectiveFrom.*effectiveTo.*mappedBy.*approvedBy',
+    '(?is)historico simulado aprobado como referencia\s+funcional.*No son codigos oficiales.*pendientes de confirmacion institucional',
+    '(?m)^\| INC \| Vigente \| INCAPACITY_ACTIVE \| PENDIENTE \| PENDIENTE \|\s*$',
+    '(?m)^\| V \| Aprobada y vigente \| VACATION_APPROVED_ACTIVE \| PENDIENTE \| PENDIENTE \|\s*$',
+    '(?m)^\| A \| Confirmada \| ABSENCE_CONFIRMED \| PENDIENTE \| PENDIENTE \|\s*$',
+    '(?m)^\| A \| Pendiente de confirmar \| ABSENCE_PENDING_CONFIRMATION \| PENDIENTE \| PENDIENTE \|\s*$',
+    '(?m)^\| TA \| Vigente \| ADDITIONAL_SHIFT \| PENDIENTE \| PENDIENTE \|\s*$',
+    '(?is)una sola version activa sin solapamientos.*fronteras con\s+I3/I5.*Talento Humano y Operaciones registraron su aprobacion',
+    '(?is)I9-R04 permanece no ejecutable.*Gate 2 sigue\s+bloqueado'
+)
+Assert-PatternCount $wpI9CMappingFormPath '(?m)^\| (?:INCAPACITY_ACTIVE|VACATION_APPROVED_ACTIVE|LEAVE_OR_CALAMITY_ACTIVE|SUSPENSION_OR_TERMINATION_ACTIVE|ABSENCE_CONFIRMED|ABSENCE_PENDING_CONFIRMATION|TRAINING_OR_INDUCTION_OVERLAP|AVAILABLE|ADDITIONAL_SHIFT|ADMINISTRATIVE_EVENT|EXPIRED_OR_CANCELLED|UNKNOWN) \|' 12
+Assert-PatternCount $wpI9CMappingFormPath '(?m)^\d+\. `CAT-I9-C-(?:0[1-9]|1[0-2])`:' 12
+Assert-PatternCount $wpI9CMappingFormPath '(?m)^- \[ \] ' 12
+Assert-DocumentDoesNotContain $wpI9CMappingFormPath @(
+    '(?i)I9-R04.*APROBADA_EJECUTABLE',
+    '(?i)Gate 2.*Cerrado',
+    '(?im)^\| (?:Talento Humano|Operaciones) \| (?!PENDIENTE \| PENDIENTE \| PENDIENTE \| PENDIENTE \| PENDIENTE \|).+$',
+    '(?im)^\| (?:INC|V|A|TA) \|.*\| (?:APROBADO|CONFIRMADO) \|'
+)
+Assert-DocumentContains $subgate2APlanPath @(
+    'docs/operations/2026-08-14-i9-wp-c-formato-catalogo-mapeo-novedades-r04\.md',
+    'LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_TH_OPERACIONES_NO_EJECUTABLE',
+    '(?is)codigos reales, versiones, vigencias y decisiones permanecen `PENDIENTE`.*preparacion no completa WP-I9-C ni autoriza implementacion'
+)
+Assert-DocumentContains $parameterMatrixPath @(
+    'docs/operations/2026-08-14-i9-wp-c-formato-catalogo-mapeo-novedades-r04\.md',
+    '(?is)codigos reales, version, vigencia y decisiones permanecen PENDIENTE'
+)
+
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
 Assert-DocumentContains $validationActPath @(
     '(?m)^> Estado: \*\*APROBADA\*\*\s*$',
