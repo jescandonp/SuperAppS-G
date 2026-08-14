@@ -341,6 +341,12 @@ hasta validar I9-R05 y obtener aprobacion auditada. I9-R03 permanece no
 ejecutable hasta completar sus pruebas e integracion con I9-R05. Esta decision
 no aprueba I9-R04 a I9-R07.
 
+El usuario confirmo despues que I9-R03 aplica a todos los proyectos y puestos,
+comparando borradores vigentes y programaciones aprobadas del mismo guarda. Los
+intervalos son semiabiertos `[inicio, fin)`, los cambios manuales revalidan la
+regla y ninguna excepcion de traslado puede eludir un solapamiento. Durante el
+desarrollo permanece desactivada o en validacion simulada.
+
 ### Parametrizacion I9-R04
 
 El 2026-08-13 el usuario aprobo la clasificacion de novedades de I9-R04.

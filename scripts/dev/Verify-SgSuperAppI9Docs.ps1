@@ -393,11 +393,16 @@ Assert-DocumentContains $catalogPath @(
     '(?m)^## Decision De Parametrizacion I9-R03\s*$',
     '(?m)^Estado de I9-R03: \*\*APROBADA_MIXTA_NO_EJECUTABLE\*\*\s*$',
     '(?is)inicio de un turno es anterior al fin.*solapamiento real',
+    '(?is)todos los proyectos y puestos.*borradores vigentes.*programaciones ya aprobadas.*mismo guarda',
+    '(?is)intervalos semiabiertos `\[inicio, fin\)`.*frontera fin/inicio no constituye solapamiento',
     '(?is)solapamiento real es bloqueante, no admite excepcion.*vacante',
     '(?is)adyacentes.*exactamente al finalizar.*no constituye.*solapamiento',
     '(?is)puestos distintos.*excepcion `PENDIENTE`.*no aprobarse ni publicarse',
     '(?is)I9-R05.*SCHEDULING/APPROVE_EXCEPTION',
-    '(?is)fecha y hora completas.*turnos nocturnos.*cambios.*mes.*ano'
+    '(?is)cambio manual vuelve a ejecutar I9-R03.*guardar,\s+aprobar o publicar',
+    '(?is)excepcion de traslado de I9-R05 nunca permite autorizar un solapamiento',
+    '(?is)fecha y hora completas.*turnos nocturnos.*cambios.*mes.*ano',
+    '(?is)desactivada o en validacion simulada'
 )
 Assert-DocumentDoesNotContain $catalogPath @(
     '(?i)I9-R03.*APROBADA_EJECUTABLE'
@@ -484,6 +489,9 @@ Assert-DocumentContains $parameterMatrixPath @(
     '(?is)Motivo Otro \| Descripcion obligatoria \| Prueba de rechazo sin descripcion',
     '(?is)Efecto del motivo \| No sustituye la aprobacion del Director de Operaciones',
     '(?is)Modo durante desarrollo \| Desactivada o advertencia; no ejecutable en produccion',
+    '(?is)Semantica del intervalo \| Semiabierto \[inicio, fin\)',
+    '(?is)Cambios manuales \| Revalidacion obligatoria antes de guardar/aprobar/publicar',
+    '(?is)Prioridad frente a R05 \| Excepcion de traslado nunca elude solapamiento',
     '(?is)Codigos que bloquean \| PENDIENTE',
     '(?is)Origen, destino y tiempo requerido \| PENDIENTE',
     '(?is)Catalogo de requisitos por puesto \| PENDIENTE',

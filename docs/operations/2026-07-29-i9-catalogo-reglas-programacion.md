@@ -120,6 +120,10 @@ Evidencia: aprobacion explicita del usuario en esta conversacion.
 
 - Existe solapamiento real cuando el inicio de un turno es anterior al fin de
   otro turno asignado al mismo guarda.
+- La regla aplica a todos los proyectos y puestos, y compara la propuesta con
+  sus borradores vigentes y con programaciones ya aprobadas del mismo guarda.
+- Los turnos se modelan como intervalos semiabiertos `[inicio, fin)`: compartir
+  exactamente la frontera fin/inicio no constituye solapamiento.
 - El solapamiento real es bloqueante, no admite excepcion y deja la vacante
   visible para reprogramacion.
 - Dos turnos son adyacentes cuando el segundo inicia exactamente al finalizar el
@@ -130,6 +134,10 @@ Evidencia: aprobacion explicita del usuario en esta conversacion.
   propuesta como excepcion `PENDIENTE`, pero no aprobarse ni publicarse hasta
   validar I9-R05 y obtener aprobacion con `SCHEDULING/APPROVE_EXCEPTION`.
 - Hasta parametrizar I9-R05 no se infiere distancia ni tiempo de traslado.
+- Todo cambio manual vuelve a ejecutar I9-R03 antes de permitir guardar,
+  aprobar o publicar.
+- Una excepcion de traslado de I9-R05 nunca permite autorizar un solapamiento
+  real detectado por I9-R03.
 - El calculo utiliza fecha y hora completas, incluidos turnos nocturnos y cambios
   de dia, mes y ano.
 - Evidencia: guarda, turnos, puestos, intervalos, resultado del cruce, traslado,
@@ -137,6 +145,7 @@ Evidencia: aprobacion explicita del usuario en esta conversacion.
 
 I9-R03 no pasa a ejecutable hasta completar mensajes, pruebas de bordes
 temporales, integracion con I9-R05 y evidencia de aprobacion institucional.
+Durante el desarrollo permanece desactivada o en validacion simulada.
 
 ## Decision De Parametrizacion I9-R04
 
