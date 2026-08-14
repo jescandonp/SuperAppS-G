@@ -377,9 +377,11 @@ Assert-DocumentContains $catalogPath @(
     '(?m)^Estado de I9-R02: \*\*APROBADA_COMO_EXCEPCION_NO_BLOQUEANTE\*\*\s*$',
     '(?is)12 horas continuas.*igual o superior a 12 horas cumple',
     '(?is)inferior a 12 horas no bloquea la generacion.*excepcion `PENDIENTE`',
-    '(?is)no puede aprobarse ni publicarse.*SCHEDULING/APPROVE_EXCEPTION',
-    '(?is)motivo, responsable, fecha, vigencia y auditoria',
-    '(?is)politica preventiva S&G.*no como valor legal atribuido',
+    '(?is)no puede aprobarse ni publicarse.*Director de Operaciones.*SCHEDULING/APPROVE_EXCEPTION',
+    '(?is)todos los proyectos de vigilancia gestionados por I9.*sin un umbral distinto',
+    '(?is)motivo obligatorio.*catalogo configurable.*responsable, fecha, vigencia y auditoria',
+    '(?is)autorizacion se limita al turno y excepcion evaluados.*no crea una\s+autorizacion permanente',
+    '(?is)politica preventiva S&G.*no como valor legal atribuido.*desactivada o en modo\s+advertencia',
     '(?is)I9-R05.*tiempo de traslado.*no se infiere un valor'
 )
 Assert-DocumentDoesNotContain $catalogPath @(
@@ -473,6 +475,11 @@ Assert-DocumentContains $parameterMatrixPath @(
     '(?is)Existencia de acuerdo escrito \| Marca obligatoria para programar mas de 8 h; conserva responsable y fecha',
     '(?is)Referencia, documento u otro soporte del acuerdo \| Opcional; su ausencia no bloquea por si sola',
     '(?is)Tratamiento mayor a 12 h/dia \| Bloqueo absoluto',
+    '(?is)Rol aprobador \| Director de Operaciones \| Confirmacion explicita del usuario',
+    '(?is)Alcance \| Todos los proyectos de vigilancia gestionados por I9; umbral unico',
+    '(?is)Vigencia de la autorizacion \| Solo el turno y excepcion evaluados; no reutilizable',
+    '(?is)Motivos autorizados \| Catalogo configurable y seleccion obligatoria; valores PENDIENTES',
+    '(?is)Modo durante desarrollo \| Desactivada o advertencia; no ejecutable en produccion',
     '(?is)Codigos que bloquean \| PENDIENTE',
     '(?is)Origen, destino y tiempo requerido \| PENDIENTE',
     '(?is)Catalogo de requisitos por puesto \| PENDIENTE',

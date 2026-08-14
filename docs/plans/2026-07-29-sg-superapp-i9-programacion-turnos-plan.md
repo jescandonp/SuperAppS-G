@@ -307,8 +307,13 @@ El 2026-08-13 el usuario aprobo I9-R02 con un umbral preventivo S&G de 12
 horas, sin convertirlo en bloqueo de generacion. Un intervalo menor crea una
 excepcion pendiente: la propuesta puede generarse, pero no aprobarse ni
 publicarse hasta contar con motivo y aprobacion auditada de una persona con
-permiso `SCHEDULING/APPROVE_EXCEPTION`. I9-R02 permanece no ejecutable hasta
-completar mensajes, pruebas de borde y evidencia institucional. Esta decision no
+permiso `SCHEDULING/APPROVE_EXCEPTION`. El usuario confirmo que aplica a todos
+los proyectos de vigilancia, que el Director de Operaciones es el aprobador y
+que la autorizacion solo cubre el turno y excepcion evaluados. El motivo es
+obligatorio y proviene de un catalogo configurable aun pendiente de definir.
+Durante el desarrollo queda desactivada o en modo advertencia. I9-R02 permanece
+no ejecutable hasta completar mensajes, pruebas de borde y evidencia
+institucional. Esta decision no
 aprueba I9-R03 a I9-R07.
 
 ### Parametrizacion I9-R03

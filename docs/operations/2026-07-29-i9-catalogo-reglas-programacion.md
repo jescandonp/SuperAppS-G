@@ -83,9 +83,15 @@ Evidencia: aprobacion explicita del usuario en esta conversacion.
 - Un intervalo inferior a 12 horas no bloquea la generacion de la propuesta;
   crea una excepcion `PENDIENTE` y mantiene visible la advertencia.
 - La programacion que contiene la excepcion no puede aprobarse ni publicarse
-  hasta que una persona con permiso `SCHEDULING/APPROVE_EXCEPTION` la apruebe.
-- La aprobacion exige motivo, responsable, fecha, vigencia y auditoria. Un
+  hasta que el Director de Operaciones, con permiso
+  `SCHEDULING/APPROVE_EXCEPTION`, la apruebe.
+- El criterio aplica a todos los proyectos de vigilancia gestionados por I9,
+  sin un umbral distinto por proyecto o contrato.
+- La aprobacion exige un motivo obligatorio tomado de un catalogo configurable,
+  responsable, fecha, vigencia y auditoria. Un
   rechazo mantiene la asignacion no publicable y obliga a reprogramar.
+- La autorizacion se limita al turno y excepcion evaluados; no crea una
+  autorizacion permanente ni se reutiliza en otra asignacion.
 - Cuando los turnos correspondan a puestos distintos, I9-R05 definira el tiempo
   de traslado que debe considerarse; hasta aprobar I9-R05 no se infiere un valor.
 - El descanso semanal minimo se controla por separado y no se sustituye con esta
@@ -93,7 +99,9 @@ Evidencia: aprobacion explicita del usuario en esta conversacion.
 
 El umbral de 12 horas se registra como politica preventiva S&G aprobada por el
 usuario, no como valor legal atribuido. La regla no pasa a ejecutable hasta
-completar sus mensajes, pruebas de borde y evidencia de aprobacion institucional.
+completar el catalogo de motivos, sus mensajes, pruebas de borde y evidencia de
+aprobacion institucional. Mientras tanto permanece desactivada o en modo
+advertencia para el desarrollo.
 
 ## Decision De Parametrizacion I9-R03
 
