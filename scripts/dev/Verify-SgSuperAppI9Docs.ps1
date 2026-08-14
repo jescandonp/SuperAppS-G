@@ -414,6 +414,22 @@ Assert-DocumentContains $catalogPath @(
 Assert-DocumentDoesNotContain $catalogPath @(
     '(?i)I9-R06.*APROBADA_EJECUTABLE'
 )
+Assert-DocumentContains $catalogPath @(
+    '(?m)^## Decision De Parametrizacion I9-R07\s*$',
+    '(?m)^Estado de I9-R07: \*\*APROBADA_CON_EXCEPCION_NO_EJECUTABLE\*\*\s*$',
+    '(?is)plantilla seleccionada.*2X2, 4X2, 6X1.*obligatoria por\s+defecto',
+    '(?is)Toda diferencia.*version vigente.*desviacion explicita',
+    '(?is)desviacion no bloquea la generacion.*excepcion `PENDIENTE`.*no puede aprobarse ni publicarse',
+    '(?is)cambios manuales reciben el mismo tratamiento',
+    '(?is)plantilla y version, guarda, fechas y celdas.*valor original, valor propuesto.*aprobador',
+    '(?is)excepcion de plantilla nunca permite eludir bloqueos absolutos',
+    '(?is)cambio de plantilla solo afecta borradores futuros.*no modifica.*programaciones aprobadas',
+    '(?is)snapshot conserva la plantilla, su version y las desviaciones',
+    '(?is)I9-R07 no pasa a ejecutable hasta definir y validar motivos autorizados'
+)
+Assert-DocumentDoesNotContain $catalogPath @(
+    '(?i)I9-R07.*APROBADA_EJECUTABLE'
+)
 
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
 Assert-DocumentContains $validationActPath @(

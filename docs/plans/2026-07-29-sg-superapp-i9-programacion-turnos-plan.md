@@ -346,3 +346,14 @@ configuracion explicita y versionada, y la falta de datos nunca acredita
 cumplimiento. I9-R06 permanece no ejecutable hasta mapear los catalogos reales
 de I3/I5, completar responsables, mensajes y pruebas. Esta decision no aprueba
 I9-R07.
+
+### Parametrizacion I9-R07
+
+El 2026-08-13 el usuario aprobo I9-R07 con plantilla obligatoria por defecto.
+Toda diferencia frente a la version seleccionada, incluida una edicion manual,
+genera una excepcion pendiente: no bloquea la propuesta, pero impide aprobarla
+o publicarla hasta contar con autorizacion auditada. La evidencia conserva los
+valores anterior y propuesto, celdas, motivo y aprobador; ninguna excepcion de
+plantilla puede eludir bloqueos absolutos. Los cambios de plantilla solo afectan
+borradores futuros. I9-R07 permanece no ejecutable hasta completar motivos,
+responsables, mensajes, pruebas y evidencia institucional.

@@ -33,7 +33,7 @@ pendiente invalida la regla como entrada del motor.
 | I9-R04 | Novedades | Excluir o advertir indisponibilidad por novedad vigente | Confirmadas: bloqueo; pendientes/compatibles: excepcion aprobable; administrativas: informativas | Aprobada por clasificacion | Tipo, vigencia, estado, fuente, decision y auditoria | APROBADA_PARA_PARAMETRIZACION |
 | I9-R05 | Ubicacion | Evaluar compatibilidad territorial y tiempo de traslado | Matriz versionada por proyecto/contrato; insuficiencia genera excepcion y prohibicion expresa bloquea | Aprobada por criterio | Origen, destino, tiempos, version, decision y auditoria | APROBADA_PARA_PARAMETRIZACION |
 | I9-R06 | Requisitos | Verificar cursos, acreditaciones y condiciones del puesto | No bloquea propuesta; faltante, vencido o no verificado requiere excepcion antes de aprobar/publicar | Aprobada no bloqueante | Requisito, vigencia, evidencia, subsanacion, decision y auditoria | APROBADA_PARA_PARAMETRIZACION |
-| I9-R07 | Desviacion de plantilla | Detectar cambios frente al ciclo aprobado y exigir motivo | Tolerancias y autorizador parametrizados antes de codificar | Aprobada | Plantilla, celda y motivo | APROBADA_PARA_PARAMETRIZACION |
+| I9-R07 | Desviacion de plantilla | Detectar cambios frente al ciclo aprobado y exigir motivo | Plantilla obligatoria por defecto; toda desviacion requiere aprobacion auditada | Aprobada con excepcion | Plantilla/version, guarda, celdas, valores, motivo, aprobador y fecha | APROBADA_PARA_PARAMETRIZACION |
 
 ## Decision De Parametrizacion I9-R01
 
@@ -186,6 +186,32 @@ Evidencia: aprobacion explicita del usuario en esta conversacion.
   efectivamente evaluados.
 
 I9-R06 no pasa a ejecutable hasta mapear los catalogos reales de I3/I5,
+responsables, mensajes, pruebas y evidencia institucional.
+
+## Decision De Parametrizacion I9-R07
+
+Estado de I9-R07: **APROBADA_CON_EXCEPCION_NO_EJECUTABLE**
+Fecha de decision: 2026-08-13
+Evidencia: aprobacion explicita del usuario en esta conversacion.
+
+- La plantilla seleccionada (2X2, 4X2, 6X1 u otra aprobada) es obligatoria por
+  defecto.
+- Toda diferencia frente a la secuencia de su version vigente constituye una
+  desviacion explicita.
+- La desviacion no bloquea la generacion de la propuesta, pero crea una
+  excepcion `PENDIENTE`; la programacion no puede aprobarse ni publicarse hasta
+  que sea autorizada mediante `SCHEDULING/APPROVE_EXCEPTION`.
+- Los cambios manuales reciben el mismo tratamiento que los generados por el
+  motor.
+- La evidencia registra plantilla y version, guarda, fechas y celdas afectadas,
+  valor original, valor propuesto, motivo, aprobador y fecha de decision.
+- Una excepcion de plantilla nunca permite eludir bloqueos absolutos de otras
+  reglas.
+- Un cambio de plantilla solo afecta borradores futuros y no modifica de forma
+  silenciosa programaciones aprobadas.
+- El snapshot conserva la plantilla, su version y las desviaciones evaluadas.
+
+I9-R07 no pasa a ejecutable hasta definir y validar motivos autorizados,
 responsables, mensajes, pruebas y evidencia institucional.
 
 ## Campos Obligatorios Por Regla Antes De Activarla
