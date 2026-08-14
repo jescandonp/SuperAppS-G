@@ -32,7 +32,7 @@ pendiente invalida la regla como entrada del motor.
 | I9-R03 | Cruces | Bloquear solapamientos temporales del mismo guarda | Solapamiento real bloqueante; conflicto de traslado entre puestos genera excepcion aprobable vinculada a I9-R05 | Aprobada mixta | Intervalos, puestos, traslado, decision y auditoria | APROBADA_PARA_PARAMETRIZACION |
 | I9-R04 | Novedades | Excluir o advertir indisponibilidad por novedad vigente | Confirmadas: bloqueo; pendientes/compatibles: excepcion aprobable; administrativas: informativas | Aprobada por clasificacion | Tipo, vigencia, estado, fuente, decision y auditoria | APROBADA_PARA_PARAMETRIZACION |
 | I9-R05 | Ubicacion | Evaluar compatibilidad territorial y tiempo de traslado | Matriz versionada por proyecto/contrato; insuficiencia genera excepcion y prohibicion expresa bloquea | Aprobada por criterio | Origen, destino, tiempos, version, decision y auditoria | APROBADA_PARA_PARAMETRIZACION |
-| I9-R06 | Requisitos | Verificar cursos, acreditaciones y condiciones del puesto | Catalogo I3/I5 y tratamiento versionado | Aprobada | Requisito y habilitacion | APROBADA_PARA_PARAMETRIZACION |
+| I9-R06 | Requisitos | Verificar cursos, acreditaciones y condiciones del puesto | No bloquea propuesta; faltante, vencido o no verificado requiere excepcion antes de aprobar/publicar | Aprobada no bloqueante | Requisito, vigencia, evidencia, subsanacion, decision y auditoria | APROBADA_PARA_PARAMETRIZACION |
 | I9-R07 | Desviacion de plantilla | Detectar cambios frente al ciclo aprobado y exigir motivo | Tolerancias y autorizador parametrizados antes de codificar | Aprobada | Plantilla, celda y motivo | APROBADA_PARA_PARAMETRIZACION |
 
 ## Decision De Parametrizacion I9-R01
@@ -164,6 +164,29 @@ Evidencia: aprobacion explicita del usuario en esta conversacion.
 I9-R05 no pasa a ejecutable hasta cargar y validar la matriz real aplicable,
 completar mensajes, pruebas de frontera e integracion con I9-R03 y aportar
 evidencia institucional.
+
+## Decision De Parametrizacion I9-R06
+
+Estado de I9-R06: **APROBADA_NO_BLOQUEANTE_NO_EJECUTABLE**
+Fecha de decision: 2026-08-13
+Evidencia: aprobacion explicita del usuario en esta conversacion.
+
+- Cada requisito se configura por puesto, proyecto y vigencia.
+- Ningun incumplimiento bloquea la generacion de la propuesta.
+- Un requisito vigente y acreditado se registra como cumplido.
+- Un requisito faltante, vencido o no verificado crea una excepcion
+  `PENDIENTE`; la propuesta no puede aprobarse ni publicarse hasta que la
+  excepcion sea autorizada mediante `SCHEDULING/APPROVE_EXCEPTION`.
+- Un requisito subsanable puede clasificarse como informativo solo mediante
+  configuracion explicita y versionada; la ausencia de informacion nunca
+  acredita su cumplimiento.
+- La excepcion registra motivo, responsable de subsanacion, fecha limite,
+  aprobador, decision y evidencia.
+- El snapshot conserva los requisitos, vigencias, acreditaciones y fuentes
+  efectivamente evaluados.
+
+I9-R06 no pasa a ejecutable hasta mapear los catalogos reales de I3/I5,
+responsables, mensajes, pruebas y evidencia institucional.
 
 ## Campos Obligatorios Por Regla Antes De Activarla
 

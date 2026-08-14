@@ -335,3 +335,14 @@ expresamente prohibida es bloqueo absoluto. Trafico en tiempo real y rutas
 dinamicas quedan fuera del MVP. I9-R05 permanece no ejecutable hasta cargar y
 validar la matriz real, completar pruebas e integrarla con I9-R03. Esta decision
 no aprueba I9-R06 ni I9-R07.
+
+### Parametrizacion I9-R06
+
+El 2026-08-13 el usuario aprobo I9-R06 como regla no bloqueante para generar
+propuestas. Un requisito faltante, vencido o no verificado produce una excepcion
+pendiente: la programacion no puede aprobarse ni publicarse hasta obtener
+aprobacion auditada. Los requisitos subsanables pueden ser informativos solo por
+configuracion explicita y versionada, y la falta de datos nunca acredita
+cumplimiento. I9-R06 permanece no ejecutable hasta mapear los catalogos reales
+de I3/I5, completar responsables, mensajes y pruebas. Esta decision no aprueba
+I9-R07.

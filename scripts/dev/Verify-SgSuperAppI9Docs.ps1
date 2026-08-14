@@ -398,6 +398,22 @@ Assert-DocumentContains $catalogPath @(
 Assert-DocumentDoesNotContain $catalogPath @(
     '(?i)I9-R05.*APROBADA_EJECUTABLE'
 )
+Assert-DocumentContains $catalogPath @(
+    '(?m)^## Decision De Parametrizacion I9-R06\s*$',
+    '(?m)^Estado de I9-R06: \*\*APROBADA_NO_BLOQUEANTE_NO_EJECUTABLE\*\*\s*$',
+    '(?is)Cada requisito se configura por puesto, proyecto y vigencia',
+    '(?is)Ningun incumplimiento bloquea la generacion de la propuesta',
+    '(?is)requisito faltante, vencido o no verificado.*excepcion\s+`PENDIENTE`.*no puede aprobarse ni publicarse',
+    '(?is)SCHEDULING/APPROVE_EXCEPTION',
+    '(?is)requisito subsanable.*informativo solo mediante.*configuracion explicita y versionada',
+    '(?is)ausencia de informacion nunca.*acredita.*cumplimiento',
+    '(?is)motivo, responsable de subsanacion, fecha limite.*aprobador.*evidencia',
+    '(?is)snapshot conserva los requisitos, vigencias, acreditaciones y fuentes',
+    '(?is)I9-R06 no pasa a ejecutable hasta mapear los catalogos reales de I3/I5'
+)
+Assert-DocumentDoesNotContain $catalogPath @(
+    '(?i)I9-R06.*APROBADA_EJECUTABLE'
+)
 
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
 Assert-DocumentContains $validationActPath @(
