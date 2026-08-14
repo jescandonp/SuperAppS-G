@@ -546,7 +546,8 @@ Assert-DocumentDoesNotContain $r02TestProposalPath @(
 
 $r03TestProposalPath = 'docs/operations/2026-08-13-i9-r03-mensajes-pruebas.md'
 Assert-DocumentContains $r03TestProposalPath @(
-    '(?m)^> Estado: \*\*PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE\*\*\s*$',
+    '(?m)^> Estado: \*\*APROBADO_FUNCIONALMENTE_NO_EJECUTABLE\*\*\s*$',
+    '(?m)^> Evidencia: aprobacion explicita del usuario en esta conversacion\.\s*$',
     '(?is)I9-R03-OK.*I9-R03-ADJACENT.*I9-R03-BLOCK.*I9-R03-APPROVED.*I9-R03-DRAFT.*I9-R03-TRANSFER.*I9-R03-EDIT',
     '(?m)^\| R03-T01 \| A termina 18:00; B inicia 18:00 \| No hay solapamiento; aplica intervalo \[inicio, fin\) \|\s*$',
     '(?m)^\| R03-T02 \| A termina 18:00; B inicia 17:59 \| Bloqueo absoluto por un minuto de solapamiento \|\s*$',
@@ -554,7 +555,7 @@ Assert-DocumentContains $r03TestProposalPath @(
     '(?is)borrador vigente.*Bloquea.*I9-R03-DRAFT',
     '(?is)Excepcion R05 aprobada pero existe cruce.*I9-R03 mantiene bloqueo absoluto',
     '(?is)Edicion manual introduce cruce.*rechaza guardar/aprobar/publicar',
-    '(?is)Este artefacto no activa I9-R03'
+    '(?is)Este artefacto no activa I9-R03.*aprobacion\s+funcional.*implementacion posterior mediante TDD.*evidencia institucional'
 )
 Assert-PatternCount $r03TestProposalPath '(?m)^\| R03-T(?:0[1-9]|1[0-5]) \|' 15
 Assert-DocumentDoesNotContain $r03TestProposalPath @(

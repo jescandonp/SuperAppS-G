@@ -1,8 +1,9 @@
 # I9-R03 - Mensajes Y Casos De Prueba
 
-> Estado: **PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE**
+> Estado: **APROBADO_FUNCIONALMENTE_NO_EJECUTABLE**
 > Fecha: 2026-08-13
 > Regla: cruces temporales del mismo guarda.
+> Evidencia: aprobacion explicita del usuario en esta conversacion.
 
 ## Mensajes Funcionales Propuestos
 
@@ -51,6 +52,7 @@ la programacion y regla/version aplicada, respetando los permisos de consulta.
 
 ## Condicion De Aprobacion
 
-Este artefacto no activa I9-R03. Requiere aprobacion funcional, implementacion
-posterior mediante TDD, ejecucion satisfactoria y evidencia institucional antes
-de proponer la regla como ejecutable.
+Este artefacto no activa I9-R03. Los mensajes y casos tienen aprobacion
+funcional del usuario; requieren implementacion posterior mediante TDD,
+ejecucion satisfactoria y evidencia institucional antes de proponer la regla
+como ejecutable.

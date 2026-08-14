@@ -353,7 +353,9 @@ Se preparo `docs/operations/2026-08-13-i9-r03-mensajes-pruebas.md` con siete
 mensajes y quince casos que cubren intervalos adyacentes, solapamientos
 parciales/totales, nocturnos, cambios de mes/ano, borradores, programaciones
 aprobadas, edicion manual y precedencia sobre I9-R05. Su estado es
-`PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE`; no activa I9-R03 ni cierra Gate 2.
+`APROBADO_FUNCIONALMENTE_NO_EJECUTABLE` por confirmacion explicita del usuario.
+No activa I9-R03 ni cierra Gate 2; faltan implementacion TDD, ejecucion
+satisfactoria, integracion validada con I9-R05 y evidencia institucional.
 
 ### Parametrizacion I9-R04
 
