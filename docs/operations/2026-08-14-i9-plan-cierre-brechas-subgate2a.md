@@ -61,6 +61,11 @@ preparacion no completa WP-I9-A ni autoriza implementacion.
 **Criterio de salida:** una version vigente por catalogo, sin codigos inventados
 ni motivos implicitos.
 
+**Formato preparado:**
+`docs/operations/2026-08-14-i9-wp-b-formato-catalogos-motivos-r02-r07.md`, con
+estado `LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_OPERACIONES_NO_EJECUTABLE`. Su
+preparacion no completa WP-I9-B ni autoriza implementacion.
+
 ### WP-I9-C - Catalogo De Novedades R04
 
 **Responsables de validacion:** Talento Humano y Operaciones.

@@ -789,6 +789,37 @@ Assert-DocumentContains $parameterMatrixPath @(
     '(?is)todos los campos de decision permanecen\s+`PENDIENTE`.*no constituye concepto ni cierre de WP-I9-A'
 )
 
+$wpI9BCatalogFormPath = 'docs/operations/2026-08-14-i9-wp-b-formato-catalogos-motivos-r02-r07.md'
+Assert-DocumentContains $wpI9BCatalogFormPath @(
+    '(?m)^> Estado: \*\*LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_OPERACIONES_NO_EJECUTABLE\*\*\s*$',
+    '(?is)no constituye catalogo institucional aprobado ni autoriza implementacion, excepciones o activacion de reglas',
+    '(?is)motivos funcionales ya aprobados.*sin\s+inventar codigos institucionales',
+    '(?is)OTHER.*Otro siempre exige descripcion.*nunca\s+sustituye la aprobacion del Director de Operaciones',
+    '(?is)Reemplazo urgente por ausencia o incapacidad.*Continuidad temporal del servicio.*Contingencia operativa.*Emergencia o fuerza mayor.*Solicitud excepcional del cliente.*Otro - descripcion obligatoria',
+    '(?is)OPERATIONAL_CONTINGENCY.*URGENT_REPLACEMENT.*EXCEPTIONAL_CLIENT_REQUEST.*TEMPORARY_TEMPLATE_TRANSITION.*SPECIAL_COVERAGE.*OTHER - descripcion obligatoria',
+    '(?is)CAT-I9-B-01.*CAT-I9-B-02.*CAT-I9-B-03.*CAT-I9-B-04.*CAT-I9-B-05.*CAT-I9-B-06.*CAT-I9-B-07.*CAT-I9-B-08.*CAT-I9-B-09.*CAT-I9-B-10',
+    '(?is)Decision Institucional Por Catalogo.*R02 - motivos de descanso excepcional.*R07 - motivos de desviacion de plantilla',
+    '(?is)Checklist De Completitud.*seis filas R02.*seis filas R07.*CAT-I9-B-01 a CAT-I9-B-10',
+    '(?is)WP-I9-B solo puede marcarse completado.*dos catalogos.*versionados, vigentes.*evidencia institucional.*no activa I9-R02 o I9-R07 ni autoriza implementacion'
+)
+Assert-PatternCount $wpI9BCatalogFormPath '(?m)^\| CAT-I9-B-(?:0[1-9]|10) \|' 10
+Assert-PatternCount $wpI9BCatalogFormPath '(?m)^- \[ \] ' 10
+Assert-DocumentDoesNotContain $wpI9BCatalogFormPath @(
+    '(?i)APROBADO_EJECUTABLE',
+    '(?i)Gate 2.*(?:Cerrado|Aprobado)',
+    '(?im)^\| (?:R02 - motivos de descanso excepcional|R07 - motivos de desviacion de plantilla) \|\s*(?:APROBADO|APROBADO_CON_AJUSTES|NO_APROBADO|REQUIERE_INFORMACION)\s*\|',
+    '(?im)^\| (?:Identificador institucional del catalogo|Version|Fecha de inicio de vigencia|Responsable de mantenimiento|Aprobador institucional) \| (?!PENDIENTE\s*\|).+$'
+)
+Assert-DocumentContains $subgate2APlanPath @(
+    'docs/operations/2026-08-14-i9-wp-b-formato-catalogos-motivos-r02-r07\.md',
+    'LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_OPERACIONES_NO_EJECUTABLE',
+    '(?is)preparacion no completa WP-I9-B ni autoriza implementacion'
+)
+Assert-DocumentContains $parameterMatrixPath @(
+    'docs/operations/2026-08-14-i9-wp-b-formato-catalogos-motivos-r02-r07\.md',
+    '(?is)codigos/version/vigencia permanecen PENDIENTE'
+)
+
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
 Assert-DocumentContains $validationActPath @(
     '(?m)^> Estado: \*\*APROBADA\*\*\s*$',

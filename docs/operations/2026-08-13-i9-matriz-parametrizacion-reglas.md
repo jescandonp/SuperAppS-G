@@ -70,6 +70,7 @@ preparado para diligenciamiento; todos los campos de decision permanecen
 | Efecto del motivo | No sustituye la aprobacion del Director de Operaciones | Prueba de workflow pendiente/aprobado |
 | Modo durante desarrollo | Desactivada o advertencia; no ejecutable en produccion | Prueba de configuration gate |
 | Mensajes y pruebas | APROBADO_FUNCIONALMENTE_NO_EJECUTABLE | `docs/operations/2026-08-13-i9-r02-mensajes-pruebas.md`; casos R02-T01 a R02-T16 |
+| Formato de catalogo institucional | LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_OPERACIONES_NO_EJECUTABLE | `docs/operations/2026-08-14-i9-wp-b-formato-catalogos-motivos-r02-r07.md`; codigos/version/vigencia permanecen PENDIENTE |
 
 ### I9-R03 - Cruces
 
@@ -136,6 +137,7 @@ preparado para diligenciamiento; todos los campos de decision permanecen
 | Efecto de desviacion | Excepcion PENDIENTE; impide aprobar/publicar | Prueba de workflow |
 | Cambio de version | Solo borradores futuros | Prueba de inmutabilidad de programacion aprobada |
 | Parametros, mensajes y pruebas | APROBADO_FUNCIONALMENTE_NO_EJECUTABLE | `docs/operations/2026-08-14-i9-r07-parametros-mensajes-pruebas.md`; casos R07-T01 a R07-T23; aprobacion explicita del usuario |
+| Formato de catalogo institucional | LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_OPERACIONES_NO_EJECUTABLE | `docs/operations/2026-08-14-i9-wp-b-formato-catalogos-motivos-r02-r07.md`; codigos/version/vigencia permanecen PENDIENTE |
 
 ## Criterio De Salida Del Subgate 2A
 
