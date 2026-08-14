@@ -1,8 +1,9 @@
 # I9-R04 - Mensajes Y Casos De Prueba
 
-> Estado: **PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE**
+> Estado: **APROBADO_FUNCIONALMENTE_NO_EJECUTABLE**
 > Fecha: 2026-08-13
 > Regla: novedades e indisponibilidades del guarda.
+> Evidencia: aprobacion explicita del usuario en esta conversacion.
 
 ## Mensajes Funcionales Propuestos
 
@@ -75,6 +76,7 @@ o de otra categoria vigente de I9-R04.
 
 ## Condicion De Aprobacion
 
-Este artefacto no activa I9-R04. Requiere aprobacion funcional, implementacion
-posterior mediante TDD, carga del catalogo institucional, ejecucion satisfactoria
-y evidencia institucional antes de proponer la regla como ejecutable.
+Este artefacto no activa I9-R04. Los mensajes y casos tienen aprobacion
+funcional del usuario; requieren implementacion posterior mediante TDD, carga
+del catalogo institucional, ejecucion satisfactoria y evidencia institucional
+antes de proponer la regla como ejecutable.

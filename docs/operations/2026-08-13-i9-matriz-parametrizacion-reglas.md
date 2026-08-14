@@ -22,7 +22,7 @@ interpreta como cero, falso, vacio permitido o valor por defecto.
 | I9-R01 | Limites ordinarios y sectoriales con aprobacion obligatoria entre 10 y 12 h | Revision juridica de la armonizacion Ley 1920/2018 y articulo 167A CST; vigencia | Juridica y Operaciones | PROPUESTA_JURIDICA_EN_REVISION_NO_EJECUTABLE |
 | I9-R02 | Umbral preventivo global de 12 h; excepcion por turno antes de aprobar/publicar | Implementacion TDD, ejecucion de pruebas y evidencia institucional | Director de Operaciones | PARAMETROS_FUNCIONALES_APROBADOS_NO_EJECUTABLE |
 | I9-R03 | Solapamiento global bloqueante sobre intervalo [inicio, fin); traslado se remite a I9-R05 | Implementacion TDD, ejecucion de pruebas, enlace validado con R05 y evidencia | Operaciones | PARAMETROS_FUNCIONALES_APROBADOS_NO_EJECUTABLE |
-| I9-R04 | Novedades clasificadas; mapeo inicial INC/V/A/TA aprobado | Codigos institucionales restantes, fuente/version, mensajes y pruebas | Talento Humano y Operaciones | MAPEO_PARCIAL_APROBADO_NO_EJECUTABLE |
+| I9-R04 | Novedades clasificadas; mapeo inicial, contrato, mensajes y pruebas aprobados | Codigos institucionales restantes, fuente/version, implementacion TDD y evidencia | Talento Humano y Operaciones | PARAMETROS_FUNCIONALES_PARCIALES_APROBADOS_NO_EJECUTABLE |
 | I9-R05 | Matriz de traslados por proyecto/contrato; sin valor universal | Matriz real origen-destino y combinaciones prohibidas | Operaciones | PENDIENTE_DE_PARAMETROS |
 | I9-R06 | No bloquea propuesta; excepcion antes de aprobar/publicar | Catalogos reales I3/I5, vigencias y responsables de subsanacion | Talento Humano y Operaciones | PENDIENTE_DE_PARAMETROS |
 | I9-R07 | Plantilla obligatoria; desviacion con aprobacion auditada | Motivos autorizados y responsables de excepcion | Operaciones | PENDIENTE_DE_PARAMETROS |
@@ -94,7 +94,7 @@ bloquea el desarrollo, pero I9-R01 permanece no ejecutable en produccion.
 | Estados sin efecto | Vencida o anulada | Estados reales equivalentes |
 | Fuente y version | Historico simulado para mapeo inicial; catalogo institucional PENDIENTE | Validacion de Talento Humano y Operaciones |
 | Contrato interno desacoplado | APROBADO_FUNCIONALMENTE_NO_EJECUTABLE | `docs/operations/2026-08-13-i9-r04-contrato-categorias-novedad.md`; 12 categorias canonicas |
-| Mensajes y pruebas de prioridad | PROPUESTA_PARA_VALIDACION | `docs/operations/2026-08-13-i9-r04-mensajes-pruebas.md`; casos R04-T01 a R04-T24 |
+| Mensajes y pruebas de prioridad | APROBADO_FUNCIONALMENTE_NO_EJECUTABLE | `docs/operations/2026-08-13-i9-r04-mensajes-pruebas.md`; casos R04-T01 a R04-T24 |
 
 ### I9-R05 - Ubicacion Y Traslado
 

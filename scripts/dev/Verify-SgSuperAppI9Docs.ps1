@@ -594,7 +594,8 @@ Assert-DocumentDoesNotContain $r04CategoryContractPath @(
 
 $r04TestProposalPath = 'docs/operations/2026-08-13-i9-r04-mensajes-pruebas.md'
 Assert-DocumentContains $r04TestProposalPath @(
-    '(?m)^> Estado: \*\*PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE\*\*\s*$',
+    '(?m)^> Estado: \*\*APROBADO_FUNCIONALMENTE_NO_EJECUTABLE\*\*\s*$',
+    '(?m)^> Evidencia: aprobacion explicita del usuario en esta conversacion\.\s*$',
     '(?is)I9-R04-OK.*I9-R04-BLOCK.*I9-R04-EXCEPTION.*I9-R04-INFO.*I9-R04-UNKNOWN.*I9-R04-INCOMPLETE.*I9-R04-PENDING.*I9-R04-REJECTED.*I9-R04-APPROVED',
     '(?m)^\| R04-T04 \| A con estado Pendiente de confirmar \| Genera excepcion PENDIENTE; no permite aprobar/publicar \|\s*$',
     '(?m)^\| R04-T12 \| Codigo desconocido parecido a INC \| UNKNOWN; no aproxima por texto, prefijo o semejanza \|\s*$',
@@ -605,7 +606,7 @@ Assert-DocumentContains $r04TestProposalPath @(
     '(?is)mappingVersion.*Snapshot historico conserva codigo, estado, categoria y version',
     '(?is)BLOQUEO_ABSOLUTO.*prevalece.*EXCEPCION_PENDIENTE.*ADVERTENCIA.*INFORMATIVA.*SIN_EFECTO',
     '(?is)aprobacion de excepcion nunca elude un bloqueo absoluto de I9-R01, I9-R03',
-    '(?is)Este artefacto no activa I9-R04'
+    '(?is)Este artefacto no activa I9-R04.*aprobacion\s+funcional.*implementacion posterior mediante TDD.*catalogo institucional.*evidencia institucional'
 )
 Assert-PatternCount $r04TestProposalPath '(?m)^\| R04-T(?:0[1-9]|1[0-9]|2[0-4]) \|' 24
 Assert-DocumentDoesNotContain $r04TestProposalPath @(

@@ -393,7 +393,9 @@ Se preparo `docs/operations/2026-08-13-i9-r04-mensajes-pruebas.md` con nueve
 mensajes y veinticuatro casos de prueba para las categorias canonicas,
 prioridades, vigencias, datos incompletos, `UNKNOWN`, codigos D/N/X, permisos,
 no reutilizacion, snapshots y dependencias con I9-R01/I9-R02/I9-R03. Su estado
-es `PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE`; no activa I9-R04 ni cierra Gate 2.
+es `APROBADO_FUNCIONALMENTE_NO_EJECUTABLE` por confirmacion explicita del
+usuario. No activa I9-R04 ni cierra Gate 2; faltan codigos institucionales,
+fuente/version, implementacion TDD, ejecucion satisfactoria y evidencia.
 
 ### Parametrizacion I9-R05
 
