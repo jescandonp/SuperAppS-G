@@ -327,7 +327,9 @@ Se preparo `docs/operations/2026-08-13-i9-r02-mensajes-pruebas.md` con siete
 mensajes funcionales y dieciseis casos de prueba que cubren las fronteras de 12
 horas, datos obligatorios, permisos, aprobacion, rechazo, reutilizacion,
 solapamiento e integracion con I9-R05. Su estado es
-`PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE`; no activa la regla ni cierra Gate 2.
+`APROBADO_FUNCIONALMENTE_NO_EJECUTABLE` por confirmacion explicita del usuario.
+La aprobacion funcional no activa la regla ni cierra Gate 2; faltan su
+implementacion TDD, ejecucion satisfactoria y evidencia institucional.
 
 ### Parametrizacion I9-R03
 

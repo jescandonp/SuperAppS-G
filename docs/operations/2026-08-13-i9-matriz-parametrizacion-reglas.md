@@ -20,7 +20,7 @@ interpreta como cero, falso, vacio permitido o valor por defecto.
 | Regla | Decision funcional aprobada | Insumo pendiente principal | Ruta de validacion | Estado |
 |---|---|---|---|---|
 | I9-R01 | Limites ordinarios y sectoriales con aprobacion obligatoria entre 10 y 12 h | Revision juridica de la armonizacion Ley 1920/2018 y articulo 167A CST; vigencia | Juridica y Operaciones | PROPUESTA_JURIDICA_EN_REVISION_NO_EJECUTABLE |
-| I9-R02 | Umbral preventivo global de 12 h; excepcion por turno antes de aprobar/publicar | Mensajes, pruebas y evidencia institucional | Director de Operaciones | PENDIENTE_DE_PARAMETROS |
+| I9-R02 | Umbral preventivo global de 12 h; excepcion por turno antes de aprobar/publicar | Implementacion TDD, ejecucion de pruebas y evidencia institucional | Director de Operaciones | PARAMETROS_FUNCIONALES_APROBADOS_NO_EJECUTABLE |
 | I9-R03 | Solapamiento real bloqueante; traslado se remite a I9-R05 | Mensajes, fronteras temporales y enlace validado con R05 | Operaciones | PENDIENTE_DE_PARAMETROS |
 | I9-R04 | Novedades clasificadas como bloqueo, excepcion o informacion | Mapeo de codigos y estados reales de novedades | Talento Humano y Operaciones | PENDIENTE_DE_PARAMETROS |
 | I9-R05 | Matriz de traslados por proyecto/contrato; sin valor universal | Matriz real origen-destino y combinaciones prohibidas | Operaciones | PENDIENTE_DE_PARAMETROS |
@@ -64,7 +64,7 @@ bloquea el desarrollo, pero I9-R01 permanece no ejecutable en produccion.
 | Motivo Otro | Descripcion obligatoria | Prueba de rechazo sin descripcion |
 | Efecto del motivo | No sustituye la aprobacion del Director de Operaciones | Prueba de workflow pendiente/aprobado |
 | Modo durante desarrollo | Desactivada o advertencia; no ejecutable en produccion | Prueba de configuration gate |
-| Mensajes y pruebas | PROPUESTA_PARA_VALIDACION | `docs/operations/2026-08-13-i9-r02-mensajes-pruebas.md`; casos R02-T01 a R02-T16 |
+| Mensajes y pruebas | APROBADO_FUNCIONALMENTE_NO_EJECUTABLE | `docs/operations/2026-08-13-i9-r02-mensajes-pruebas.md`; casos R02-T01 a R02-T16 |
 
 ### I9-R03 - Cruces
 

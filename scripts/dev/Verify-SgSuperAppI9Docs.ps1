@@ -517,7 +517,8 @@ Assert-DocumentDoesNotContain $legalProposalPath @(
 
 $r02TestProposalPath = 'docs/operations/2026-08-13-i9-r02-mensajes-pruebas.md'
 Assert-DocumentContains $r02TestProposalPath @(
-    '(?m)^> Estado: \*\*PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE\*\*\s*$',
+    '(?m)^> Estado: \*\*APROBADO_FUNCIONALMENTE_NO_EJECUTABLE\*\*\s*$',
+    '(?m)^> Evidencia: aprobacion explicita del usuario en esta conversacion\.\s*$',
     '(?is)I9-R02-OK.*I9-R02-WARN.*I9-R02-MOTIVE.*I9-R02-OTHER.*I9-R02-PENDING.*I9-R02-REJECTED.*I9-R02-APPROVED',
     '(?m)^\| R02-T01 \| Intervalo 12 h 00 min \| CUMPLE; no crea excepcion \|\s*$',
     '(?m)^\| R02-T03 \| Intervalo 11 h 59 min \| Genera propuesta y excepcion PENDIENTE; no permite aprobar/publicar \|\s*$',
@@ -526,7 +527,7 @@ Assert-DocumentContains $r02TestProposalPath @(
     '(?is)reutilizar aprobacion en otro turno.*Rechaza reutilizacion',
     '(?is)Intervalo negativo por solapamiento.*I9-R03 aplica bloqueo absoluto',
     '(?is)Turnos en puestos diferentes.*I9-R05.*no presume tiempo de traslado',
-    '(?is)Este artefacto no activa I9-R02'
+    '(?is)Este artefacto no activa I9-R02.*aprobacion\s+funcional.*implementacion posterior mediante TDD.*evidencia institucional'
 )
 Assert-PatternCount $r02TestProposalPath '(?m)^\| R02-T(?:0[1-9]|1[0-6]) \|' 16
 Assert-DocumentDoesNotContain $r02TestProposalPath @(

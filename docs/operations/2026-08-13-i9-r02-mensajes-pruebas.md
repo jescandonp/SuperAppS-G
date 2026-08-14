@@ -1,8 +1,9 @@
 # I9-R02 - Mensajes Y Casos De Prueba
 
-> Estado: **PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE**
+> Estado: **APROBADO_FUNCIONALMENTE_NO_EJECUTABLE**
 > Fecha: 2026-08-13
 > Regla: descanso preventivo minimo de 12 horas.
+> Evidencia: aprobacion explicita del usuario en esta conversacion.
 
 ## Mensajes Funcionales Propuestos
 
@@ -55,6 +56,7 @@ los permisos autorizados.
 
 ## Condicion De Aprobacion
 
-Este artefacto no activa I9-R02. Requiere validacion funcional de mensajes y
-casos por S&G, implementacion posterior mediante TDD y evidencia institucional
-antes de proponer la regla como ejecutable.
+Este artefacto no activa I9-R02. Los mensajes y casos tienen aprobacion
+funcional del usuario; requieren implementacion posterior mediante TDD,
+ejecucion satisfactoria y evidencia institucional antes de proponer la regla
+como ejecutable.
