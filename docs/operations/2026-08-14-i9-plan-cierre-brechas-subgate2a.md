@@ -103,6 +103,13 @@ preparacion no completa WP-I9-C ni autoriza implementacion.
 **Criterio de salida:** matriz versionada y validada; una ausencia nunca se
 interpreta como cero.
 
+**Formato preparado:**
+`docs/operations/2026-08-14-i9-wp-d-formato-matriz-traslados-r05.md`, con
+estado `LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_OPERACIONES_NO_EJECUTABLE`.
+Los proyectos, puestos, tiempos, prohibiciones, version, vigencia y decision
+permanecen `PENDIENTE`; su preparacion no completa WP-I9-D ni autoriza
+implementacion.
+
 ### WP-I9-E - Requisitos Del Puesto R06
 
 **Responsables de validacion:** Talento Humano valida; Director de Operaciones

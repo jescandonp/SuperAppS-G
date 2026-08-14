@@ -114,6 +114,7 @@ preparado para diligenciamiento; todos los campos de decision permanecen
 | Tiempo insuficiente | Excepcion PENDIENTE | Pruebas menor, igual y mayor al requerido |
 | Trafico/rutas dinamicas | Fuera del MVP | Confirmacion de alcance |
 | Parametros, mensajes y pruebas | APROBADO_FUNCIONALMENTE_NO_EJECUTABLE | `docs/operations/2026-08-13-i9-r05-parametros-mensajes-pruebas.md`; casos R05-T01 a R05-T20; aprobacion explicita del usuario |
+| Formato de matriz institucional | LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_OPERACIONES_NO_EJECUTABLE | `docs/operations/2026-08-14-i9-wp-d-formato-matriz-traslados-r05.md`; proyectos, puestos, tiempos, prohibiciones, version, vigencia y decision permanecen PENDIENTE |
 
 ### I9-R06 - Requisitos Del Puesto
 

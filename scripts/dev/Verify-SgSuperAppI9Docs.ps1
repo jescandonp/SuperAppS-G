@@ -856,6 +856,37 @@ Assert-DocumentContains $parameterMatrixPath @(
     '(?is)codigos reales, version, vigencia y decisiones permanecen PENDIENTE'
 )
 
+$wpI9DTransferMatrixPath = 'docs/operations/2026-08-14-i9-wp-d-formato-matriz-traslados-r05.md'
+Assert-DocumentContains $wpI9DTransferMatrixPath @(
+    '(?m)^> Estado: \*\*LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_OPERACIONES_NO_EJECUTABLE\*\*\s*$',
+    '(?is)no constituye matriz institucional aprobada ni autoriza implementacion, excepciones o activacion de I9-R05',
+    '(?is)sin inventar proyectos, contratos, puestos,\s+tiempos ni restricciones',
+    '(?is)cada fila representa un solo sentido: `A -> B` y `B -> A` son\s+relaciones independientes',
+    '(?is)minutos enteros no negativos.*relacion ausente\s+nunca se interpreta como cero',
+    '(?is)cero minutos por\s+identidad.*mismo puesto exacto.*puestos diferentes.*requieren una fila explicita',
+    '(?is)projectOrContractId.*originPositionId.*destinationPositionId.*requiredMinutes.*prohibited.*restrictionSource.*matrixVersion.*effectiveFrom.*effectiveTo.*recordedBy',
+    '(?is)Fila existente.*Evalua la frontera configurada.*Fila ausente.*Excepcion PENDIENTE; nunca usa cero.*Combinacion prohibida.*Bloqueo absoluto sin excepcion',
+    '(?is)Director de Operaciones registro su\s+aprobacion con evidencia.*I9-R05 permanece no ejecutable.*Gate 2 sigue bloqueado'
+)
+Assert-PatternCount $wpI9DTransferMatrixPath '(?m)^\d+\. `MAT-I9-D-(?:0[1-9]|1[0-2])`:' 12
+Assert-PatternCount $wpI9DTransferMatrixPath '(?m)^- \[ \] ' 12
+Assert-PatternCount $wpI9DTransferMatrixPath '(?m)^\| (?:Fila existente|Fila ausente|Combinacion prohibida) \|' 3
+Assert-DocumentDoesNotContain $wpI9DTransferMatrixPath @(
+    '(?i)I9-R05.*APROBADA_EJECUTABLE',
+    '(?i)Gate 2.*Cerrado',
+    '(?im)^\| Director de Operaciones \| (?!PENDIENTE \| PENDIENTE \| PENDIENTE \| PENDIENTE \| PENDIENTE \|).+$',
+    '(?im)^\| (?!PENDIENTE \| PENDIENTE \| PENDIENTE \| PENDIENTE \| PENDIENTE \| PENDIENTE \| PENDIENTE \| PENDIENTE \| PENDIENTE \| PENDIENTE \| PENDIENTE \|).+\|\s*\d+\s*\|\s*(?:SI|NO)\s*\|'
+)
+Assert-DocumentContains $subgate2APlanPath @(
+    'docs/operations/2026-08-14-i9-wp-d-formato-matriz-traslados-r05\.md',
+    'LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_OPERACIONES_NO_EJECUTABLE',
+    '(?is)proyectos, puestos, tiempos, prohibiciones, version, vigencia y decision\s+permanecen `PENDIENTE`.*preparacion no completa WP-I9-D ni autoriza\s+implementacion'
+)
+Assert-DocumentContains $parameterMatrixPath @(
+    'docs/operations/2026-08-14-i9-wp-d-formato-matriz-traslados-r05\.md',
+    '(?is)proyectos, puestos, tiempos, prohibiciones, version, vigencia y decision permanecen PENDIENTE'
+)
+
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
 Assert-DocumentContains $validationActPath @(
     '(?m)^> Estado: \*\*APROBADA\*\*\s*$',
