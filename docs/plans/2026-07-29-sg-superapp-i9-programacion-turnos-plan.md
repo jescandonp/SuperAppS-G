@@ -486,6 +486,15 @@ gestionados por I9. En paralelo pueden recopilarse los catalogos de
 novedades y requisitos, la matriz de traslados y los motivos de excepcion, sin
 convertir datos ausentes en valores por defecto.
 
+#### Propuesta De Cierre De Brechas Del Subgate 2A
+
+El 2026-08-14 se consolido
+`docs/operations/2026-08-14-i9-plan-cierre-brechas-subgate2a.md`. La propuesta
+organiza cinco paquetes institucionales, seis tareas tecnicas posteriores y
+cuatro checkpoints. Su estado es
+`PROPUESTA_PARA_APROBACION_NO_AUTORIZA_IMPLEMENTACION`: no completa fuentes,
+catalogos ni matrices, no activa reglas y no cierra Gate 2.
+
 ### Propuesta Juridica No Bloqueante I9-R01
 
 El 2026-08-13 se preparo la propuesta

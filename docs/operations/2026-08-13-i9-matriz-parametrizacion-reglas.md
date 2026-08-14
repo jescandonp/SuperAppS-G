@@ -145,3 +145,11 @@ El Subgate 2A solo puede cerrarse cuando:
 
 Hasta ese cierre, las siete reglas permanecen no ejecutables y Gate 2 continua
 bloqueado.
+
+## Plan Propuesto De Cierre
+
+El orden de recopilacion institucional, implementacion tecnica posterior y
+checkpoints se consolida en
+`docs/operations/2026-08-14-i9-plan-cierre-brechas-subgate2a.md`, con estado
+`PROPUESTA_PARA_APROBACION_NO_AUTORIZA_IMPLEMENTACION`. El plan no completa
+campos pendientes, no activa reglas y no cierra Gate 2.
