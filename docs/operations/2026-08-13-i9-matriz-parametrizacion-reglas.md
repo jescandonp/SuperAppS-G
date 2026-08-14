@@ -23,7 +23,7 @@ interpreta como cero, falso, vacio permitido o valor por defecto.
 | I9-R02 | Umbral preventivo global de 12 h; excepcion por turno antes de aprobar/publicar | Implementacion TDD, ejecucion de pruebas y evidencia institucional | Director de Operaciones | PARAMETROS_FUNCIONALES_APROBADOS_NO_EJECUTABLE |
 | I9-R03 | Solapamiento global bloqueante sobre intervalo [inicio, fin); traslado se remite a I9-R05 | Implementacion TDD, ejecucion de pruebas, enlace validado con R05 y evidencia | Operaciones | PARAMETROS_FUNCIONALES_APROBADOS_NO_EJECUTABLE |
 | I9-R04 | Novedades clasificadas; mapeo inicial, contrato, mensajes y pruebas aprobados | Codigos institucionales restantes, fuente/version, implementacion TDD y evidencia | Talento Humano y Operaciones | PARAMETROS_FUNCIONALES_PARCIALES_APROBADOS_NO_EJECUTABLE |
-| I9-R05 | Matriz de traslados por proyecto/contrato; sin valor universal | Matriz real origen-destino y combinaciones prohibidas | Operaciones | PENDIENTE_DE_PARAMETROS |
+| I9-R05 | Matriz de traslados por proyecto/contrato; propuesta detallada de parametros, mensajes y pruebas | Aprobacion de parametros propuestos; matriz real, fuente/version, TDD y evidencia | Operaciones | PROPUESTA_DE_PARAMETROS_PARA_VALIDACION_NO_EJECUTABLE |
 | I9-R06 | No bloquea propuesta; excepcion antes de aprobar/publicar | Catalogos reales I3/I5, vigencias y responsables de subsanacion | Talento Humano y Operaciones | PENDIENTE_DE_PARAMETROS |
 | I9-R07 | Plantilla obligatoria; desviacion con aprobacion auditada | Motivos autorizados y responsables de excepcion | Operaciones | PENDIENTE_DE_PARAMETROS |
 
@@ -106,6 +106,7 @@ bloquea el desarrollo, pero I9-R01 permanece no ejecutable en produccion.
 | Valor ausente | Advertencia y excepcion PENDIENTE; nunca cero | Prueba de ausencia de fila |
 | Tiempo insuficiente | Excepcion PENDIENTE | Pruebas menor, igual y mayor al requerido |
 | Trafico/rutas dinamicas | Fuera del MVP | Confirmacion de alcance |
+| Parametros, mensajes y pruebas | PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE | `docs/operations/2026-08-13-i9-r05-parametros-mensajes-pruebas.md`; casos R05-T01 a R05-T20 |
 
 ### I9-R06 - Requisitos Del Puesto
 

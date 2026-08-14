@@ -616,6 +616,31 @@ Assert-DocumentDoesNotContain $r04TestProposalPath @(
     '(?im)^(?!.*\bno\b).*bloqueo absoluto.*(?:admite|permite).*excepcion'
 )
 
+$r05ProposalPath = 'docs/operations/2026-08-13-i9-r05-parametros-mensajes-pruebas.md'
+Assert-DocumentContains $r05ProposalPath @(
+    '(?m)^> Estado: \*\*PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE\*\*\s*$',
+    '(?is)criterios base aprobados por el usuario.*parametros detallados pendientes de aprobacion',
+    '(?is)Director de Operaciones.*SCHEDULING/APPROVE_EXCEPTION',
+    '(?is)minutos enteros no negativos.*A -> B.*B -> A',
+    '(?is)Excepcion no reutilizable.*guarda.*dos turnos.*origen.*destino',
+    '(?is)Mismo puesto exacto.*cero minutos por identidad.*puestos diferentes.*no se asume',
+    '(?is)I9-R05-SAME.*I9-R05-OK.*I9-R05-INSUFFICIENT.*I9-R05-MISSING.*I9-R05-PROHIBITED.*I9-R05-PENDING.*I9-R05-REJECTED.*I9-R05-APPROVED.*I9-R05-NO-VERSION',
+    '(?m)^\| R05-T03 \| A -> B requiere 30 min; disponibles 30 \| CUMPLE por frontera igual \|\s*$',
+    '(?m)^\| R05-T05 \| A -> B requiere 30 min; disponibles 29 \| Excepcion PENDIENTE; bloquea aprobar/publicar \|\s*$',
+    '(?is)Combinacion marcada prohibida.*Bloqueo absoluto; no permite solicitar excepcion',
+    '(?is)Otro rol intenta aprobar.*Acceso denegado',
+    '(?is)reutilizar aprobacion.*Rechaza reutilizacion',
+    '(?is)Existe solapamiento.*I9-R03 mantiene bloqueo absoluto',
+    '(?is)propuesta para validacion.*no\s+activa I9-R05 ni cierra Gate 2.*implementacion mediante TDD'
+)
+Assert-PatternCount $r05ProposalPath '(?m)^\| R05-T(?:0[1-9]|1[0-9]|20) \|' 20
+Assert-DocumentDoesNotContain $r05ProposalPath @(
+    '(?i)I9-R05.*APROBADA_EJECUTABLE',
+    '(?i)Gate 2.*Cerrado',
+    '(?m)^> Evidencia: aprobacion explicita del usuario en esta conversacion\.\s*$',
+    '(?im)^(?!.*\bno\b).*combinacion.*prohibida.*(?:admite|permite).*excepcion'
+)
+
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
 Assert-DocumentContains $validationActPath @(
     '(?m)^> Estado: \*\*APROBADA\*\*\s*$',

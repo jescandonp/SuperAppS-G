@@ -409,6 +409,17 @@ dinamicas quedan fuera del MVP. I9-R05 permanece no ejecutable hasta cargar y
 validar la matriz real, completar pruebas e integrarla con I9-R03. Esta decision
 no aprueba I9-R06 ni I9-R07.
 
+#### Propuesta De Parametros, Mensajes Y Pruebas I9-R05
+
+Se preparo
+`docs/operations/2026-08-13-i9-r05-parametros-mensajes-pruebas.md` con diez
+parametros, nueve mensajes y veinte casos de prueba. La propuesta explicita el
+rol aprobador, minutos enteros, filas direccionales, versiones vigentes,
+excepciones no reutilizables, tratamiento del mismo puesto, fronteras y
+prioridad frente a I9-R03. Su estado es
+`PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE`; no atribuye aprobacion al usuario, no
+activa I9-R05 y no cierra Gate 2.
+
 ### Parametrizacion I9-R06
 
 El 2026-08-13 el usuario aprobo I9-R06 como regla no bloqueante para generar
