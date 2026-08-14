@@ -368,6 +368,15 @@ La regla permanece no ejecutable hasta mapear los codigos reales, completar
 mensajes, pruebas y evidencia institucional. Esta decision no aprueba I9-R05 a
 I9-R07.
 
+El usuario aprobo despues el mapeo inicial visible en el historico simulado:
+`INC` incapacidad bloqueante, `V` vacaciones bloqueantes, `A` ausencia cuyo
+estado determina bloqueo o excepcion, y `TA` turno adicional como excepcion
+sujeta a I9-R01/I9-R02. `D`, `N` y `X` son codigos de programacion, no
+novedades. Un codigo desconocido solo genera advertencia. El Director de
+Operaciones aprueba excepciones y el alcance cubre todos los proyectos I9. La
+regla sigue no ejecutable hasta completar los codigos institucionales restantes,
+fuente/version, mensajes, pruebas y evidencia.
+
 ### Parametrizacion I9-R05
 
 El 2026-08-13 el usuario aprobo I9-R05 con una matriz versionada de traslados

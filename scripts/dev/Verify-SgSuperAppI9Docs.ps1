@@ -414,10 +414,14 @@ Assert-DocumentContains $catalogPath @(
     '(?is)Ausencia confirmada \| Bloqueo absoluto.*Ausencia reportada pendiente de confirmar \| Excepcion aprobable',
     '(?is)Induccion o capacitacion coincidente \| Excepcion aprobable',
     '(?is)Turno adicional \| Excepcion aprobable, sujeta a I9-R01 e I9-R02',
+    '(?is)Mapeo inicial aprobado desde el historico simulado.*INC \| Incapacidad vigente \| Bloqueo absoluto.*V \| Vacaciones aprobadas y vigentes \| Bloqueo absoluto.*A \| Ausencia \| Confirmada: bloqueo absoluto; pendiente de confirmar: excepcion aprobable.*TA \| Turno adicional \| Excepcion aprobable sujeta a I9-R01 e I9-R02',
+    '(?is)D / N / X \| Dia / noche / descanso \| Codigos de programacion; no son novedades',
     '(?is)Descuento o sancion administrativa \| Informativa, salvo indisponibilidad formal',
     '(?is)tipo, inicio, fin, estado, fuente y responsable',
+    '(?is)Director de Operaciones aprueba las excepciones de I9-R04.*SCHEDULING/APPROVE_EXCEPTION.*todos los proyectos',
+    '(?is)codigo desconocido genera advertencia.*no se convierte automaticamente\s+en bloqueo, excepcion aprobada ni disponibilidad',
     '(?is)prevalece: bloqueo absoluto, luego excepcion.*finalmente informativa',
-    '(?is)I9-R04 no pasa a ejecutable hasta mapear los codigos reales de novedades de S&G'
+    '(?is)I9-R04 no pasa a ejecutable hasta confirmar la fuente y version.*licencia/calamidad.*suspension/retiro.*capacitacion/induccion.*novedades administrativas'
 )
 Assert-DocumentDoesNotContain $catalogPath @(
     '(?i)I9-R04.*APROBADA_EJECUTABLE'
@@ -492,7 +496,10 @@ Assert-DocumentContains $parameterMatrixPath @(
     '(?is)Semantica del intervalo \| Semiabierto \[inicio, fin\)',
     '(?is)Cambios manuales \| Revalidacion obligatoria antes de guardar/aprobar/publicar',
     '(?is)Prioridad frente a R05 \| Excepcion de traslado nunca elude solapamiento',
-    '(?is)Codigos que bloquean \| PENDIENTE',
+    '(?is)Codigos que bloquean \| INC: incapacidad vigente; V: vacaciones aprobadas/vigentes; A confirmada: ausencia',
+    '(?is)Codigos con excepcion \| A pendiente de confirmar; TA sujeto a I9-R01/I9-R02',
+    '(?is)Codigos de programacion \| D dia; N noche; X descanso; no son novedades',
+    '(?is)Codigo desconocido \| Advertencia; no infiere bloqueo, excepcion aprobada ni disponibilidad',
     '(?is)Origen, destino y tiempo requerido \| PENDIENTE',
     '(?is)Catalogo de requisitos por puesto \| PENDIENTE',
     '(?is)Motivos autorizados \| PENDIENTE',

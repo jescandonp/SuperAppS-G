@@ -167,6 +167,16 @@ Evidencia: aprobacion explicita del usuario en esta conversacion.
 | Descuento o sancion administrativa | Informativa, salvo indisponibilidad formal |
 | Novedad vencida o anulada | No afecta la programacion |
 
+Mapeo inicial aprobado desde el historico simulado:
+
+| Codigo visible | Interpretacion | Tratamiento |
+|---|---|---|
+| INC | Incapacidad vigente | Bloqueo absoluto durante su vigencia |
+| V | Vacaciones aprobadas y vigentes | Bloqueo absoluto durante su vigencia |
+| A | Ausencia | Confirmada: bloqueo absoluto; pendiente de confirmar: excepcion aprobable |
+| TA | Turno adicional | Excepcion aprobable sujeta a I9-R01 e I9-R02 |
+| D / N / X | Dia / noche / descanso | Codigos de programacion; no son novedades |
+
 - Toda novedad debe registrar tipo, inicio, fin, estado, fuente y responsable.
 - Una novedad sin vigencia completa genera advertencia y no se convierte
   automaticamente en bloqueo.
@@ -174,10 +184,17 @@ Evidencia: aprobacion explicita del usuario en esta conversacion.
   aprobable y finalmente informativa.
 - Toda excepcion requiere motivo, aprobador, fecha, vigencia y auditoria antes
   de aprobar o publicar la programacion.
+- El Director de Operaciones aprueba las excepciones de I9-R04 mediante
+  `SCHEDULING/APPROVE_EXCEPTION` y el criterio aplica a todos los proyectos de
+  vigilancia gestionados por I9.
+- Un codigo desconocido genera advertencia y no se convierte automaticamente
+  en bloqueo, excepcion aprobada ni disponibilidad.
 - La fuente, estado y version de la novedad quedan en el snapshot de evaluacion.
 
-I9-R04 no pasa a ejecutable hasta mapear los codigos reales de novedades de S&G,
-completar mensajes, pruebas de prioridad y evidencia institucional.
+I9-R04 no pasa a ejecutable hasta confirmar la fuente y version del mapeo,
+incorporar los codigos reales de licencia/calamidad, suspension/retiro,
+capacitacion/induccion y novedades administrativas, y completar mensajes,
+pruebas de prioridad y evidencia institucional.
 
 ## Decision De Parametrizacion I9-R05
 
