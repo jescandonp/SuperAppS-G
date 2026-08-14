@@ -381,3 +381,15 @@ como rol aprobador y el alcance comprende todos los proyectos de vigilancia
 gestionados por I9. En paralelo pueden recopilarse los catalogos de
 novedades y requisitos, la matriz de traslados y los motivos de excepcion, sin
 convertir datos ausentes en valores por defecto.
+
+### Propuesta Juridica No Bloqueante I9-R01
+
+El 2026-08-13 se preparo la propuesta
+`docs/operations/2026-08-13-i9-propuesta-juridica-jornada.md` a partir de fuentes
+oficiales colombianas para revision de Juridica. La revision no bloquea el
+desarrollo de interfaz, persistencia, auditoria, permisos, mensajes y pruebas.
+I9-R01 permanece no ejecutable en produccion y su configuracion debe estar
+desactivada o en modo advertencia hasta resolver la armonizacion entre el
+articulo 7 de la Ley 1920 de 2018 y el articulo 167A del Codigo Sustantivo del
+Trabajo modificado por la Ley 2466 de 2025. La marca I9 de existencia del acuerdo
+no sustituye el escrito ni las firmas requeridas legalmente.

@@ -19,7 +19,7 @@ interpreta como cero, falso, vacio permitido o valor por defecto.
 
 | Regla | Decision funcional aprobada | Insumo pendiente principal | Ruta de validacion | Estado |
 |---|---|---|---|---|
-| I9-R01 | Limites ordinarios y sectoriales con aprobacion obligatoria entre 10 y 12 h | Fuente y vigencia juridicas | Juridica y Operaciones | PENDIENTE_DE_PARAMETROS |
+| I9-R01 | Limites ordinarios y sectoriales con aprobacion obligatoria entre 10 y 12 h | Revision juridica de la armonizacion Ley 1920/2018 y articulo 167A CST; vigencia | Juridica y Operaciones | PROPUESTA_JURIDICA_EN_REVISION_NO_EJECUTABLE |
 | I9-R02 | Umbral preventivo S&G de 12 h; excepcion antes de aprobar/publicar | Alcance por proyecto, mensajes y vigencia de la politica | Operaciones y Juridica | PENDIENTE_DE_PARAMETROS |
 | I9-R03 | Solapamiento real bloqueante; traslado se remite a I9-R05 | Mensajes, fronteras temporales y enlace validado con R05 | Operaciones | PENDIENTE_DE_PARAMETROS |
 | I9-R04 | Novedades clasificadas como bloqueo, excepcion o informacion | Mapeo de codigos y estados reales de novedades | Talento Humano y Operaciones | PENDIENTE_DE_PARAMETROS |
@@ -39,11 +39,16 @@ interpreta como cero, falso, vacio permitido o valor por defecto.
 | Maximo vigilancia semanal | 60 horas | Fuente sectorial validada |
 | Existencia de acuerdo escrito | Marca obligatoria para programar mas de 8 h; conserva responsable y fecha | Confirmacion explicita del usuario |
 | Referencia, documento u otro soporte del acuerdo | Opcional; su ausencia no bloquea por si sola | Campo disponible para trazabilidad |
+| Conservacion legal del acuerdo | La marca I9 no reemplaza escrito ni firmas; medio institucional PENDIENTE | Revision de Juridica sobre Ley 1920 de 2018, articulo 7 |
 | Tratamiento mayor a 10 y hasta 12 h/dia | Excepcion PENDIENTE con aprobacion obligatoria; no bloquea propuesta | Decision del usuario; falta fuente/vigencia juridica |
 | Rol aprobador de 10 a 12 h/dia | Director de Operaciones | Confirmacion explicita del usuario; permiso SCHEDULING/APPROVE_EXCEPTION |
 | Tratamiento mayor a 12 h/dia | Bloqueo absoluto | Prueba de rechazo sin excepcion |
 | Alcance | Todos los proyectos de vigilancia gestionados por I9; sin valor distinto por proyecto/contrato | Confirmacion explicita del usuario |
 | Mensajes y pruebas de borde | PENDIENTE | Casos 8/10/12 h y 42/60 h |
+
+Propuesta de referencia para revision:
+`docs/operations/2026-08-13-i9-propuesta-juridica-jornada.md`. Su revision no
+bloquea el desarrollo, pero I9-R01 permanece no ejecutable en produccion.
 
 ### I9-R02 - Descanso Minimo
 

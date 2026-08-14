@@ -485,6 +485,25 @@ Assert-DocumentDoesNotContain $parameterMatrixPath @(
     '(?i)PENDIENTE.*(?:=|se interpreta como)\s*(?:0|cero|false|falso)'
 )
 
+$legalProposalPath = 'docs/operations/2026-08-13-i9-propuesta-juridica-jornada.md'
+Assert-DocumentContains $legalProposalPath @(
+    '(?m)^> Estado: \*\*PROPUESTA_PENDIENTE_REVISION_JURIDICA_NO_EJECUTABLE\*\*\s*$',
+    '(?is)Ley 1920 de 2018.*articulo 7.*escrito.*firma de ambas partes.*12 horas.*60 horas',
+    '(?is)Ley 2101 de 2021.*42 horas',
+    '(?is)Ley 2466 de 2025.*articulo 167A.*2 horas diarias y 12 semanales',
+    '(?is)Juridica debe determinar.*armonizan.*Ley 1920.*articulo 167A',
+    '(?is)marca del sistema.*no reemplaza el documento escrito ni las firmas',
+    '(?is)revision juridica no bloquea el desarrollo',
+    '(?is)I9-R01 permanece no ejecutable en produccion',
+    '(?is)configuracion normativa se mantiene desactivada o en modo advertencia',
+    '(?is)no se aprueba ni publica automaticamente'
+)
+Assert-DocumentDoesNotContain $legalProposalPath @(
+    '(?i)CONCEPTO_JURIDICO_APROBADO',
+    '(?i)I9-R01.*APROBADA_EJECUTABLE',
+    '(?i)marca.*(?:reemplaza|equivale).*(?:acuerdo escrito|firmas)'
+)
+
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
 Assert-DocumentContains $validationActPath @(
     '(?m)^> Estado: \*\*APROBADA\*\*\s*$',
