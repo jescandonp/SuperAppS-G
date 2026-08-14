@@ -680,6 +680,39 @@ Assert-DocumentDoesNotContain $planPath @(
     '(?ms)^### Parametrizacion I9-R04\s*$(?:(?!^### ).)*^#### (?:Propuesta De )?Parametros, Mensajes Y Pruebas I9-R06'
 )
 
+$r07ProposalPath = 'docs/operations/2026-08-14-i9-r07-parametros-mensajes-pruebas.md'
+Assert-DocumentContains $r07ProposalPath @(
+    '(?m)^> Estado: \*\*PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE\*\*\s*$',
+    '(?is)criterio base aprobado por el usuario.*parametros detallados pendientes de aprobacion',
+    '(?is)Director de Operaciones.*SCHEDULING/APPROVE_EXCEPTION',
+    '(?is)OPERATIONAL_CONTINGENCY.*URGENT_REPLACEMENT.*EXCEPTIONAL_CLIENT_REQUEST.*TEMPORARY_TEMPLATE_TRANSITION.*SPECIAL_COVERAGE.*OTHER',
+    '(?is)OTHER.*exige descripcion obligatoria.*nunca sustituye la aprobacion',
+    '(?is)Agrupacion controlada.*mismo\s+guarda y version.*No cubre celdas futuras.*otros guardas',
+    '(?is)No reutilizacion.*cambio de guarda.*periodo.*plantilla.*version.*celda.*valor',
+    '(?is)Comparacion deterministica.*ciclo, anclaje y version seleccionados',
+    '(?is)programacion publicada no se modifica.*nueva version.*reprogramacion trazable',
+    '(?is)I9-R07-OK.*I9-R07-DEVIATION.*I9-R07-MOTIVE.*I9-R07-OTHER.*I9-R07-PENDING.*I9-R07-REJECTED.*I9-R07-APPROVED.*I9-R07-STALE.*I9-R07-NO-TEMPLATE',
+    '(?m)^\| R07-T02 \| Una celda cambia D por N \| Excepcion PENDIENTE; identifica valor esperado y propuesto \|\s*$',
+    '(?is)Rol sin permiso intenta aprobar.*Acceso denegado',
+    '(?is)reutilizar aprobacion para otro guarda.*Rechaza reutilizacion',
+    '(?is)bloqueo absoluto R01/R03/R05.*Mantiene bloqueo absoluto',
+    '(?is)Decisiones Pendientes De Aprobacion.*Director de Operaciones como aprobador',
+    '(?is)propuesta para validacion.*no\s+activa I9-R07 ni cierra Gate 2.*implementacion mediante TDD'
+)
+Assert-PatternCount $r07ProposalPath '(?m)^\| R07-T(?:0[1-9]|1[0-9]|2[0-3]) \|' 23
+Assert-DocumentDoesNotContain $r07ProposalPath @(
+    '(?i)I9-R07.*APROBADA_EJECUTABLE',
+    '(?i)Gate 2.*Cerrado',
+    '(?m)^> Evidencia: aprobacion explicita del usuario en esta conversacion\.\s*$',
+    '(?im)^(?!.*\bno\b).*excepcion de plantilla.*elude.*bloqueo absoluto'
+)
+Assert-DocumentSectionContains $planPath '(?ms)^### Parametrizacion I9-R07\s*$.*?(?=^### Apertura Subgate 2A.*$)' @(
+    '(?m)^#### Propuesta De Parametros, Mensajes Y Pruebas I9-R07\s*$',
+    'docs/operations/2026-08-14-i9-r07-parametros-mensajes-pruebas\.md',
+    'PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE',
+    '(?is)no activan I9-R07 y no cierran Gate 2'
+)
+
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
 Assert-DocumentContains $validationActPath @(
     '(?m)^> Estado: \*\*APROBADA\*\*\s*$',

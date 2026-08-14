@@ -457,6 +457,17 @@ plantilla puede eludir bloqueos absolutos. Los cambios de plantilla solo afectan
 borradores futuros. I9-R07 permanece no ejecutable hasta completar motivos,
 responsables, mensajes, pruebas y evidencia institucional.
 
+#### Propuesta De Parametros, Mensajes Y Pruebas I9-R07
+
+El 2026-08-14 se preparo
+`docs/operations/2026-08-14-i9-r07-parametros-mensajes-pruebas.md` con diez
+parametros, nueve mensajes y veintitres casos de prueba. La propuesta define al
+Director de Operaciones como aprobador, un catalogo inicial de motivos,
+agrupacion controlada por guarda y snapshot, no reutilizacion, comparacion
+deterministica e inmutabilidad de programaciones publicadas. Su estado es
+`PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE`; estas decisiones detalladas aun no se
+atribuyen al usuario, no activan I9-R07 y no cierran Gate 2.
+
 ### Apertura Subgate 2A - Matriz De Parametrizacion
 
 El 2026-08-13, luego de la aprobacion funcional individual de I9-R01 a I9-R07,
