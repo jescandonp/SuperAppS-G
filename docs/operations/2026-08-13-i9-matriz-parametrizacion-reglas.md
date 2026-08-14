@@ -24,7 +24,7 @@ interpreta como cero, falso, vacio permitido o valor por defecto.
 | I9-R03 | Solapamiento global bloqueante sobre intervalo [inicio, fin); traslado se remite a I9-R05 | Implementacion TDD, ejecucion de pruebas, enlace validado con R05 y evidencia | Operaciones | PARAMETROS_FUNCIONALES_APROBADOS_NO_EJECUTABLE |
 | I9-R04 | Novedades clasificadas; mapeo inicial, contrato, mensajes y pruebas aprobados | Codigos institucionales restantes, fuente/version, implementacion TDD y evidencia | Talento Humano y Operaciones | PARAMETROS_FUNCIONALES_PARCIALES_APROBADOS_NO_EJECUTABLE |
 | I9-R05 | Matriz de traslados por proyecto/contrato; parametros, mensajes y pruebas aprobados | Matriz real, fuente/version, TDD y evidencia | Director de Operaciones | PARAMETROS_FUNCIONALES_APROBADOS_NO_EJECUTABLE |
-| I9-R06 | No bloquea propuesta; excepcion antes de aprobar/publicar | Catalogos reales I3/I5, vigencias y responsables de subsanacion | Talento Humano y Operaciones | PENDIENTE_DE_PARAMETROS |
+| I9-R06 | No bloquea propuesta; propuesta detallada de parametros, mensajes y pruebas | Aprobacion de parametros; catalogos reales I3/I5, fuente/version, TDD y evidencia | Talento Humano y Operaciones | PROPUESTA_DE_PARAMETROS_PARA_VALIDACION_NO_EJECUTABLE |
 | I9-R07 | Plantilla obligatoria; desviacion con aprobacion auditada | Motivos autorizados y responsables de excepcion | Operaciones | PENDIENTE_DE_PARAMETROS |
 
 ## Datos A Diligenciar
@@ -118,6 +118,7 @@ bloquea el desarrollo, pero I9-R01 permanece no ejecutable en produccion.
 | Requisito subsanable informativo | Solo configuracion explicita | Responsable, plazo y evidencia |
 | Responsable de subsanacion | PENDIENTE | Rol autorizado |
 | Mensajes y pruebas | PENDIENTE | Cumplido, faltante, vencido, no verificado e informativo |
+| Propuesta detallada | PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE | `docs/operations/2026-08-14-i9-r06-parametros-mensajes-pruebas.md`; casos R06-T01 a R06-T23 |
 
 ### I9-R07 - Desviacion De Plantilla
 

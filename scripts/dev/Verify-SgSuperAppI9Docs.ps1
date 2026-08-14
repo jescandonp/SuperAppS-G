@@ -641,6 +641,34 @@ Assert-DocumentDoesNotContain $r05ProposalPath @(
     '(?im)^(?!.*\bno\b).*combinacion.*prohibida.*(?:admite|permite).*excepcion'
 )
 
+$r06ProposalPath = 'docs/operations/2026-08-14-i9-r06-parametros-mensajes-pruebas.md'
+Assert-DocumentContains $r06ProposalPath @(
+    '(?m)^> Estado: \*\*PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE\*\*\s*$',
+    '(?is)criterio base aprobado por el usuario.*parametros detallados pendientes de aprobacion',
+    '(?is)COURSE.*ACCREDITATION.*CERTIFICATION.*LICENSE_OR_PERMIT.*OTHER_REQUIREMENT',
+    '(?is)vigente desde el\s+inicio hasta el fin completo del turno',
+    '(?is)COMPLIANT.*MISSING.*EXPIRED.*UNVERIFIED.*INFORMATIVE_REMEDIABLE',
+    '(?is)Sin periodo de gracia universal.*unidad, valor, fuente y vigencia',
+    '(?is)Talento Humano valida.*Director de Operaciones aprueba.*SCHEDULING/APPROVE_EXCEPTION',
+    '(?is)Subsanable informativo.*responsable de\s+subsanacion.*fecha limite.*No equivale a cumplimiento',
+    '(?is)Excepcion no reutilizable.*guarda.*requisito.*puesto.*turno.*version',
+    '(?is)I9-R06-OK.*I9-R06-MISSING.*I9-R06-EXPIRED.*I9-R06-UNVERIFIED.*I9-R06-REMEDIABLE.*I9-R06-INCOMPLETE.*I9-R06-PENDING.*I9-R06-REJECTED.*I9-R06-APPROVED',
+    '(?m)^\| R06-T04 \| Requisito vence durante el turno \| Excepcion PENDIENTE; no se considera vigente \|\s*$',
+    '(?is)Talento Humano valida evidencia.*no sustituye aprobacion operativa',
+    '(?is)Director de Operaciones intenta aprobar sin validacion TH.*Rechaza flujo',
+    '(?is)reutiliza aprobacion.*Rechaza reutilizacion',
+    '(?is)bloqueo absoluto R01/R03/R05.*Mantiene el bloqueo absoluto',
+    '(?is)Decisiones Pendientes De Aprobacion.*ruta Talento Humano valida / Director de Operaciones aprueba',
+    '(?is)propuesta para validacion.*no\s+activa I9-R06 ni cierra Gate 2.*implementacion mediante TDD'
+)
+Assert-PatternCount $r06ProposalPath '(?m)^\| R06-T(?:0[1-9]|1[0-9]|2[0-3]) \|' 23
+Assert-DocumentDoesNotContain $r06ProposalPath @(
+    '(?i)I9-R06.*APROBADA_EJECUTABLE',
+    '(?i)Gate 2.*Cerrado',
+    '(?m)^> Evidencia: aprobacion explicita del usuario en esta conversacion\.\s*$',
+    '(?im)^(?!.*\b(?:no|nunca)\b).*ausencia de informacion.*acredita.*cumplimiento'
+)
+
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
 Assert-DocumentContains $validationActPath @(
     '(?m)^> Estado: \*\*APROBADA\*\*\s*$',

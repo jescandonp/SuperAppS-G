@@ -368,6 +368,17 @@ La regla permanece no ejecutable hasta mapear los codigos reales, completar
 mensajes, pruebas y evidencia institucional. Esta decision no aprueba I9-R05 a
 I9-R07.
 
+#### Propuesta De Parametros, Mensajes Y Pruebas I9-R06
+
+El 2026-08-14 se preparo
+`docs/operations/2026-08-14-i9-r06-parametros-mensajes-pruebas.md` con diez
+parametros, nueve mensajes y veintitres casos de prueba. La propuesta distingue
+la validacion de Talento Humano de la aprobacion operativa, exige vigencia
+durante el turno, evita periodos de gracia inferidos y delimita las excepciones
+como no reutilizables. Su estado es
+`PROPUESTA_PARA_VALIDACION_NO_EJECUTABLE`; estas decisiones detalladas aun no se
+atribuyen al usuario, no activan I9-R06 y no cierran Gate 2.
+
 El usuario aprobo despues el mapeo inicial visible en el historico simulado:
 `INC` incapacidad bloqueante, `V` vacaciones bloqueantes, `A` ausencia cuyo
 estado determina bloqueo o excepcion, y `TA` turno adicional como excepcion
