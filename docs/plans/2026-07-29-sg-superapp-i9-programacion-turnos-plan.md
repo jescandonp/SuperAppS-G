@@ -296,7 +296,9 @@ del usuario y no un concepto juridico aportado. El usuario confirmo al Director
 de Operaciones como aprobador mediante `SCHEDULING/APPROVE_EXCEPTION`. La regla
 aplica a todos los proyectos de vigilancia gestionados por I9, sin un valor
 distinto por proyecto o contrato. Permanece no ejecutable hasta validar
-fuente/vigencia juridica y evidencia. La
+fuente y vigencia juridicas. Para jornadas superiores a 8 horas basta marcar la
+existencia del acuerdo escrito, conservando responsable y fecha; los soportes o
+referencias son opcionales y su ausencia no bloquea por si sola. La
 aprobacion de I9-R01 no aprueba I9-R02 a I9-R07.
 
 ### Parametrizacion I9-R02
@@ -374,7 +376,7 @@ responsables, mensajes y pruebas. Su artefacto rector de trabajo es
 
 La apertura no activa reglas ni cierra Gate 2. Para I9-R01 ya se definio que
 toda jornada superior a 10 y hasta 12 horas requiere aprobacion, pero faltan su
-fuente/vigencia juridica y evidencia; el Director de Operaciones fue confirmado
+fuente y vigencia juridicas; el Director de Operaciones fue confirmado
 como rol aprobador y el alcance comprende todos los proyectos de vigilancia
 gestionados por I9. En paralelo pueden recopilarse los catalogos de
 novedades y requisitos, la matriz de traslados y los motivos de excepcion, sin

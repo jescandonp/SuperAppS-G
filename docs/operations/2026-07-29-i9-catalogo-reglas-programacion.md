@@ -43,7 +43,8 @@ Estado de I9-R01: **APROBADA_CONDICION_JURIDICA_NO_EJECUTABLE**
 
 - Jornada ordinaria: maximo 8 horas diarias y 42 horas semanales.
 - Jornada especial de vigilancia: maximo 12 horas diarias y 60 horas semanales,
-  incluidas las suplementarias, cuando exista acuerdo escrito registrado.
+  incluidas las suplementarias, cuando la existencia del acuerdo escrito este
+  marcada en el sistema.
 - El exceso sobre 8 horas diarias o 42 semanales se identifica y explica como
   tiempo suplementario.
 - Toda jornada superior a 10 y hasta 12 horas crea una excepcion `PENDIENTE`:
@@ -51,7 +52,11 @@ Estado de I9-R01: **APROBADA_CONDICION_JURIDICA_NO_EJECUTABLE**
   publicarse hasta registrar la aprobacion del Director de Operaciones mediante
   `SCHEDULING/APPROVE_EXCEPTION`.
 - Se bloquea superar 12 horas diarias, superar 60 horas semanales o programar
-  mas de 8 horas diarias sin acuerdo escrito.
+  mas de 8 horas diarias cuando la marca de existencia del acuerdo sea falsa o
+  no este diligenciada.
+- La marca de existencia del acuerdo conserva responsable y fecha. Se pueden
+  adjuntar referencia, documento u otro soporte, pero son opcionales y su
+  ausencia no bloquea por si sola la programacion.
 - Ventana de acumulacion: semana calendario; debe conservarse como parametro
   versionado para admitir un alcance contractual distinto aprobado.
 - Evidencia: turnos considerados, total diario, total semanal, acuerdo escrito,
@@ -60,7 +65,7 @@ Estado de I9-R01: **APROBADA_CONDICION_JURIDICA_NO_EJECUTABLE**
 La exigencia de aprobacion para toda jornada superior a 10 y hasta 12 horas
 proviene de la confirmacion del usuario, no de un concepto juridico aportado. El
 usuario confirmo al Director de Operaciones como rol aprobador. Permanecen
-pendientes la fuente y vigencia juridicas y la evidencia exigible. Por decision
+pendientes la fuente y vigencia juridicas. Por decision
 del usuario, el criterio aplica a todos los proyectos de vigilancia gestionados
 por I9, sin un valor distinto por proyecto o contrato.
 Hasta completarlos y validarlos, I9-R01 no
