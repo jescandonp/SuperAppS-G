@@ -357,3 +357,16 @@ valores anterior y propuesto, celdas, motivo y aprobador; ninguna excepcion de
 plantilla puede eludir bloqueos absolutos. Los cambios de plantilla solo afectan
 borradores futuros. I9-R07 permanece no ejecutable hasta completar motivos,
 responsables, mensajes, pruebas y evidencia institucional.
+
+### Apertura Subgate 2A - Matriz De Parametrizacion
+
+El 2026-08-13, luego de la aprobacion funcional individual de I9-R01 a I9-R07,
+se abrio el Subgate 2A para diligenciar valores, fuentes, vigencias, alcances,
+responsables, mensajes y pruebas. Su artefacto rector de trabajo es
+`docs/operations/2026-08-13-i9-matriz-parametrizacion-reglas.md`, con estado
+`BORRADOR_PARA_DILIGENCIAMIENTO_NO_EJECUTABLE`.
+
+La apertura no activa reglas ni cierra Gate 2. El primer bloqueo a resolver es
+el concepto juridico de I9-R01; en paralelo pueden recopilarse los catalogos de
+novedades y requisitos, la matriz de traslados y los motivos de excepcion, sin
+convertir datos ausentes en valores por defecto.

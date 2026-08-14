@@ -431,6 +431,25 @@ Assert-DocumentDoesNotContain $catalogPath @(
     '(?i)I9-R07.*APROBADA_EJECUTABLE'
 )
 
+$parameterMatrixPath = 'docs/operations/2026-08-13-i9-matriz-parametrizacion-reglas.md'
+Assert-DocumentContains $parameterMatrixPath @(
+    '(?m)^> Estado: \*\*BORRADOR_PARA_DILIGENCIAMIENTO_NO_EJECUTABLE\*\*\s*$',
+    '(?is)no autoriza ejecucion en el motor',
+    '(?is)`PENDIENTE` nunca se\s+interpreta como cero, falso, vacio permitido o valor por defecto',
+    '(?is)I9-R01.*I9-R02.*I9-R03.*I9-R04.*I9-R05.*I9-R06.*I9-R07',
+    '(?is)Tratamiento despues de 10 h/dia \| PENDIENTE',
+    '(?is)Codigos que bloquean \| PENDIENTE',
+    '(?is)Origen, destino y tiempo requerido \| PENDIENTE',
+    '(?is)Catalogo de requisitos por puesto \| PENDIENTE',
+    '(?is)Motivos autorizados \| PENDIENTE',
+    '(?is)Hasta ese cierre, las siete reglas permanecen no ejecutables y Gate 2 continua\s+bloqueado'
+)
+Assert-DocumentDoesNotContain $parameterMatrixPath @(
+    '(?i)APROBADA_EJECUTABLE',
+    '(?i)Gate 2.*Cerrado',
+    '(?i)PENDIENTE.*(?:=|se interpreta como)\s*(?:0|cero|false|falso)'
+)
+
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
 Assert-DocumentContains $validationActPath @(
     '(?m)^> Estado: \*\*APROBADA\*\*\s*$',
