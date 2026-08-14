@@ -377,6 +377,16 @@ Operaciones aprueba excepciones y el alcance cubre todos los proyectos I9. La
 regla sigue no ejecutable hasta completar los codigos institucionales restantes,
 fuente/version, mensajes, pruebas y evidencia.
 
+#### Contrato Desacoplado De Novedades I9-R04
+
+El usuario aprobo el contrato interno
+`docs/operations/2026-08-13-i9-r04-contrato-categorias-novedad.md`. Define doce
+categorias canonicas independientes del sistema fuente, validacion en la
+frontera, version unica activa, auditoria y `UNKNOWN` como resultado seguro para
+codigos no mapeados. El contrato es aditivo y no reutiliza identificadores. Su
+aprobacion funcional permite continuar el desarrollo sin inventar codigos
+institucionales, pero no activa I9-R04 ni cierra Gate 2.
+
 ### Parametrizacion I9-R05
 
 El 2026-08-13 el usuario aprobo I9-R05 con una matriz versionada de traslados

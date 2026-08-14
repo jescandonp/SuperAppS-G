@@ -93,6 +93,7 @@ bloquea el desarrollo, pero I9-R01 permanece no ejecutable en produccion.
 | Alcance | Todos los proyectos de vigilancia gestionados por I9 | Confirmacion explicita del usuario |
 | Estados sin efecto | Vencida o anulada | Estados reales equivalentes |
 | Fuente y version | Historico simulado para mapeo inicial; catalogo institucional PENDIENTE | Validacion de Talento Humano y Operaciones |
+| Contrato interno desacoplado | APROBADO_FUNCIONALMENTE_NO_EJECUTABLE | `docs/operations/2026-08-13-i9-r04-contrato-categorias-novedad.md`; 12 categorias canonicas |
 | Mensajes y pruebas de prioridad | PENDIENTE | Coincidencia bloqueo/excepcion/informacion |
 
 ### I9-R05 - Ubicacion Y Traslado

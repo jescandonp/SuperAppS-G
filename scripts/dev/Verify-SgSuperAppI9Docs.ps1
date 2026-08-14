@@ -571,6 +571,27 @@ Assert-DocumentDoesNotContain $r03TestProposalPath @(
     '(?im)^(?!.*\bno\b).*solapamiento.*(?:admite|permite).*excepcion'
 )
 
+$r04CategoryContractPath = 'docs/operations/2026-08-13-i9-r04-contrato-categorias-novedad.md'
+Assert-DocumentContains $r04CategoryContractPath @(
+    '(?m)^> Estado: \*\*APROBADO_FUNCIONALMENTE_NO_EJECUTABLE\*\*\s*$',
+    '(?m)^> Evidencia: aprobacion explicita del usuario en esta conversacion\.\s*$',
+    '(?is)INCAPACITY_ACTIVE.*VACATION_APPROVED_ACTIVE.*LEAVE_OR_CALAMITY_ACTIVE.*SUSPENSION_OR_TERMINATION_ACTIVE.*ABSENCE_CONFIRMED.*ABSENCE_PENDING_CONFIRMATION.*TRAINING_OR_INDUCTION_OVERLAP.*AVAILABLE.*ADDITIONAL_SHIFT.*ADMINISTRATIVE_EVENT.*EXPIRED_OR_CANCELLED.*UNKNOWN',
+    '(?is)identificadores son `UPPER_SNAKE_CASE`.*Nuevas categorias se agregan sin\s+cambiar el significado.*deprecacion y\s+migracion',
+    '(?is)sourceSystem.*sourceCode.*sourceStatus.*semanticCategory.*mappingVersion.*effectiveFrom.*effectiveTo.*mappedBy.*approvedBy',
+    '(?is)dos mapeos\s+activos.*sourceSystem \+ sourceCode \+ sourceStatus',
+    '(?is)valor desconocido siempre se transforma en `UNKNOWN`.*nunca se aproxima',
+    '(?is)INC \| Vigente \| INCAPACITY_ACTIVE.*V \| Aprobada y vigente \| VACATION_APPROVED_ACTIVE.*A \| Confirmada \| ABSENCE_CONFIRMED.*A \| Pendiente de confirmar \| ABSENCE_PENDING_CONFIRMATION.*TA \| Vigente \| ADDITIONAL_SHIFT',
+    '(?is)`D`, `N` y `X` no ingresan.*codigos de programacion',
+    '(?is)Solo existe una version activa.*snapshot conserva\s+codigo, estado, categoria y version',
+    '(?is)permanece no ejecutable.*Gate 2 continua abierto'
+)
+Assert-PatternCount $r04CategoryContractPath '(?m)^\| (?:INCAPACITY_ACTIVE|VACATION_APPROVED_ACTIVE|LEAVE_OR_CALAMITY_ACTIVE|SUSPENSION_OR_TERMINATION_ACTIVE|ABSENCE_CONFIRMED|ABSENCE_PENDING_CONFIRMATION|TRAINING_OR_INDUCTION_OVERLAP|AVAILABLE|ADDITIONAL_SHIFT|ADMINISTRATIVE_EVENT|EXPIRED_OR_CANCELLED|UNKNOWN) \|' 12
+Assert-DocumentDoesNotContain $r04CategoryContractPath @(
+    '(?i)I9-R04.*APROBADA_EJECUTABLE',
+    '(?i)Gate 2.*Cerrado',
+    '(?i)UNKNOWN.*(?:bloqueo absoluto|disponible)'
+)
+
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
 Assert-DocumentContains $validationActPath @(
     '(?m)^> Estado: \*\*APROBADA\*\*\s*$',
