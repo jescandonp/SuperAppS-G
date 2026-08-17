@@ -114,6 +114,34 @@ function Test-SqlChecksumCanonicalizationLinkage {
         $TestContent -match '(?s)i9_mvp_canonical_jsonb\s*\(\s*''1e2''::jsonb\s*\).*?i9_mvp_canonical_jsonb\s*\(\s*''100''::jsonb\s*\)'
 }
 
+function Test-StringAndDuplicateCanonicalizationLinkage {
+    param([string]$ValidatorContent)
+    return $ValidatorContent -match '(?s)CanonicalizeJsonString\s*\(\s*string\s+value\s*\).*?ToString\s*\(\s*"x4"' -and
+        $ValidatorContent -match '(?s)Dictionary<string,\s*JsonElement>.*?lastProperties\s*\[\s*property\.Name\s*\]\s*=\s*property\.Value' -and
+        $ValidatorContent -match '(?s)CanonicalizeJsonString\s*\(\s*property\.Key\s*\)' -and
+        $ValidatorContent -notmatch 'JsonSerializer\.Serialize'
+}
+
+function ConvertTo-I9CanonicalStringSelfTest {
+    param([string]$Value)
+    $builder = New-Object System.Text.StringBuilder
+    [void]$builder.Append('"')
+    foreach ($character in $Value.ToCharArray()) {
+        $code = [int]$character
+        if ($character -eq '"') { [void]$builder.Append('\"') }
+        elseif ($character -eq '\') { [void]$builder.Append('\\') }
+        elseif ($code -eq 8) { [void]$builder.Append('\b') }
+        elseif ($code -eq 9) { [void]$builder.Append('\t') }
+        elseif ($code -eq 10) { [void]$builder.Append('\n') }
+        elseif ($code -eq 12) { [void]$builder.Append('\f') }
+        elseif ($code -eq 13) { [void]$builder.Append('\r') }
+        elseif ($code -lt 32) { [void]$builder.Append(('\u{0:x4}' -f $code)) }
+        else { [void]$builder.Append($character) }
+    }
+    [void]$builder.Append('"')
+    return $builder.ToString()
+}
+
 function ConvertTo-I9CanonicalDecimalSelfTest {
     param([string]$RawNumber)
     if ($RawNumber -notmatch '^(?<sign>-?)(?<integer>0|[1-9][0-9]*)(?:\.(?<fraction>[0-9]+))?(?:[eE](?<exponent>[+-]?[0-9]+))?$') { throw 'unsupported number' }
@@ -209,6 +237,17 @@ $sqlLinkageNegative = Test-SqlChecksumCanonicalizationLinkage `
 if (-not $sqlLinkagePositive -or $sqlLinkageNegative) {
     throw 'I9 MVP rules verifier SQL checksum canonicalization linkage self-test failed.'
 }
+$stringLinkagePositive = 'CanonicalizeJsonString(string value) { code.ToString("x4"); Dictionary<string, JsonElement> lastProperties; lastProperties[property.Name] = property.Value; CanonicalizeJsonString(property.Key); }'
+$stringLinkageNegative = 'JsonSerializer.Serialize(property.Name); foreach (property in properties) { emit(property); }'
+if (-not (Test-StringAndDuplicateCanonicalizationLinkage $stringLinkagePositive) -or
+    (Test-StringAndDuplicateCanonicalizationLinkage $stringLinkageNegative)) {
+    throw 'I9 MVP rules verifier string/duplicate linkage self-test failed.'
+}
+$verticalTabExpected = '"' + '\' + 'u000b"'
+if ((ConvertTo-I9CanonicalStringSelfTest ([string][char]11)) -cne $verticalTabExpected -or
+    (ConvertTo-I9CanonicalStringSelfTest 'Bogota ñ 😀') -cne '"Bogota ñ 😀"') {
+    throw 'I9 MVP rules verifier UTF-8/control string self-test failed.'
+}
 
 Assert-FileContains 'Versioned rule profile persistence' 'db/migrations/012_i9_mvp_rule_profiles.sql' @(
     (Pattern 'scheduling_rule_profiles' '(?i)\bscheduling_rule_profiles\b'),
@@ -234,7 +273,9 @@ Assert-FileContains 'Versioned profile database contract' 'db/tests/008_i9_mvp_r
     (Pattern 'executable SQL' '(?i)\b(DO|BEGIN|SELECT)\b'), (Pattern 'active uniqueness' '(?i)(unique|overlap|superpuest|vigencia)'),
     (Pattern 'immutability' $immutabilityPattern), (Pattern 'evaluation history' '(?i)evaluat'),
     (Pattern 'semantic number equivalence' "(?is)i9_mvp_canonical_jsonb\s*\(\s*'1e2'::jsonb\s*\).*?i9_mvp_canonical_jsonb\s*\(\s*'100'::jsonb\s*\)"),
-    (Pattern 'canonical seed checksum' '(?i)Seed checksum.*canonical executable')
+    (Pattern 'canonical seed checksum' '(?i)Seed checksum.*canonical executable'),
+    (Pattern 'U+000B lowercase escape' '(?is)to_jsonb\s*\(\s*chr\s*\(\s*11\s*\)\s*\).*?u000b'),
+    (Pattern 'nested duplicate last-wins' '(?is)"outer".*?"dup"\s*:\s*1.*?"dup"\s*:\s*2.*?"dup"\s*:\s*2')
 )
 $migrationChecksumPath = Join-Path $repoRoot 'db/migrations/012_i9_mvp_rule_profiles.sql'
 $seedChecksumPath = Join-Path $repoRoot 'db/seeds/011_i9_mvp_simulated_rule_profile.sql'
@@ -274,6 +315,9 @@ Assert-FileContains 'Profile validation and environment gate' 'apps/sg-superapp-
     (Pattern 'exact decimal normalization' '(?i)NormalizeJsonNumber'),
     (Pattern 'bounded number digits' '(?i)MaximumNumberDigits'),
     (Pattern 'bounded number scale' '(?i)MaximumNumberScale'),
+    (Pattern 'canonical string serializer' '(?i)CanonicalizeJsonString'),
+    (Pattern 'lowercase control hex' '(?i)ToString\s*\(\s*"x4"'),
+    (Pattern 'duplicate last-wins dictionary' '(?s)Dictionary<string,\s*JsonElement>.*?\[\s*property\.Name\s*\]\s*=\s*property\.Value'),
     (Pattern 'overlap validation' '(?i)RangesOverlap'),
     (Pattern 'I9-R01' 'I9-R01'), (Pattern 'I9-R02' 'I9-R02'), (Pattern 'I9-R03' 'I9-R03'),
     (Pattern 'I9-R04' 'I9-R04'), (Pattern 'I9-R05' 'I9-R05'), (Pattern 'I9-R06' 'I9-R06'),
@@ -288,6 +332,10 @@ if ((Test-Path -LiteralPath $repositoryPath -PathType Leaf) -and (Test-Path -Lit
 if ((Test-Path -LiteralPath $validatorPath -PathType Leaf) -and
     -not (Test-NumberCanonicalizationLinkage (Get-EffectiveContent $validatorPath))) {
     $failures.Add('Rule profile checksum contract: JSON numbers are not linked to bounded exact canonicalization')
+}
+if ((Test-Path -LiteralPath $validatorPath -PathType Leaf) -and
+    -not (Test-StringAndDuplicateCanonicalizationLinkage (Get-EffectiveContent $validatorPath))) {
+    $failures.Add('Rule profile checksum contract: strings or duplicate keys are not PostgreSQL-compatible')
 }
 Assert-FileContains 'Rule profile dependency registration' 'apps/sg-superapp-api/Program.cs' @(
     (Pattern 'profile validator DI' '(?i)AddSingleton<SchedulingRuleProfileValidator>'),

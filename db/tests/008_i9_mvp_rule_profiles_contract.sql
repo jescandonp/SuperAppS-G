@@ -75,6 +75,13 @@ BEGIN
        <> '[{"a": true, "z": 1}, null, "x"]' THEN
         RAISE EXCEPTION 'I9 canonical JSONB array or scalar preservation failed';
     END IF;
+    IF i9_mvp_canonical_jsonb(to_jsonb(chr(11))) <> ('"'||chr(92)||'u000b"') THEN
+        RAISE EXCEPTION 'I9 canonical JSONB control escape casing failed';
+    END IF;
+    IF i9_mvp_canonical_jsonb('{"outer":{"dup":1,"dup":2}}'::jsonb)
+       <> '{"outer": {"dup": 2}}' THEN
+        RAISE EXCEPTION 'I9 canonical JSONB nested duplicate last-wins failed';
+    END IF;
 
     BEGIN
         PERFORM i9_mvp_canonical_jsonb('1e1001'::jsonb);

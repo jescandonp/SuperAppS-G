@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Globalization;
 using System.Text;
-using System.Text.Encodings.Web;
 using System.Text.Json;
 using Sg.SuperApp.Api.Domain;
 
@@ -13,8 +12,6 @@ public sealed class SchedulingRuleProfileValidator
     private const int MaximumNumberScale = 1000;
     private static readonly string[] RequiredRules =
         { "I9-R01", "I9-R02", "I9-R03", "I9-R04", "I9-R05", "I9-R06", "I9-R07" };
-    private static readonly JsonSerializerOptions JsonOptions = new()
-        { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     public void Validate(SchedulingRuleProfile profile, SchedulingEnvironmentScope requestedEnvironment,
         IEnumerable<SchedulingRuleProfile>? otherProfiles = null)
@@ -66,19 +63,54 @@ public sealed class SchedulingRuleProfileValidator
         switch (element.ValueKind)
         {
             case JsonValueKind.Object:
-                return "{" + string.Join(", ", element.EnumerateObject()
-                    .OrderBy(property => property.Name, PostgresJsonbKeyComparer.Instance)
-                    .Select(property => $"{JsonSerializer.Serialize(property.Name, JsonOptions)}: {ToPostgresJsonbText(property.Value)}")) + "}";
+                var lastProperties = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+                foreach (var property in element.EnumerateObject()) lastProperties[property.Name] = property.Value;
+                return "{" + string.Join(", ", lastProperties
+                    .OrderBy(property => property.Key, PostgresJsonbKeyComparer.Instance)
+                    .Select(property => $"{CanonicalizeJsonString(property.Key)}: {ToPostgresJsonbText(property.Value)}")) + "}";
             case JsonValueKind.Array:
                 return "[" + string.Join(", ", element.EnumerateArray().Select(ToPostgresJsonbText)) + "]";
             case JsonValueKind.String:
-                return JsonSerializer.Serialize(element.GetString(), JsonOptions);
+                return CanonicalizeJsonString(element.GetString() ?? string.Empty);
             case JsonValueKind.True: return "true";
             case JsonValueKind.False: return "false";
             case JsonValueKind.Null: return "null";
             case JsonValueKind.Number: return NormalizeJsonNumber(element.GetRawText());
             default: throw new InvalidOperationException("Unsupported JSON value in rule profile.");
         }
+    }
+
+    internal static string CanonicalizeJsonString(string value)
+    {
+        var canonical = new StringBuilder(value.Length + 2).Append('"');
+        for (var index = 0; index < value.Length; index++)
+        {
+            var character = value[index];
+            switch (character)
+            {
+                case '"': canonical.Append("\\\""); break;
+                case '\\': canonical.Append("\\\\"); break;
+                case '\b': canonical.Append("\\b"); break;
+                case '\f': canonical.Append("\\f"); break;
+                case '\n': canonical.Append("\\n"); break;
+                case '\r': canonical.Append("\\r"); break;
+                case '\t': canonical.Append("\\t"); break;
+                default:
+                    if (character < ' ')
+                        canonical.Append("\\u").Append(((int)character).ToString("x4", CultureInfo.InvariantCulture));
+                    else if (char.IsHighSurrogate(character))
+                    {
+                        if (index + 1 >= value.Length || !char.IsLowSurrogate(value[index + 1]))
+                            throw new InvalidOperationException("Rule profile string contains an invalid Unicode surrogate.");
+                        canonical.Append(character).Append(value[++index]);
+                    }
+                    else if (char.IsLowSurrogate(character))
+                        throw new InvalidOperationException("Rule profile string contains an invalid Unicode surrogate.");
+                    else canonical.Append(character);
+                    break;
+            }
+        }
+        return canonical.Append('"').ToString();
     }
 
     internal static string NormalizeJsonNumber(string rawNumber)
