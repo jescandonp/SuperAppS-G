@@ -141,6 +141,23 @@ function Test-RuleProfilePayloadBoundsLinkage {
         $TestContent -match '(?s)repeat\s*\(\s*''x''\s*,\s*65537\s*\).*?repeat\s*\(\s*''x''\s*,\s*262145\s*\).*?Eighth rule profile entry'
 }
 
+function Test-RuleEvaluatorDeterminismLinkage {
+    param([string]$EvaluatorContent)
+    return $EvaluatorContent -match '(?s)OrderBy\s*\(\s*entry\s*=>\s*entry\.RuleCode.*?CreateUnverifiedEvaluation' -and
+        $EvaluatorContent -match '(?s)ComputeScopeHash\s*\(.*?profile\.Version.*?profile\.Checksum.*?projectCode.*?period.*?entry\.RuleCode.*?Canonicalize\s*\(\s*entry\.Parameters\s*\).*?Canonicalize\s*\(\s*facts\s*\)' -and
+        $EvaluatorContent -match '(?s)SchedulingRuleOutcome\.WARNING.*?SchedulingRuleSeverity\.ERROR.*?I9_RULE_NOT_IMPLEMENTED.*?ExceptionAllowed:\s*false' -and
+        $EvaluatorContent -match '(?s)CanApproveOrPublish:.*?results\.All.*?COMPLIANT.*?NOT_APPLICABLE'
+}
+
+function Test-RuleEndpointSecurityLinkage {
+    param([string]$EndpointContent)
+    return $EndpointContent -match '(?s)MapGet\s*\(\s*"/api/portal/scheduling/rule-profiles".*?RequireAsync\s*\(\s*"SCHEDULING"\s*,\s*"VIEW"' -and
+        $EndpointContent -match '(?s)MapGet\s*\(\s*"/api/portal/scheduling/rules/evaluations".*?RequireAsync\s*\(\s*"SCHEDULING"\s*,\s*"VIEW"' -and
+        $EndpointContent -match '(?s)MapPost\s*\(\s*"/api/portal/scheduling/rule-profiles/\{id:long\}/activate".*?RequireAsync\s*\(\s*"SCHEDULING"\s*,\s*"CONFIGURE".*?PRODUCTION.*?Results\.Conflict.*?validator\.Validate\s*\(\s*profile\s*,\s*environment\s*\).*?ActivateProfileAsync.*?repository\.LoadActiveAsync' -and
+        $EndpointContent -match '(?s)MapPost\s*\(\s*"/api/portal/scheduling/rules/evaluate".*?RequireAsync\s*\(\s*"SCHEDULING"\s*,\s*"GENERATE".*?validator\.Validate\s*\(\s*profile\s*,\s*environment\s*\).*?repository\.LoadActiveAsync.*?evaluator\.Evaluate' -and
+        $EndpointContent -notmatch '(?s)catch\s*\([^)]*Exception[^)]*\).*?exception\.Message'
+}
+
 function ConvertTo-I9CanonicalStringSelfTest {
     param([string]$Value)
     $builder = New-Object System.Text.StringBuilder
@@ -282,6 +299,18 @@ $payloadBoundsNegative = Test-RuleProfilePayloadBoundsLinkage `
 if (-not $payloadBoundsPositive -or $payloadBoundsNegative) {
     throw 'I9 MVP rules verifier payload-bounds negative self-test failed.'
 }
+$evaluatorLinkagePositive = 'OrderBy(entry => entry.RuleCode).Select(entry => CreateUnverifiedEvaluation()); ComputeScopeHash(profile) { profile.Version; profile.Checksum; projectCode; period; entry.RuleCode; Canonicalize(entry.Parameters); Canonicalize(facts); } SchedulingRuleOutcome.WARNING; SchedulingRuleSeverity.ERROR; "I9_RULE_NOT_IMPLEMENTED"; ExceptionAllowed: false; CanApproveOrPublish: results.All(result => result.Outcome is SchedulingRuleOutcome.COMPLIANT or SchedulingRuleOutcome.NOT_APPLICABLE);'
+$evaluatorLinkageNegative = 'OrderBy(entry => entry.RuleCode); ComputeScopeHash(profile.Id); SchedulingRuleOutcome.COMPLIANT;'
+if (-not (Test-RuleEvaluatorDeterminismLinkage $evaluatorLinkagePositive) -or
+    (Test-RuleEvaluatorDeterminismLinkage $evaluatorLinkageNegative)) {
+    throw 'I9 MVP rules verifier evaluator linkage self-test failed.'
+}
+$endpointLinkagePositive = 'MapGet("/api/portal/scheduling/rule-profiles", RequireAsync("SCHEDULING", "VIEW")); MapGet("/api/portal/scheduling/rules/evaluations", RequireAsync("SCHEDULING", "VIEW")); MapPost("/api/portal/scheduling/rule-profiles/{id:long}/activate", RequireAsync("SCHEDULING", "CONFIGURE"); PRODUCTION; Results.Conflict(); validator.Validate(profile, environment); ActivateProfileAsync(); repository.LoadActiveAsync()); MapPost("/api/portal/scheduling/rules/evaluate", RequireAsync("SCHEDULING", "GENERATE"); validator.Validate(profile, environment); repository.LoadActiveAsync(); evaluator.Evaluate());'
+$endpointLinkageNegative = 'MapGet("/api/portal/scheduling/rule-profiles", RequireAsync("SCHEDULING", "VIEW")); MapPost("/api/portal/scheduling/rules/evaluate", evaluator.Evaluate());'
+if (-not (Test-RuleEndpointSecurityLinkage $endpointLinkagePositive) -or
+    (Test-RuleEndpointSecurityLinkage $endpointLinkageNegative)) {
+    throw 'I9 MVP rules verifier HTTP security linkage self-test failed.'
+}
 
 Assert-FileContains 'Versioned rule profile persistence' 'db/migrations/012_i9_mvp_rule_profiles.sql' @(
     (Pattern 'scheduling_rule_profiles' '(?i)\bscheduling_rule_profiles\b'),
@@ -406,10 +435,16 @@ Assert-FileContains 'Rule profile dependency registration' 'apps/sg-superapp-api
     (Pattern 'profile repository DI' '(?i)AddSingleton<SchedulingRuleProfileRepository>')
 )
 Assert-FileContains 'Common evaluator' 'apps/sg-superapp-api/Services/SchedulingRuleEvaluator.cs' @(
-    (Pattern 'BLOCKED precedence' '(?i)BLOCKED'), (Pattern 'I9-R03' 'I9-R03'),
-    (Pattern 'I9-R05' 'I9-R05'), (Pattern 'scopeHash' '(?i)scopeHash'),
-    (Pattern 'parameters' '(?i)(parameter|parametro)'), (Pattern 'facts snapshot' '(?i)(facts|hechos|snapshot)')
+    (Pattern 'deterministic rule ordering' '(?i)OrderBy\s*\(\s*entry\s*=>\s*entry\.RuleCode'),
+    (Pattern 'fail-closed WARNING' '(?i)SchedulingRuleOutcome\.WARNING'),
+    (Pattern 'scopeHash' '(?i)scopeHash'), (Pattern 'parameters' '(?i)(parameter|parametro)'),
+    (Pattern 'facts snapshot' '(?i)(facts|hechos|snapshot)')
 )
+$evaluatorPath = Join-Path $repoRoot 'apps/sg-superapp-api/Services/SchedulingRuleEvaluator.cs'
+if ((Test-Path -LiteralPath $evaluatorPath -PathType Leaf) -and
+    -not (Test-RuleEvaluatorDeterminismLinkage (Get-EffectiveContent $evaluatorPath))) {
+    $failures.Add('Common evaluator: ordering, fail-closed result and scopeHash inputs are not linked')
+}
 
 $implementations = @(
     @{ R='I9-R01/R02 rules'; P='apps/sg-superapp-api/Services/SchedulingWorkRestRules.cs'; X=@((Pattern 'I9-R01' 'I9-R01'),(Pattern 'I9-R02' 'I9-R02'),(Pattern '8' '\b8\b'),(Pattern '10' '\b10\b'),(Pattern '12' '\b12\b'),(Pattern '42' '\b42\b'),(Pattern '60' '\b60\b'),(Pattern 'rest' '(?i)(rest|descanso)')) },
@@ -425,6 +460,11 @@ Assert-FileContains 'Rule profile HTTP endpoints' 'apps/sg-superapp-api/Endpoint
     (Pattern 'activate' '(?i)activate'), (Pattern 'retire' '(?i)retire'), (Pattern 'rules/evaluate' '(?i)rules/evaluate'),
     (Pattern 'VIEW' '(?i)\bVIEW\b'), (Pattern 'CONFIGURE' '(?i)\bCONFIGURE\b'), (Pattern 'GENERATE' '(?i)\bGENERATE\b')
 )
+$ruleEndpointPath = Join-Path $repoRoot 'apps/sg-superapp-api/Endpoints/SchedulingRuleEndpoints.cs'
+if ((Test-Path -LiteralPath $ruleEndpointPath -PathType Leaf) -and
+    -not (Test-RuleEndpointSecurityLinkage (Get-EffectiveContent $ruleEndpointPath))) {
+    $failures.Add('Rule profile HTTP endpoints: permissions, production gate, validation, repository and evaluator are not linked')
+}
 Assert-FileContains 'Rule HTTP contracts' 'apps/sg-superapp-api/Contracts/Portal/SchedulingRuleContracts.cs' @(
     (Pattern 'RuleProfile' '(?i)RuleProfile'), (Pattern 'RuleEvaluation summary' '(?i)(RuleEvaluation|RuleSummary)'),
     (Pattern 'scopeHash' '(?i)scopeHash'), (Pattern 'simulated' '(?i)simulated')

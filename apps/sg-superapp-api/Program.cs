@@ -16,6 +16,8 @@ builder.Services.AddSingleton<SchedulingRecommendationEngine>();
 builder.Services.AddSingleton<SchedulingExportService>();
 builder.Services.AddSingleton<SchedulingRuleProfileValidator>();
 builder.Services.AddSingleton<SchedulingRuleProfileRepository>();
+builder.Services.AddSingleton<SchedulingRuleEvaluator>();
+builder.Services.AddSingleton<SchedulingRuleHttpRepository>();
 builder.Services.AddScoped<RequestUserContext>();
 builder.Services.AddScoped<PortalAuthorizationService>();
 builder.Services.AddCors(options =>
@@ -61,5 +63,6 @@ app.MapPost("/api/portal/scheduling/recommendations/generate", async (
 app.MapHealthEndpoints();
 app.MapAuthEndpoints();
 app.MapPortalEndpoints();
+app.MapSchedulingRuleEndpoints();
 
 app.Run();
