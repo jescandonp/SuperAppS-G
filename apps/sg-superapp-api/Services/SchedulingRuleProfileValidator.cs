@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Globalization;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -8,6 +9,8 @@ namespace Sg.SuperApp.Api.Services;
 
 public sealed class SchedulingRuleProfileValidator
 {
+    private const int MaximumNumberDigits = 1000;
+    private const int MaximumNumberScale = 1000;
     private static readonly string[] RequiredRules =
         { "I9-R01", "I9-R02", "I9-R03", "I9-R04", "I9-R05", "I9-R06", "I9-R07" };
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -73,9 +76,51 @@ public sealed class SchedulingRuleProfileValidator
             case JsonValueKind.True: return "true";
             case JsonValueKind.False: return "false";
             case JsonValueKind.Null: return "null";
-            case JsonValueKind.Number: return element.GetRawText();
+            case JsonValueKind.Number: return NormalizeJsonNumber(element.GetRawText());
             default: throw new InvalidOperationException("Unsupported JSON value in rule profile.");
         }
+    }
+
+    internal static string NormalizeJsonNumber(string rawNumber)
+    {
+        if (string.IsNullOrWhiteSpace(rawNumber) || rawNumber.Length > MaximumNumberDigits + 16)
+            throw new InvalidOperationException("Rule profile number exceeds the supported canonical form.");
+
+        var negative = rawNumber[0] == '-';
+        var unsigned = negative ? rawNumber[1..] : rawNumber;
+        var exponentIndex = unsigned.IndexOfAny(new[] { 'e', 'E' });
+        var mantissa = exponentIndex < 0 ? unsigned : unsigned[..exponentIndex];
+        var exponent = 0;
+        if (exponentIndex >= 0 && !int.TryParse(unsigned[(exponentIndex + 1)..],
+                NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out exponent))
+            throw new InvalidOperationException("Rule profile number exponent is unsupported.");
+
+        var decimalIndex = mantissa.IndexOf('.');
+        var fractionalDigits = decimalIndex < 0 ? 0 : mantissa.Length - decimalIndex - 1;
+        var digits = decimalIndex < 0 ? mantissa : mantissa.Remove(decimalIndex, 1);
+        if (digits.Length == 0 || digits.Length > MaximumNumberDigits ||
+            digits.Any(character => character is < '0' or > '9'))
+            throw new InvalidOperationException("Rule profile number is unsupported.");
+
+        digits = digits.TrimStart('0');
+        if (digits.Length == 0) return "0";
+
+        int scale;
+        try { scale = checked(fractionalDigits - exponent); }
+        catch (OverflowException) { throw new InvalidOperationException("Rule profile number scale is unsupported."); }
+        while (digits.EndsWith("0", StringComparison.Ordinal))
+        {
+            digits = digits[..^1];
+            scale--;
+        }
+        if (scale is < -MaximumNumberScale or > MaximumNumberScale)
+            throw new InvalidOperationException("Rule profile number scale is unsupported.");
+
+        string canonical;
+        if (scale <= 0) canonical = digits + new string('0', -scale);
+        else if (scale >= digits.Length) canonical = "0." + new string('0', scale - digits.Length) + digits;
+        else canonical = digits.Insert(digits.Length - scale, ".");
+        return negative ? "-" + canonical : canonical;
     }
 
     private sealed class PostgresJsonbKeyComparer : IComparer<string>

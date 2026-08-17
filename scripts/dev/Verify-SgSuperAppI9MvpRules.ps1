@@ -99,6 +99,29 @@ function Test-RuleProfileChecksumLinkage {
         $ValidatorContent -match '(?s)string\.Equals\s*\(\s*profile\.Checksum\s*,\s*ComputeChecksum'
 }
 
+function Test-NumberCanonicalizationLinkage {
+    param([string]$ValidatorContent)
+    return $ValidatorContent -match '(?s)case\s+JsonValueKind\.Number\s*:\s*return\s+NormalizeJsonNumber\s*\(\s*element\.GetRawText\s*\(\s*\)\s*\)' -and
+        $ValidatorContent -match '(?s)NormalizeJsonNumber\s*\(\s*string\s+rawNumber\s*\).*?MaximumNumberDigits.*?MaximumNumberScale' -and
+        $ValidatorContent -notmatch '(?i)(GetDouble|double\.Parse)'
+}
+
+function ConvertTo-I9CanonicalDecimalSelfTest {
+    param([string]$RawNumber)
+    if ($RawNumber -notmatch '^(?<sign>-?)(?<integer>0|[1-9][0-9]*)(?:\.(?<fraction>[0-9]+))?(?:[eE](?<exponent>[+-]?[0-9]+))?$') { throw 'unsupported number' }
+    $fraction = if ($Matches.ContainsKey('fraction')) { $Matches['fraction'] } else { '' }
+    $digits = ($Matches.integer + $fraction).TrimStart('0')
+    if ($digits.Length -eq 0) { return '0' }
+    $exponent = if ($Matches.ContainsKey('exponent')) { [int]$Matches['exponent'] } else { 0 }
+    $scale = $fraction.Length - $exponent
+    while ($digits.EndsWith('0')) { $digits = $digits.Substring(0, $digits.Length - 1); $scale-- }
+    if ($scale -lt -1000 -or $scale -gt 1000) { throw 'unsupported scale' }
+    if ($scale -le 0) { $canonical = $digits + ('0' * (-$scale)) }
+    elseif ($scale -ge $digits.Length) { $canonical = '0.' + ('0' * ($scale - $digits.Length)) + $digits }
+    else { $canonical = $digits.Insert($digits.Length - $scale, '.') }
+    return $(if ($Matches.sign -eq '-') { '-' + $canonical } else { $canonical })
+}
+
 function Invoke-FocusedVerifier {
     param(
         [Parameter(Mandatory = $true)][string]$Requirement,
@@ -154,6 +177,19 @@ if (-not (Test-RuleProfileChecksumLinkage '_validator.Validate(result, environme
     (Test-RuleProfileChecksumLinkage 'return result;' 'Validate(profile) { string.Equals(profile.Checksum, ComputeChecksum(profile)); }')) {
     throw 'I9 MVP rules verifier checksum-linkage negative self-test failed.'
 }
+if (-not (Test-NumberCanonicalizationLinkage 'case JsonValueKind.Number: return NormalizeJsonNumber(element.GetRawText()); internal static string NormalizeJsonNumber(string rawNumber) { MaximumNumberDigits; MaximumNumberScale; }') -or
+    (Test-NumberCanonicalizationLinkage 'case JsonValueKind.Number: return element.GetRawText();')) {
+    throw 'I9 MVP rules verifier number-canonicalization linkage self-test failed.'
+}
+$numberEquivalences = @(@('1e2','100'), @('1.0','1.00','1'), @('-0','0'), @('0.0100','0.01'))
+foreach ($equivalentSet in $numberEquivalences) {
+    if (@($equivalentSet | ForEach-Object { ConvertTo-I9CanonicalDecimalSelfTest $_ } | Select-Object -Unique).Count -ne 1) {
+        throw 'I9 MVP rules verifier decimal equivalence self-test failed.'
+    }
+}
+$unsupportedNumberRejected = $false
+try { [void](ConvertTo-I9CanonicalDecimalSelfTest '1e1001') } catch { $unsupportedNumberRejected = $true }
+if (-not $unsupportedNumberRejected) { throw 'I9 MVP rules verifier unsupported-number negative self-test failed.' }
 
 Assert-FileContains 'Versioned rule profile persistence' 'db/migrations/012_i9_mvp_rule_profiles.sql' @(
     (Pattern 'scheduling_rule_profiles' '(?i)\bscheduling_rule_profiles\b'),
@@ -198,6 +234,9 @@ Assert-FileContains 'Profile validation and environment gate' 'apps/sg-superapp-
     (Pattern 'PRODUCTION' '(?i)PRODUCTION'), (Pattern 'checksum' '(?i)checksum'),
     (Pattern 'canonical property order' '(?i)OrderBy\s*\('), (Pattern 'SHA-256 checksum' '(?i)SHA256'),
     (Pattern 'PostgreSQL JSONB representation' '(?i)ToPostgresJsonbText'),
+    (Pattern 'exact decimal normalization' '(?i)NormalizeJsonNumber'),
+    (Pattern 'bounded number digits' '(?i)MaximumNumberDigits'),
+    (Pattern 'bounded number scale' '(?i)MaximumNumberScale'),
     (Pattern 'overlap validation' '(?i)RangesOverlap'),
     (Pattern 'I9-R01' 'I9-R01'), (Pattern 'I9-R02' 'I9-R02'), (Pattern 'I9-R03' 'I9-R03'),
     (Pattern 'I9-R04' 'I9-R04'), (Pattern 'I9-R05' 'I9-R05'), (Pattern 'I9-R06' 'I9-R06'),
@@ -208,6 +247,10 @@ $validatorPath = Join-Path $repoRoot 'apps/sg-superapp-api/Services/SchedulingRu
 if ((Test-Path -LiteralPath $repositoryPath -PathType Leaf) -and (Test-Path -LiteralPath $validatorPath -PathType Leaf) -and
     -not (Test-RuleProfileChecksumLinkage (Get-EffectiveContent $repositoryPath) (Get-EffectiveContent $validatorPath))) {
     $failures.Add('Rule profile checksum contract: repository is not linked to validator ComputeChecksum comparison')
+}
+if ((Test-Path -LiteralPath $validatorPath -PathType Leaf) -and
+    -not (Test-NumberCanonicalizationLinkage (Get-EffectiveContent $validatorPath))) {
+    $failures.Add('Rule profile checksum contract: JSON numbers are not linked to bounded exact canonicalization')
 }
 Assert-FileContains 'Rule profile dependency registration' 'apps/sg-superapp-api/Program.cs' @(
     (Pattern 'profile validator DI' '(?i)AddSingleton<SchedulingRuleProfileValidator>'),
