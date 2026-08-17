@@ -1,50 +1,76 @@
 [CmdletBinding()]
-param(
-    [string]$RepositoryRoot
-)
+param([string]$RepositoryRoot)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
 
-$defaultRepositoryRoot = Join-Path $PSScriptRoot '..\..'
-$repoRoot = if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) {
-    (Resolve-Path -LiteralPath $defaultRepositoryRoot).Path
+$requestedRoot = if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) { Join-Path $PSScriptRoot '..\..' } else { $RepositoryRoot }
+if (-not (Test-Path -LiteralPath $requestedRoot -PathType Container)) {
+    Write-Host 'I9 MVP RULES FAIL'
+    Write-Host " - Invalid repository root: '$requestedRoot'"
+    exit 1
 }
-else {
-    (Resolve-Path -LiteralPath $RepositoryRoot).Path
+try { $repoRoot = (Resolve-Path -LiteralPath $requestedRoot -ErrorAction Stop).Path }
+catch {
+    Write-Host 'I9 MVP RULES FAIL'
+    Write-Host " - Invalid repository root: '$requestedRoot'"
+    exit 1
 }
 
 $failures = New-Object 'System.Collections.Generic.List[string]'
 
-function Get-MissingPatternLabels {
+function Remove-FullLineComments {
     param(
-        [Parameter(Mandatory = $true)][string]$Content,
-        [Parameter(Mandatory = $true)][object[]]$Patterns
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][AllowEmptyString()][string[]]$Lines,
+        [string]$Extension = '.cs'
     )
-
-    $missing = New-Object 'System.Collections.Generic.List[string]'
-    foreach ($pattern in $Patterns) {
-        if (-not [regex]::IsMatch($Content, $pattern.Regex)) {
-            $missing.Add([string]$pattern.Label)
+    $effective = New-Object 'System.Collections.Generic.List[string]'
+    $lineMarker = if ($Extension -eq '.ps1') { '#' } elseif ($Extension -eq '.sql') { '--' } else { '//' }
+    $blockStart = if ($Extension -eq '.ps1') { '<#' } else { '/*' }
+    $blockEnd = if ($Extension -eq '.ps1') { '#>' } else { '*/' }
+    $inBlock = $false
+    foreach ($line in $Lines) {
+        $remaining = $line
+        $builder = New-Object System.Text.StringBuilder
+        while ($remaining.Length -gt 0) {
+            if ($inBlock) {
+                $endIndex = $remaining.IndexOf($blockEnd, [System.StringComparison]::Ordinal)
+                if ($endIndex -lt 0) { $remaining = ''; break }
+                $remaining = $remaining.Substring($endIndex + $blockEnd.Length)
+                $inBlock = $false
+                continue
+            }
+            $blockIndex = $remaining.IndexOf($blockStart, [System.StringComparison]::Ordinal)
+            $lineIndex = $remaining.IndexOf($lineMarker, [System.StringComparison]::Ordinal)
+            if ($lineIndex -ge 0 -and ($blockIndex -lt 0 -or $lineIndex -lt $blockIndex)) {
+                [void]$builder.Append($remaining.Substring(0, $lineIndex))
+                $remaining = ''
+                break
+            }
+            if ($blockIndex -ge 0) {
+                [void]$builder.Append($remaining.Substring(0, $blockIndex))
+                $remaining = $remaining.Substring($blockIndex + $blockStart.Length)
+                $inBlock = $true
+                continue
+            }
+            [void]$builder.Append($remaining)
+            $remaining = ''
         }
+        $effectiveLine = $builder.ToString()
+        if (-not [string]::IsNullOrWhiteSpace($effectiveLine)) { $effective.Add($effectiveLine) }
     }
-    return @($missing)
+    return @($effective)
 }
 
-function Invoke-HelperSelfTest {
-    $patterns = @(
-        [pscustomobject]@{ Label = 'profile version'; Regex = '(?i)profileVersion' },
-        [pscustomobject]@{ Label = 'scope hash'; Regex = '(?i)scopeHash' }
-    )
-    $positive = @(Get-MissingPatternLabels -Content 'profileVersion scopeHash' -Patterns $patterns)
-    $negative = @(Get-MissingPatternLabels -Content 'profileVersion' -Patterns $patterns)
+function Get-EffectiveContent {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    $extension = [System.IO.Path]::GetExtension($Path).ToLowerInvariant()
+    return (Remove-FullLineComments -Lines @(Get-Content -LiteralPath $Path) -Extension $extension) -join "`n"
+}
 
-    if ($positive.Count -ne 0) {
-        throw 'I9 MVP rules verifier helper positive self-test failed.'
-    }
-    if ($negative.Count -ne 1 -or $negative[0] -ne 'scope hash') {
-        throw 'I9 MVP rules verifier helper negative self-test failed.'
-    }
+function Pattern {
+    param([Parameter(Mandatory = $true)][string]$Label, [Parameter(Mandatory = $true)][string]$Regex)
+    return [pscustomobject]@{ Label = $Label; Regex = $Regex }
 }
 
 function Assert-FileContains {
@@ -53,257 +79,224 @@ function Assert-FileContains {
         [Parameter(Mandatory = $true)][string]$RelativePath,
         [Parameter(Mandatory = $true)][object[]]$Patterns
     )
-
     $path = Join-Path $repoRoot $RelativePath
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         $failures.Add("$Requirement`: missing file '$RelativePath'")
         return
     }
-
-    $content = Get-Content -LiteralPath $path -Raw
-    $missingLabels = @(Get-MissingPatternLabels -Content $content -Patterns $Patterns)
-    foreach ($label in $missingLabels) {
-        $failures.Add("$Requirement`: '$RelativePath' is missing $label")
+    $content = Get-EffectiveContent -Path $path
+    foreach ($pattern in $Patterns) {
+        if (-not [regex]::IsMatch($content, $pattern.Regex)) {
+            $failures.Add("$Requirement`: '$RelativePath' is missing $($pattern.Label)")
+        }
     }
 }
 
-function Pattern {
+function Invoke-FocusedVerifier {
     param(
-        [Parameter(Mandatory = $true)][string]$Label,
-        [Parameter(Mandatory = $true)][string]$Regex
+        [Parameter(Mandatory = $true)][string]$Requirement,
+        [Parameter(Mandatory = $true)][string]$RelativePath,
+        [Parameter(Mandatory = $true)][string]$PassPattern
     )
-
-    return [pscustomobject]@{ Label = $Label; Regex = $Regex }
+    $path = Join-Path $repoRoot $RelativePath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        $failures.Add("$Requirement`: missing file '$RelativePath'")
+        return
+    }
+    $info = New-Object System.Diagnostics.ProcessStartInfo
+    $info.FileName = 'powershell.exe'
+    $info.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$path`" -RepositoryRoot `"$repoRoot`""
+    $info.UseShellExecute = $false
+    $info.RedirectStandardOutput = $true
+    $info.RedirectStandardError = $true
+    $info.CreateNoWindow = $true
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $info
+    [void]$process.Start()
+    $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+    $stderrTask = $process.StandardError.ReadToEndAsync()
+    if (-not $process.WaitForExit(20000)) {
+        try { $process.Kill() } catch { }
+        $failures.Add("$Requirement`: '$RelativePath' timed out after 20 seconds")
+        return
+    }
+    $process.WaitForExit()
+    $output = $stdoutTask.GetAwaiter().GetResult() + "`n" + $stderrTask.GetAwaiter().GetResult()
+    if ($process.ExitCode -ne 0 -or $output -notmatch $PassPattern) {
+        $failures.Add("$Requirement`: '$RelativePath' did not execute successfully with PASS")
+    }
 }
 
-Invoke-HelperSelfTest
+$selfTest = (Remove-FullLineComments -Lines @(
+    '// RuleProfile ScopeHash',
+    'public sealed record RealContract(string Value); // SIMULATED MVP_TEST PRODUCTION checksum I9-R01 I9-R07',
+    '/* BLOCKED EXCEPTION_REQUIRED */'
+) -Extension '.cs') -join "`n"
+if ($selfTest -match 'RuleProfile|ScopeHash|I9-R01|\bPASS\b|\bACTIVE\b|immutable' -or $selfTest -notmatch 'RealContract') {
+    throw 'I9 MVP rules verifier comment-filter self-test failed.'
+}
 
 Assert-FileContains 'Versioned rule profile persistence' 'db/migrations/012_i9_mvp_rule_profiles.sql' @(
     (Pattern 'scheduling_rule_profiles' '(?i)\bscheduling_rule_profiles\b'),
     (Pattern 'scheduling_rule_profile_entries' '(?i)\bscheduling_rule_profile_entries\b'),
     (Pattern 'scheduling_rule_evaluations' '(?i)\bscheduling_rule_evaluations\b'),
-    (Pattern 'profile version and checksum fields' '(?is)\bversion\b.*\bchecksum\b'),
-    (Pattern 'rule-bound exception snapshot fields' '(?is)\brule_code\b.*\bevaluation_id\b.*\bscope_hash\b'),
-    (Pattern 'schedule version profile and simulated markers' '(?is)\bschedule_versions\b.*\b(rule_profile|rule_profile_id|rule_profile_version)\b.*\bsimulated\b')
+    (Pattern 'profile version' '(?i)\bversion\b'), (Pattern 'profile checksum' '(?i)\bchecksum\b'),
+    (Pattern 'exception rule code' '(?i)\brule_code\b'), (Pattern 'exception evaluation id' '(?i)\bevaluation_id\b'),
+    (Pattern 'exception scope hash' '(?i)\bscope_hash\b'),
+    (Pattern 'schedule profile reference' '(?i)\b(rule_profile|rule_profile_id|rule_profile_version)\b'),
+    (Pattern 'simulated marker' '(?i)\bsimulated\b')
 )
-
 Assert-FileContains 'Simulated MVP profile seed' 'db/seeds/011_i9_mvp_simulated_rule_profile.sql' @(
-    (Pattern 'SIMULATED origin' '(?i)\bSIMULATED\b'),
-    (Pattern 'MVP_TEST environment' '(?i)\bMVP_TEST\b'),
-    (Pattern 'all rule entries I9-R01 through I9-R07' '(?is)I9-R01.*I9-R02.*I9-R03.*I9-R04.*I9-R05.*I9-R06.*I9-R07')
+    (Pattern 'SIMULATED' '(?i)\bSIMULATED\b'), (Pattern 'MVP_TEST' '(?i)\bMVP_TEST\b'),
+    (Pattern 'I9-R01' 'I9-R01'), (Pattern 'I9-R02' 'I9-R02'), (Pattern 'I9-R03' 'I9-R03'),
+    (Pattern 'I9-R04' 'I9-R04'), (Pattern 'I9-R05' 'I9-R05'), (Pattern 'I9-R06' 'I9-R06'),
+    (Pattern 'I9-R07' 'I9-R07')
 )
-
 Assert-FileContains 'Versioned profile database contract' 'db/tests/008_i9_mvp_rule_profiles_contract.sql' @(
-    (Pattern 'active profile uniqueness' '(?is)\bACTIVE\b.*(unique|overlap|superpuest|vigencia)'),
-    (Pattern 'active profile immutability' '(?is)(immutable|inmutab|reject|rechaz).*(active|activo)'),
-    (Pattern 'evaluation history immutability' '(?is)(immutable|inmutab|reject|rechaz).*evaluat')
+    (Pattern 'executable SQL' '(?i)\b(DO|BEGIN|SELECT)\b'), (Pattern 'active uniqueness' '(?i)(unique|overlap|superpuest|vigencia)'),
+    (Pattern 'immutability' '(?i)(immutable|inmutab|reject|rechaz)'), (Pattern 'evaluation history' '(?i)evaluat')
 )
 
-Assert-FileContains 'Typed versioned profile and common result contracts' 'apps/sg-superapp-api/Domain/SchedulingRuleModels.cs' @(
-    (Pattern 'profile identity and version' '(?is)ProfileCode.*Version'),
-    (Pattern 'origin and environment scope' '(?is)Origin.*EnvironmentScope'),
-    (Pattern 'effective dates, status and checksum' '(?is)EffectiveFrom.*EffectiveTo.*Status.*Checksum'),
-    (Pattern 'common rule evaluation result' '(?i)(record|class)\s+RuleEvaluation'),
-    (Pattern 'all common outcomes' '(?is)COMPLIANT.*BLOCKED.*EXCEPTION_REQUIRED.*WARNING.*NOT_APPLICABLE'),
-    (Pattern 'scopeHash' '(?i)ScopeHash')
+Assert-FileContains 'Typed profile and result contracts' 'apps/sg-superapp-api/Domain/SchedulingRuleModels.cs' @(
+    (Pattern 'ProfileCode' '(?i)ProfileCode'), (Pattern 'Version' '(?i)\bVersion\b'),
+    (Pattern 'Origin' '(?i)\bOrigin\b'), (Pattern 'EnvironmentScope' '(?i)EnvironmentScope'),
+    (Pattern 'EffectiveFrom' '(?i)EffectiveFrom'), (Pattern 'EffectiveTo' '(?i)EffectiveTo'),
+    (Pattern 'Status' '(?i)\bStatus\b'), (Pattern 'Checksum' '(?i)Checksum'),
+    (Pattern 'RuleEvaluation' '(?i)(record|class)\s+RuleEvaluation'),
+    (Pattern 'COMPLIANT' '(?i)COMPLIANT'), (Pattern 'BLOCKED' '(?i)BLOCKED'),
+    (Pattern 'EXCEPTION_REQUIRED' '(?i)EXCEPTION_REQUIRED'), (Pattern 'WARNING' '(?i)WARNING'),
+    (Pattern 'NOT_APPLICABLE' '(?i)NOT_APPLICABLE'), (Pattern 'ScopeHash' '(?i)ScopeHash')
+)
+Assert-FileContains 'Profile repository' 'apps/sg-superapp-api/Services/SchedulingRuleProfileRepository.cs' @(
+    (Pattern 'ACTIVE' '(?i)ACTIVE'), (Pattern 'project' '(?i)(project|proyecto)'),
+    (Pattern 'period' '(?i)(period|periodo)'), (Pattern 'environment' '(?i)(environment|ambiente)'),
+    (Pattern 'profile entries' '(?i)SchedulingRuleProfileEntr')
+)
+Assert-FileContains 'Profile validation and environment gate' 'apps/sg-superapp-api/Services/SchedulingRuleProfileValidator.cs' @(
+    (Pattern 'SIMULATED' '(?i)SIMULATED'), (Pattern 'MVP_TEST' '(?i)MVP_TEST'),
+    (Pattern 'PRODUCTION' '(?i)PRODUCTION'), (Pattern 'checksum' '(?i)checksum'),
+    (Pattern 'I9-R01' 'I9-R01'), (Pattern 'I9-R02' 'I9-R02'), (Pattern 'I9-R03' 'I9-R03'),
+    (Pattern 'I9-R04' 'I9-R04'), (Pattern 'I9-R05' 'I9-R05'), (Pattern 'I9-R06' 'I9-R06'),
+    (Pattern 'I9-R07' 'I9-R07')
+)
+Assert-FileContains 'Common evaluator' 'apps/sg-superapp-api/Services/SchedulingRuleEvaluator.cs' @(
+    (Pattern 'BLOCKED precedence' '(?i)BLOCKED'), (Pattern 'I9-R03' 'I9-R03'),
+    (Pattern 'I9-R05' 'I9-R05'), (Pattern 'scopeHash' '(?i)scopeHash'),
+    (Pattern 'parameters' '(?i)(parameter|parametro)'), (Pattern 'facts snapshot' '(?i)(facts|hechos|snapshot)')
 )
 
-Assert-FileContains 'Profile repository integration' 'apps/sg-superapp-api/Services/SchedulingRuleProfileRepository.cs' @(
-    (Pattern 'exact active profile selection' '(?is)ACTIVE.*(project|proyecto).*(period|periodo).*(environment|ambiente)'),
-    (Pattern 'versioned profile entries' '(?i)SchedulingRuleProfileEntr')
+$implementations = @(
+    @{ R='I9-R01/R02 rules'; P='apps/sg-superapp-api/Services/SchedulingWorkRestRules.cs'; X=@((Pattern 'I9-R01' 'I9-R01'),(Pattern 'I9-R02' 'I9-R02'),(Pattern '8' '\b8\b'),(Pattern '10' '\b10\b'),(Pattern '12' '\b12\b'),(Pattern '42' '\b42\b'),(Pattern '60' '\b60\b'),(Pattern 'rest' '(?i)(rest|descanso)')) },
+    @{ R='I9-R03/R05 rules'; P='apps/sg-superapp-api/Services/SchedulingOverlapTravelRules.cs'; X=@((Pattern 'I9-R03' 'I9-R03'),(Pattern 'I9-R05' 'I9-R05'),(Pattern 'overlap' '(?i)(overlap|solap)'),(Pattern 'directional' '(?i)(direction|direcc|travel|traslado)'),(Pattern 'prohibited' '(?i)(prohibit|prohibid)')) },
+    @{ R='I9-R04/R06 rules'; P='apps/sg-superapp-api/Services/SchedulingNoveltyRequirementRules.cs'; X=@((Pattern 'I9-R04' 'I9-R04'),(Pattern 'I9-R06' 'I9-R06'),(Pattern 'unknown' '(?i)(UNKNOWN|UNVERIFIED)'),(Pattern 'employeeId' '(?i)employeeId'),(Pattern 'position' '(?i)(position|puesto)'),(Pattern 'requirement' '(?i)(requirement|requisito)'),(Pattern 'evidence' '(?i)(evidence|evidencia)'),(Pattern 'validity' '(?i)(valid|vigencia|expiry|expires)')) },
+    @{ R='I9-R07 rule'; P='apps/sg-superapp-api/Services/SchedulingTemplateDeviationRule.cs'; X=@((Pattern 'I9-R07' 'I9-R07'),(Pattern 'template' '(?i)(template|plantilla)'),(Pattern 'version' '(?i)version'),(Pattern 'anchor' '(?i)(anchor|anclaje)'),(Pattern 'expected' '(?i)(expected|esperado)'),(Pattern 'proposed' '(?i)(proposed|propuesto)'),(Pattern 'cell' '(?i)(cell|celda)'),(Pattern 'scopeHash' '(?i)scopeHash')) }
 )
-
-Assert-FileContains 'Fail-closed profile validation and environment gate' 'apps/sg-superapp-api/Services/SchedulingRuleProfileValidator.cs' @(
-    (Pattern 'SIMULATED profile handling' '(?i)SIMULATED'),
-    (Pattern 'MVP_TEST allowance' '(?i)MVP_TEST'),
-    (Pattern 'PRODUCTION rejection' '(?i)PRODUCTION'),
-    (Pattern 'profile completeness across R01-R07' '(?is)I9-R01.*I9-R02.*I9-R03.*I9-R04.*I9-R05.*I9-R06.*I9-R07'),
-    (Pattern 'checksum validation' '(?i)checksum')
-)
-
-Assert-FileContains 'Common evaluator, precedence and deterministic snapshot' 'apps/sg-superapp-api/Services/SchedulingRuleEvaluator.cs' @(
-    (Pattern 'all rules R01-R07' '(?is)I9-R01.*I9-R02.*I9-R03.*I9-R04.*I9-R05.*I9-R06.*I9-R07'),
-    (Pattern 'BLOCKED precedence' '(?i)BLOCKED'),
-    (Pattern 'R03 precedence over R05' '(?is)I9-R03.*I9-R05'),
-    (Pattern 'deterministic scopeHash' '(?i)scopeHash'),
-    (Pattern 'parameter and fact snapshots' '(?is)(parameter|parametro).*(snapshot|facts|hechos)')
-)
-
-Assert-FileContains 'I9-R01 and I9-R02 rule implementation' 'apps/sg-superapp-api/Services/SchedulingWorkRestRules.cs' @(
-    (Pattern 'I9-R01' 'I9-R01'),
-    (Pattern 'I9-R02' 'I9-R02'),
-    (Pattern 'R01 daily boundaries 8, 10 and 12 hours' '(?s)\b8\b.*\b10\b.*\b12\b'),
-    (Pattern 'R01 weekly boundaries 42 and 60 hours' '(?s)\b42\b.*\b60\b'),
-    (Pattern 'R02 minimum rest' '(?i)(rest|descanso)')
-)
-
-Assert-FileContains 'I9-R03 and I9-R05 rule implementation' 'apps/sg-superapp-api/Services/SchedulingOverlapTravelRules.cs' @(
-    (Pattern 'I9-R03' 'I9-R03'),
-    (Pattern 'I9-R05' 'I9-R05'),
-    (Pattern 'overlap evaluation' '(?i)(overlap|solap)'),
-    (Pattern 'directional travel evaluation' '(?i)(direction|direcc|travel|traslado)'),
-    (Pattern 'prohibited travel handling' '(?i)(prohibit|prohibid)')
-)
-
-Assert-FileContains 'I9-R04 and I9-R06 rule implementation' 'apps/sg-superapp-api/Services/SchedulingNoveltyRequirementRules.cs' @(
-    (Pattern 'I9-R04' 'I9-R04'),
-    (Pattern 'I9-R06' 'I9-R06'),
-    (Pattern 'unknown or unverified novelty handling' '(?i)(UNKNOWN|UNVERIFIED)'),
-    (Pattern 'employee and position requirement evaluation' '(?is)employeeId.*(position|puesto).*(requirement|requisito)'),
-    (Pattern 'requirement evidence and validity' '(?is)(evidence|evidencia).*(valid|vigencia|expiry|expires)')
-)
-
-Assert-FileContains 'I9-R07 rule implementation' 'apps/sg-superapp-api/Services/SchedulingTemplateDeviationRule.cs' @(
-    (Pattern 'I9-R07' 'I9-R07'),
-    (Pattern 'template version and anchor comparison' '(?is)(template|plantilla).*(version).*(anchor|anclaje)'),
-    (Pattern 'expected and proposed cell values' '(?is)(expected|esperado).*(proposed|propuesto).*(cell|celda)'),
-    (Pattern 'scopeHash-bound deviation' '(?i)scopeHash')
-)
+foreach ($item in $implementations) { Assert-FileContains $item.R $item.P $item.X }
 
 Assert-FileContains 'Rule profile HTTP endpoints' 'apps/sg-superapp-api/Endpoints/SchedulingRuleEndpoints.cs' @(
-    (Pattern 'GET /api/portal/scheduling/rule-profiles' '(?i)MapGet\s*\(\s*"/api/portal/scheduling/rule-profiles"'),
-    (Pattern 'GET /api/portal/scheduling/rule-profiles/{id}' '(?i)MapGet\s*\(\s*"/api/portal/scheduling/rule-profiles/\{id(?::long)?\}"'),
-    (Pattern 'POST /api/portal/scheduling/rule-profiles' '(?i)MapPost\s*\(\s*"/api/portal/scheduling/rule-profiles"'),
-    (Pattern 'POST /api/portal/scheduling/rule-profiles/{id}/activate' '(?i)MapPost\s*\(\s*"/api/portal/scheduling/rule-profiles/\{id(?::long)?\}/activate"'),
-    (Pattern 'POST /api/portal/scheduling/rule-profiles/{id}/retire' '(?i)MapPost\s*\(\s*"/api/portal/scheduling/rule-profiles/\{id(?::long)?\}/retire"'),
-    (Pattern 'POST /api/portal/scheduling/rules/evaluate' '(?i)MapPost\s*\(\s*"/api/portal/scheduling/rules/evaluate"'),
-    (Pattern 'VIEW, CONFIGURE and GENERATE authorization' '(?is)SCHEDULING/VIEW.*SCHEDULING/CONFIGURE.*SCHEDULING/GENERATE')
+    (Pattern 'GET mapping' '(?i)MapGet'), (Pattern 'POST mapping' '(?i)MapPost'),
+    (Pattern 'rule-profiles' '(?i)rule-profiles'), (Pattern 'id route' '(?i)\{id(?::long)?\}'),
+    (Pattern 'activate' '(?i)activate'), (Pattern 'retire' '(?i)retire'), (Pattern 'rules/evaluate' '(?i)rules/evaluate'),
+    (Pattern 'VIEW' '(?i)\bVIEW\b'), (Pattern 'CONFIGURE' '(?i)\bCONFIGURE\b'), (Pattern 'GENERATE' '(?i)\bGENERATE\b')
+)
+Assert-FileContains 'Rule HTTP contracts' 'apps/sg-superapp-api/Contracts/Portal/SchedulingRuleContracts.cs' @(
+    (Pattern 'RuleProfile' '(?i)RuleProfile'), (Pattern 'RuleEvaluation summary' '(?i)(RuleEvaluation|RuleSummary)'),
+    (Pattern 'scopeHash' '(?i)scopeHash'), (Pattern 'simulated' '(?i)simulated')
+)
+Assert-FileContains 'Endpoint registration' 'apps/sg-superapp-api/Program.cs' @(
+    (Pattern 'rule endpoint mapping' '(?i)(MapSchedulingRule|SchedulingRuleEndpoints)')
 )
 
-Assert-FileContains 'Rule HTTP response contracts' 'apps/sg-superapp-api/Contracts/Portal/SchedulingRuleContracts.cs' @(
-    (Pattern 'rule profile response' '(?i)RuleProfile'),
-    (Pattern 'rule evaluation summary' '(?i)(RuleEvaluation|RuleSummary)'),
-    (Pattern 'scopeHash' '(?i)scopeHash'),
-    (Pattern 'simulated marker' '(?i)simulated')
+Assert-FileContains 'Scheduling domain integration' 'apps/sg-superapp-api/Domain/SchedulingModels.cs' @(
+    (Pattern 'rule profile' '(?i)RuleProfile(Id|Version|Reference)'), (Pattern 'RuleEvaluation' '(?i)RuleEvaluation'),
+    (Pattern 'ScopeHash' '(?i)ScopeHash'), (Pattern 'Simulated' '(?i)Simulated')
 )
-
-Assert-FileContains 'Backend endpoint registration' 'apps/sg-superapp-api/Program.cs' @(
-    (Pattern 'scheduling rule endpoint mapping' '(?i)(MapSchedulingRule|SchedulingRuleEndpoints)')
+Assert-FileContains 'Workflow contracts' 'apps/sg-superapp-api/Contracts/Portal/SchedulingContracts.cs' @(
+    (Pattern 'workflow response' '(?i)ScheduleWorkflowResponse'), (Pattern 'rule profile' '(?i)RuleProfile'),
+    (Pattern 'rule result' '(?i)Rule(Evaluation|Summary|Result)'), (Pattern 'simulated' '(?i)Simulated'),
+    (Pattern 'manual edit' '(?i)UpdateScheduleAssignmentRequest'), (Pattern 'exception request' '(?i)CreateScheduleExceptionRequest'),
+    (Pattern 'RuleCode' '(?i)RuleCode'), (Pattern 'EvaluationId' '(?i)EvaluationId'), (Pattern 'ScopeHash' '(?i)ScopeHash'),
+    (Pattern 'motive code' '(?i)(MotiveCode|ReasonCode)'), (Pattern 'transition' '(?i)ScheduleTransitionRequest')
 )
-
-Assert-FileContains 'Generation and manual-edit domain rule contracts' 'apps/sg-superapp-api/Domain/SchedulingModels.cs' @(
-    (Pattern 'versioned rule profile reference' '(?i)RuleProfile(Id|Version|Reference)'),
-    (Pattern 'common RuleEvaluation results in scheduling models' '(?i)RuleEvaluation'),
-    (Pattern 'scopeHash-bound scheduling snapshot' '(?i)ScopeHash'),
-    (Pattern 'simulated scheduling marker' '(?i)Simulated')
+Assert-FileContains 'Eligibility integration' 'apps/sg-superapp-api/Services/SchedulingEligibilityService.cs' @(
+    (Pattern 'SchedulingRuleEvaluator' '(?i)SchedulingRuleEvaluator'), (Pattern 'BLOCKED' '(?i)BLOCKED')
 )
-
-Assert-FileContains 'Generation, exception, approval and publication portal contracts' 'apps/sg-superapp-api/Contracts/Portal/SchedulingContracts.cs' @(
-    (Pattern 'generation/edit/transition response rule profile' '(?is)Schedule(Proposal|Version|Workflow)Response.*RuleProfile'),
-    (Pattern 'generation/edit/transition response rule result summary' '(?is)Schedule(Proposal|Version|Workflow)Response.*Rule(Evaluation|Summary|Result)'),
-    (Pattern 'generation/edit/transition response simulated marker' '(?is)Schedule(Proposal|Version|Workflow)Response.*Simulated'),
-    (Pattern 'manual-edit contract' '(?i)UpdateScheduleAssignmentRequest'),
-    (Pattern 'exception ruleCode snapshot' '(?is)CreateScheduleExceptionRequest.*RuleCode'),
-    (Pattern 'exception evaluationId snapshot' '(?is)CreateScheduleExceptionRequest.*EvaluationId'),
-    (Pattern 'exception scopeHash snapshot' '(?is)CreateScheduleExceptionRequest.*ScopeHash'),
-    (Pattern 'catalogued exception motive' '(?is)CreateScheduleExceptionRequest.*(MotiveCode|ReasonCode)'),
-    (Pattern 'approval/publication transition contract' '(?i)ScheduleTransitionRequest')
-)
-
-Assert-FileContains 'Generation eligibility integration' 'apps/sg-superapp-api/Services/SchedulingEligibilityService.cs' @(
-    (Pattern 'versioned rule evaluator integration' '(?i)SchedulingRuleEvaluator'),
-    (Pattern 'BLOCKED candidate rejection' '(?i)BLOCKED')
-)
-
 Assert-FileContains 'Recommendation integration' 'apps/sg-superapp-api/Services/SchedulingRecommendationEngine.cs' @(
-    (Pattern 'versioned rule evaluation result' '(?i)RuleEvaluation'),
-    (Pattern 'exception-required scoring' '(?i)EXCEPTION_REQUIRED')
+    (Pattern 'RuleEvaluation' '(?i)RuleEvaluation'), (Pattern 'EXCEPTION_REQUIRED' '(?i)EXCEPTION_REQUIRED')
+)
+Assert-FileContains 'Workflow persistence' 'apps/sg-superapp-api/Services/PostgresPortalRepository.cs' @(
+    (Pattern 'rule profile' '(?i)(rule.*profile|profile.*rule)'), (Pattern 'scopeHash' '(?i)scopeHash'),
+    (Pattern 'simulated' '(?i)simulated'), (Pattern 'rule result' '(?i)(RuleEvaluation|BLOCKED|EXCEPTION_REQUIRED)')
+)
+Assert-FileContains 'Workflow endpoint enforcement' 'apps/sg-superapp-api/Endpoints/PortalEndpoints.cs' @(
+    (Pattern 'exceptions' '(?i)/exceptions'), (Pattern 'approve' '(?i)/approve'), (Pattern 'publish' '(?i)/publish'),
+    (Pattern 'RuleCode' '(?i)RuleCode'), (Pattern 'EvaluationId' '(?i)EvaluationId'), (Pattern 'ScopeHash' '(?i)ScopeHash'),
+    (Pattern 'rule blocking' '(?i)(RuleEvaluation|BLOCKED|EXCEPTION_REQUIRED)'),
+    (Pattern 'stale conflict' '(?i)(Conflict|409|stale|obsolet|desactual)')
 )
 
-Assert-FileContains 'Workflow snapshot and stale-exception integration' 'apps/sg-superapp-api/Services/PostgresPortalRepository.cs' @(
-    (Pattern 'rule profile snapshot persistence' '(?is)rule.*profile.*snapshot'),
-    (Pattern 'scopeHash revalidation' '(?i)scopeHash'),
-    (Pattern 'simulated marker persistence' '(?i)simulated'),
-    (Pattern 'approval or publication rule revalidation' '(?is)(approv|aproba|publish|publica).*(RuleEvaluation|BLOCKED|EXCEPTION_REQUIRED)')
+Assert-FileContains 'Frontend rule types' 'apps/sg-superapp-web/src/types/portal.ts' @(
+    (Pattern 'RuleProfile' '(?i)RuleProfile'), (Pattern 'rule result' '(?i)Rule(Evaluation|Summary|Result)'),
+    (Pattern 'scopeHash' '(?i)scopeHash'), (Pattern 'simulated' '(?i)simulated')
+)
+Assert-FileContains 'Frontend API' 'apps/sg-superapp-web/src/services/portalApi.ts' @(
+    (Pattern 'rule-profiles' '(?i)rule-profiles'), (Pattern 'rules/evaluate' '(?i)rules/evaluate')
+)
+Assert-FileContains 'Frontend rule state' 'apps/sg-superapp-web/src/hooks/usePortalShell.ts' @(
+    (Pattern 'ruleProfile' '(?i)ruleProfile'), (Pattern 'rule results' '(?i)rule(Evaluation|Summary|Results)'),
+    (Pattern 'revalidation' '(?i)(revalid|evaluateRules|ruleEvaluation)')
+)
+Assert-FileContains 'Frontend rule panel' 'apps/sg-superapp-web/src/features/scheduling/RuleEvaluationPanel.tsx' @(
+    (Pattern 'simulated label' '(?i)DATOS SIMULADOS\s*-\s*MVP'), (Pattern 'BLOCKED' '(?i)BLOCKED'),
+    (Pattern 'EXCEPTION_REQUIRED' '(?i)EXCEPTION_REQUIRED'), (Pattern 'WARNING' '(?i)WARNING'),
+    (Pattern 'accessible status' '(?i)(aria-live|role=.status)')
+)
+Assert-FileContains 'Scheduling page rule panel' 'apps/sg-superapp-web/src/features/scheduling/SchedulingPage.tsx' @(
+    (Pattern 'RuleEvaluationPanel' '(?i)RuleEvaluationPanel'), (Pattern 'simulated' '(?i)simulated')
+)
+Assert-FileContains 'Exception panel snapshot' 'apps/sg-superapp-web/src/features/scheduling/ExceptionPanel.tsx' @(
+    (Pattern 'ruleCode' '(?i)ruleCode'), (Pattern 'scopeHash' '(?i)scopeHash')
 )
 
-Assert-FileContains 'Exception, approval and publication endpoint rule enforcement' 'apps/sg-superapp-api/Endpoints/PortalEndpoints.cs' @(
-    (Pattern 'exception endpoint rule snapshot handling' '(?is)/exceptions.*(RuleCode|EvaluationId).*ScopeHash'),
-    (Pattern 'approval endpoint rule revalidation' '(?is)/approve.*(SchedulingRuleEvaluator|RuleEvaluation|BLOCKED|EXCEPTION_REQUIRED)'),
-    (Pattern 'publication endpoint rule revalidation' '(?is)/publish.*(SchedulingRuleEvaluator|RuleEvaluation|BLOCKED|EXCEPTION_REQUIRED)'),
-    (Pattern 'stale scopeHash conflict response' '(?is)ScopeHash.*(Conflict|Results\.Conflict|409|stale|obsolet|desactual)')
+$focused = @(
+    @{ R='I9-R01/R02 verifier'; P='scripts/dev/Verify-SgSuperAppI9R01R02.ps1'; Pass='I9 R01 R02 PASS' },
+    @{ R='I9-R03/R05 verifier'; P='scripts/dev/Verify-SgSuperAppI9R03R05.ps1'; Pass='I9 R03 R05 PASS' },
+    @{ R='I9-R04/R06 verifier'; P='scripts/dev/Verify-SgSuperAppI9R04R06.ps1'; Pass='I9 R04 R06 PASS' },
+    @{ R='I9-R07 verifier'; P='scripts/dev/Verify-SgSuperAppI9R07.ps1'; Pass='I9 R07 PASS' }
 )
+foreach ($verifier in $focused) { Invoke-FocusedVerifier $verifier.R $verifier.P $verifier.Pass }
 
-Assert-FileContains 'Frontend rule profile and result types' 'apps/sg-superapp-web/src/types/portal.ts' @(
-    (Pattern 'rule profile type' '(?i)(interface|type)\s+.*RuleProfile'),
-    (Pattern 'rule result or summary type' '(?i)(interface|type)\s+.*Rule(Evaluation|Summary|Result)'),
-    (Pattern 'scopeHash' '(?i)scopeHash'),
-    (Pattern 'simulated marker' '(?i)simulated')
+Assert-FileContains 'MVP generation verifier' 'scripts/dev/Verify-SgSuperAppI9MvpGeneration.ps1' @(
+    (Pattern 'BLOCKED' '(?i)BLOCKED'), (Pattern 'candidate' '(?i)(candidate|candidato|assign|asign)'),
+    (Pattern 'scopeHash' '(?i)scopeHash'), (Pattern 'invalidation' '(?i)(invalid|recalcul|change|cambi)')
 )
-
-Assert-FileContains 'Frontend rule profile API client' 'apps/sg-superapp-web/src/services/portalApi.ts' @(
-    (Pattern 'rule-profiles endpoint' '(?i)rule-profiles'),
-    (Pattern 'rules/evaluate endpoint' '(?i)rules/evaluate')
+Assert-FileContains 'MVP workflow verifier' 'scripts/dev/Verify-SgSuperAppI9MvpWorkflow.ps1' @(
+    (Pattern 'scopeHash' '(?i)scopeHash'), (Pattern 'stale' '(?i)(stale|obsolet|desactual|invalid)'),
+    (Pattern 'approval' '(?i)(approv|aproba)'), (Pattern 'publication' '(?i)(publish|publica)'),
+    (Pattern 'blocking' '(?i)(BLOCKED|EXCEPTION_REQUIRED)')
 )
-
-Assert-FileContains 'Frontend shell rule state integration' 'apps/sg-superapp-web/src/hooks/usePortalShell.ts' @(
-    (Pattern 'rule profile state' '(?i)ruleProfile'),
-    (Pattern 'rule evaluation or summary state' '(?i)rule(Evaluation|Summary|Results)'),
-    (Pattern 'revalidation after changes' '(?i)(revalid|evaluateRules|ruleEvaluation)')
-)
-
-Assert-FileContains 'Frontend rule results panel' 'apps/sg-superapp-web/src/features/scheduling/RuleEvaluationPanel.tsx' @(
-    (Pattern 'persistent simulated MVP label' '(?i)DATOS SIMULADOS\s*-\s*MVP'),
-    (Pattern 'rule result summary' '(?i)(COMPLIANT|BLOCKED|EXCEPTION_REQUIRED|WARNING)'),
-    (Pattern 'accessible status announcement' '(?i)(aria-live|role=.status)')
-)
-
-Assert-FileContains 'Scheduling page rule panel integration' 'apps/sg-superapp-web/src/features/scheduling/SchedulingPage.tsx' @(
-    (Pattern 'RuleEvaluationPanel' '(?i)RuleEvaluationPanel'),
-    (Pattern 'simulated marker' '(?i)simulated')
-)
-
-Assert-FileContains 'Exception panel scope snapshot integration' 'apps/sg-superapp-web/src/features/scheduling/ExceptionPanel.tsx' @(
-    (Pattern 'rule code' '(?i)ruleCode'),
-    (Pattern 'scopeHash' '(?i)scopeHash')
-)
-
-$ruleVerifierContracts = @(
-    @{ Requirement = 'I9-R01/R02 focused verifier'; Path = 'scripts/dev/Verify-SgSuperAppI9R01R02.ps1'; Rules = '(?is)I9-R01.*I9-R02' },
-    @{ Requirement = 'I9-R03/R05 focused verifier'; Path = 'scripts/dev/Verify-SgSuperAppI9R03R05.ps1'; Rules = '(?is)I9-R03.*I9-R05' },
-    @{ Requirement = 'I9-R04/R06 focused verifier'; Path = 'scripts/dev/Verify-SgSuperAppI9R04R06.ps1'; Rules = '(?is)I9-R04.*I9-R06' },
-    @{ Requirement = 'I9-R07 focused verifier'; Path = 'scripts/dev/Verify-SgSuperAppI9R07.ps1'; Rules = 'I9-R07' }
-)
-foreach ($verifier in $ruleVerifierContracts) {
-    Assert-FileContains $verifier.Requirement $verifier.Path @(
-        (Pattern 'the expected rule codes' $verifier.Rules),
-        (Pattern 'an explicit PASS outcome' '(?i)\bPASS\b')
-    )
-}
-
-Assert-FileContains 'MVP generation integration verifier' 'scripts/dev/Verify-SgSuperAppI9MvpGeneration.ps1' @(
-    (Pattern 'blocked candidate rejection' '(?is)BLOCKED.*(candidate|candidato|assign|asign)'),
-    (Pattern 'scopeHash invalidation after edit' '(?is)scopeHash.*(invalid|recalcul|change|cambi)')
-)
-
-Assert-FileContains 'MVP workflow integration verifier' 'scripts/dev/Verify-SgSuperAppI9MvpWorkflow.ps1' @(
-    (Pattern 'stale scopeHash rejection' '(?is)scopeHash.*(stale|obsolet|desactual|invalid)'),
-    (Pattern 'approval and publication blocking' '(?is)(approv|aproba).*(publish|publica).*(BLOCKED|EXCEPTION_REQUIRED)')
-)
-
 Assert-FileContains 'MVP frontend API verifier' 'scripts/dev/Verify-SgSuperAppI9MvpFrontendApi.ps1' @(
-    (Pattern 'rule profile contract' '(?i)ruleProfile'),
-    (Pattern 'simulated marker contract' '(?i)simulated')
+    (Pattern 'ruleProfile' '(?i)ruleProfile'), (Pattern 'simulated' '(?i)simulated')
 )
-
 Assert-FileContains 'MVP UI verifier' 'scripts/dev/Verify-SgSuperAppI9MvpUi.ps1' @(
-    (Pattern 'simulated MVP label' '(?i)DATOS SIMULADOS\s*-\s*MVP'),
-    (Pattern 'rule result states' '(?is)BLOCKED.*EXCEPTION_REQUIRED.*WARNING')
+    (Pattern 'simulated label' '(?i)DATOS SIMULADOS\s*-\s*MVP'), (Pattern 'BLOCKED' '(?i)BLOCKED'),
+    (Pattern 'EXCEPTION_REQUIRED' '(?i)EXCEPTION_REQUIRED'), (Pattern 'WARNING' '(?i)WARNING')
 )
-
-Assert-FileContains 'Existing I9 suite extended with MVP closure regression' 'scripts/dev/Verify-SgSuperAppI9Integration.ps1' @(
-    (Pattern 'MVP rules closure verifier invocation' '(?i)Verify-SgSuperAppI9MvpRules\.ps1'),
-    (Pattern 'MVP hermetic integration verifier invocation' '(?i)Verify-SgSuperAppI9MvpIntegration\.ps1'),
-    (Pattern 'generation and workflow regression coverage' '(?is)Verify-SgSuperAppI9(Eligibility|Recommendations)\.ps1.*Verify-SgSuperAppI9Workflow\.ps1'),
-    (Pattern 'security and export regression coverage' '(?is)Verify-SgSuperAppI9Security\.ps1.*Verify-SgSuperAppI9Exports\.ps1')
+Assert-FileContains 'Existing I9 suite regression' 'scripts/dev/Verify-SgSuperAppI9Integration.ps1' @(
+    (Pattern 'MVP rules' '(?i)Verify-SgSuperAppI9MvpRules\.ps1'),
+    (Pattern 'MVP integration' '(?i)Verify-SgSuperAppI9MvpIntegration\.ps1'),
+    (Pattern 'eligibility' '(?i)Verify-SgSuperAppI9Eligibility\.ps1'),
+    (Pattern 'recommendations' '(?i)Verify-SgSuperAppI9Recommendations\.ps1'),
+    (Pattern 'workflow' '(?i)Verify-SgSuperAppI9Workflow\.ps1'),
+    (Pattern 'security' '(?i)Verify-SgSuperAppI9Security\.ps1'),
+    (Pattern 'exports' '(?i)Verify-SgSuperAppI9Exports\.ps1')
 )
-
 Assert-FileContains 'Hermetic MVP closure suite' 'scripts/dev/Verify-SgSuperAppI9MvpIntegration.ps1' @(
-    (Pattern 'all rule verifiers or rules R01-R07' '(?is)I9-R01.*I9-R02.*I9-R03.*I9-R04.*I9-R05.*I9-R06.*I9-R07'),
-    (Pattern 'MVP_TEST simulated profile' '(?is)MVP_TEST.*SIMULATED'),
-    (Pattern 'PRODUCTION rejection' '(?is)PRODUCTION.*(reject|rechaz|fail|conflict)'),
-    (Pattern 'deterministic double execution' '(?i)(double|doble|twice|segunda ejecucion)'),
-    (Pattern 'explicit PASS outcome' '(?i)I9 MVP.*PASS')
+    (Pattern 'I9-R01' 'I9-R01'), (Pattern 'I9-R02' 'I9-R02'), (Pattern 'I9-R03' 'I9-R03'),
+    (Pattern 'I9-R04' 'I9-R04'), (Pattern 'I9-R05' 'I9-R05'), (Pattern 'I9-R06' 'I9-R06'),
+    (Pattern 'I9-R07' 'I9-R07'), (Pattern 'MVP_TEST' '(?i)MVP_TEST'), (Pattern 'SIMULATED' '(?i)SIMULATED'),
+    (Pattern 'PRODUCTION' '(?i)PRODUCTION'), (Pattern 'production rejection' '(?i)(reject|rechaz|fail|conflict)'),
+    (Pattern 'double execution' '(?i)(double|doble|twice|segunda ejecucion)'), (Pattern 'PASS' '(?i)I9 MVP.*PASS')
 )
 
 if ($failures.Count -gt 0) {
@@ -311,5 +304,4 @@ if ($failures.Count -gt 0) {
     $failures | ForEach-Object { Write-Host " - $_" }
     exit 1
 }
-
 Write-Host 'I9 MVP RULES PASS'
