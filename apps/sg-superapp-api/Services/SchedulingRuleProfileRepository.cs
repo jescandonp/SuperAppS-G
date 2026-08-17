@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Npgsql;
+using NpgsqlTypes;
 using Sg.SuperApp.Api.Domain;
 
 namespace Sg.SuperApp.Api.Services;
@@ -59,11 +60,11 @@ ORDER BY p.id, e.rule_code;";
             if (!profiles.TryGetValue(id, out var profile))
             {
                 profile = new ProfileBuilder(id, reader.GetString(1), reader.GetInt32(2),
-                    Enum.Parse<SchedulingRuleOrigin>(reader.GetString(3), true),
-                    Enum.Parse<SchedulingEnvironmentScope>(reader.GetString(4), true), reader.GetString(5),
+                    ParseStoredEnum<SchedulingRuleOrigin>(reader.GetString(3)),
+                    ParseStoredEnum<SchedulingEnvironmentScope>(reader.GetString(4)), reader.GetString(5),
                     DateOnly.FromDateTime(reader.GetDateTime(6)),
                     reader.IsDBNull(7) ? null : DateOnly.FromDateTime(reader.GetDateTime(7)),
-                    Enum.Parse<SchedulingRuleProfileStatus>(reader.GetString(8), true), reader.GetString(9));
+                    ParseStoredEnum<SchedulingRuleProfileStatus>(reader.GetString(8)), reader.GetString(9));
                 profiles.Add(id, profile);
             }
             if (!reader.IsDBNull(12))
@@ -78,10 +79,94 @@ ORDER BY p.id, e.rule_code;";
         return result;
     }
 
+    public async Task<SchedulingRuleProfile> CreateDraftAsync(SchedulingRuleProfile profile, string actor,
+        CancellationToken cancellationToken = default)
+    {
+        if (profile.Status != SchedulingRuleProfileStatus.DRAFT || string.IsNullOrWhiteSpace(actor))
+            throw new InvalidOperationException("Only attributed DRAFT profiles can be created.");
+        _validator.Validate(profile, profile.EnvironmentScope);
+        RejectPersonalData(profile);
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            const string profileSql = @"INSERT INTO scheduling_rule_profiles
+(profile_code,version,origin,environment_scope,scope_code,effective_from,effective_to,status,checksum,created_by,created_at,approval_evidence)
+VALUES(@code,@version,@origin,@environment,@scope,@from,@to,'DRAFT',@checksum,@actor,NOW(),'{}'::jsonb) RETURNING id";
+            await using var profileCommand = new NpgsqlCommand(profileSql, connection, transaction);
+            profileCommand.Parameters.AddWithValue("code", profile.ProfileCode);
+            profileCommand.Parameters.AddWithValue("version", profile.Version);
+            profileCommand.Parameters.AddWithValue("origin", profile.Origin.ToString());
+            profileCommand.Parameters.AddWithValue("environment", profile.EnvironmentScope.ToString());
+            profileCommand.Parameters.AddWithValue("scope", profile.ScopeCode);
+            profileCommand.Parameters.Add("from", NpgsqlDbType.Date).Value = profile.EffectiveFrom.ToDateTime(TimeOnly.MinValue);
+            profileCommand.Parameters.Add("to", NpgsqlDbType.Date).Value = profile.EffectiveTo is { } effectiveTo
+                ? effectiveTo.ToDateTime(TimeOnly.MinValue) : DBNull.Value;
+            profileCommand.Parameters.AddWithValue("checksum", profile.Checksum);
+            profileCommand.Parameters.AddWithValue("actor", actor);
+            var id = Convert.ToInt64(await profileCommand.ExecuteScalarAsync(cancellationToken));
+
+            const string entrySql = @"INSERT INTO scheduling_rule_profile_entries
+(rule_profile_id,rule_code,parameters,catalog_snapshot,enabled,created_at)
+VALUES(@profile,@rule,@parameters,@catalog,@enabled,NOW())";
+            foreach (var entry in profile.Entries.OrderBy(item => item.RuleCode, StringComparer.Ordinal))
+            {
+                await using var entryCommand = new NpgsqlCommand(entrySql, connection, transaction);
+                entryCommand.Parameters.AddWithValue("profile", id);
+                entryCommand.Parameters.AddWithValue("rule", entry.RuleCode);
+                entryCommand.Parameters.Add("parameters", NpgsqlDbType.Jsonb).Value = entry.Parameters.GetRawText();
+                entryCommand.Parameters.Add("catalog", NpgsqlDbType.Jsonb).Value = entry.CatalogSnapshot.GetRawText();
+                entryCommand.Parameters.AddWithValue("enabled", entry.Enabled);
+                await entryCommand.ExecuteNonQueryAsync(cancellationToken);
+            }
+            await transaction.CommitAsync(cancellationToken);
+            return profile with { Id = id };
+        }
+        catch
+        {
+            try { await transaction.RollbackAsync(CancellationToken.None); } catch { }
+            throw;
+        }
+    }
+
     private static JsonElement ReadJson(string value)
     {
         using var document = JsonDocument.Parse(value);
         return document.RootElement.Clone();
+    }
+
+    private static T ParseStoredEnum<T>(string value) where T : struct, Enum
+    {
+        if (!Enum.GetNames<T>().Contains(value, StringComparer.Ordinal) || !Enum.TryParse<T>(value, out var parsed))
+            throw new SchedulingRuleContractException();
+        return parsed;
+    }
+
+    private static void RejectPersonalData(SchedulingRuleProfile profile)
+    {
+        var forbiddenFragments = new[] { "name", "nombre", "email", "correo", "phone", "telefono", "address", "direccion", "document" };
+        foreach (var root in profile.Entries.SelectMany(entry => new[] { entry.Parameters, entry.CatalogSnapshot }))
+        {
+            var pending = new Stack<JsonElement>();
+            pending.Push(root);
+            while (pending.Count > 0)
+            {
+                var current = pending.Pop();
+                if (current.ValueKind == JsonValueKind.Object)
+                    foreach (var property in current.EnumerateObject())
+                    {
+                        if (forbiddenFragments.Any(fragment => property.Name.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
+                            throw new InvalidOperationException("Rule profiles cannot contain personal data fields.");
+                        if (property.Value.ValueKind == JsonValueKind.String && (property.Value.GetString() ?? string.Empty).Contains('@'))
+                            throw new InvalidOperationException("Rule profiles cannot contain personal contact values.");
+                        pending.Push(property.Value);
+                    }
+                else if (current.ValueKind == JsonValueKind.Array)
+                    foreach (var item in current.EnumerateArray()) pending.Push(item);
+            }
+        }
     }
 
     private sealed record ProfileBuilder(long Id, string ProfileCode, int Version, SchedulingRuleOrigin Origin,

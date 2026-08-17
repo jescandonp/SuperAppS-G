@@ -2,6 +2,22 @@ using System.Text.Json;
 
 namespace Sg.SuperApp.Api.Contracts.Portal;
 
+public sealed record CreateSchedulingRuleProfileRequest(
+    string ProfileCode,
+    int Version,
+    string Origin,
+    string EnvironmentScope,
+    string ScopeCode,
+    string EffectiveFrom,
+    string? EffectiveTo,
+    IReadOnlyList<CreateSchedulingRuleProfileEntryRequest> Entries);
+
+public sealed record CreateSchedulingRuleProfileEntryRequest(
+    string RuleCode,
+    JsonElement Parameters,
+    JsonElement CatalogSnapshot,
+    bool Enabled);
+
 public sealed record ActivateSchedulingRuleProfileRequest(
     string ProjectCode,
     string Period,

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Npgsql;
 using Sg.SuperApp.Api.Domain;
 
@@ -29,11 +30,23 @@ public sealed class SchedulingRuleEvaluator
     private const int MaximumFactsUtf8Bytes = 256 * 1024;
     private const int MaximumFactsDepth = 32;
     private const int MaximumFactsNodes = 4096;
-    private static readonly HashSet<string> PiiFieldNames = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly IReadOnlyDictionary<string, HashSet<string>> RootFactsByRule =
+        new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
     {
-        "name", "fullName", "firstName", "lastName", "document", "documentNumber",
-        "identificationNumber", "email", "phone", "telephone", "mobile"
+        ["I9-R01"] = Fields("assignmentId", "scheduleVersionId", "dailyHours", "weeklyHours", "writtenAgreement"),
+        ["I9-R02"] = Fields("assignmentId", "scheduleVersionId", "previousShiftEnd", "proposedShiftStart"),
+        ["I9-R03"] = Fields("assignmentId", "scheduleVersionId", "proposedShiftStart", "proposedShiftEnd", "existingIntervals"),
+        ["I9-R04"] = Fields("assignmentId", "scheduleVersionId", "noveltyCodes"),
+        ["I9-R05"] = Fields("assignmentId", "scheduleVersionId", "originPositionCode", "destinationPositionCode", "availableMinutes"),
+        ["I9-R06"] = Fields("assignmentId", "scheduleVersionId", "employeeId", "positionCode", "shiftStart", "shiftEnd", "requirementEvaluations"),
+        ["I9-R07"] = Fields("assignmentId", "scheduleVersionId", "templateCode", "templateVersion", "anchorDate", "expectedCells", "proposedCells")
     };
+    private static readonly HashSet<string> AllowedRootFacts = RootFactsByRule.Values
+        .SelectMany(fields => fields).ToHashSet(StringComparer.Ordinal);
+    private static readonly HashSet<string> AllowedNestedFacts = Fields(
+        "start", "end", "positionCode", "shiftId", "code", "status", "validFrom", "validTo", "required",
+        "evidenceCode", "minutes", "prohibited", "cell", "expected", "proposed", "date", "shiftCode", "employeeId");
+    private static readonly Regex AnonymousCode = new("^[A-Za-z0-9._:-]{1,80}$", RegexOptions.CultureInvariant);
 
     public SchedulingRuleEvaluationBatch Evaluate(
         SchedulingRuleProfile profile,
@@ -86,8 +99,12 @@ public sealed class SchedulingRuleEvaluator
             {
                 foreach (var property in current.Element.EnumerateObject())
                 {
-                    if (PiiFieldNames.Contains(property.Name))
-                        throw new ArgumentException("Facts must not contain personal identification fields.");
+                    var allowed = current.Depth == 1 ? AllowedRootFacts : AllowedNestedFacts;
+                    if (!allowed.Contains(property.Name))
+                        throw new ArgumentException("Facts contain a field outside the anonymous rule schema.");
+                    ValidateScalar(property.Name, property.Value);
+                    if (property.Value.ValueKind == JsonValueKind.Array)
+                        foreach (var item in property.Value.EnumerateArray()) ValidateScalar(property.Name, item);
                     pending.Push((property.Value, current.Depth + 1));
                 }
             }
@@ -96,6 +113,43 @@ public sealed class SchedulingRuleEvaluator
         }
     }
 
+    private static void ValidateScalar(string propertyName, JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.String) return;
+        var text = value.GetString() ?? string.Empty;
+        if (propertyName.EndsWith("Start", StringComparison.Ordinal) || propertyName.EndsWith("End", StringComparison.Ordinal) ||
+            propertyName is "start" or "end" or "validFrom" or "validTo" or "date" or "anchorDate")
+        {
+            if (!DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out _) &&
+                !DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+                throw new ArgumentException("Facts contain an invalid temporal value.");
+            return;
+        }
+        if (!AnonymousCode.IsMatch(text))
+            throw new ArgumentException("Facts contain a non-anonymous free-text value.");
+    }
+
+    private static JsonElement SanitizeFacts(string ruleCode, JsonElement facts)
+    {
+        if (!RootFactsByRule.TryGetValue(ruleCode, out var allowed)) throw new SchedulingRuleContractException();
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            foreach (var property in facts.EnumerateObject().Where(property => allowed.Contains(property.Name))
+                         .OrderBy(property => property.Name, StringComparer.Ordinal))
+            {
+                writer.WritePropertyName(property.Name);
+                property.Value.WriteTo(writer);
+            }
+            writer.WriteEndObject();
+        }
+        using var document = JsonDocument.Parse(stream.ToArray());
+        return document.RootElement.Clone();
+    }
+
+    private static HashSet<string> Fields(params string[] names) => new(names, StringComparer.Ordinal);
+
     private static RuleEvaluation CreateUnverifiedEvaluation(
         SchedulingRuleProfile profile,
         SchedulingRuleProfileEntry entry,
@@ -103,7 +157,8 @@ public sealed class SchedulingRuleEvaluator
         DateOnly period,
         JsonElement facts)
     {
-        var scopeHash = ComputeScopeHash(profile, entry, projectCode, period, facts);
+        var sanitizedFacts = SanitizeFacts(entry.RuleCode, facts);
+        var scopeHash = ComputeScopeHash(profile, entry, projectCode, period, sanitizedFacts);
         return new RuleEvaluation(
             entry.RuleCode,
             profile.Version,
@@ -113,7 +168,7 @@ public sealed class SchedulingRuleEvaluator
             "La regla aun no tiene evaluador funcional; no se acredita cumplimiento.",
             scopeHash,
             entry.Parameters.Clone(),
-            facts.Clone(),
+            sanitizedFacts,
             ExceptionAllowed: false);
     }
 
@@ -248,8 +303,8 @@ JOIN scheduling_rule_profiles p ON p.id=e.rule_profile_id WHERE schedule_version
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
             results.Add(new RuleEvaluation(reader.GetString(0), reader.GetInt32(1),
-                Enum.Parse<SchedulingRuleOutcome>(reader.GetString(2), true),
-                Enum.Parse<SchedulingRuleSeverity>(reader.GetString(3), true), reader.GetString(4), reader.GetString(5),
+                ParseStoredEnum<SchedulingRuleOutcome>(reader.GetString(2)),
+                ParseStoredEnum<SchedulingRuleSeverity>(reader.GetString(3)), reader.GetString(4), reader.GetString(5),
                 reader.GetString(6), ReadJson(reader.GetString(7)), ReadJson(reader.GetString(8)), reader.GetBoolean(9)));
         return results;
     }
@@ -267,10 +322,10 @@ JOIN scheduling_rule_profiles p ON p.id=e.rule_profile_id WHERE schedule_version
             if (!builders.TryGetValue(id, out var builder))
             {
                 builder = new ProfileBuilder(id, reader.GetString(1), reader.GetInt32(2),
-                    Enum.Parse<SchedulingRuleOrigin>(reader.GetString(3), true),
-                    Enum.Parse<SchedulingEnvironmentScope>(reader.GetString(4), true), reader.GetString(5),
+                    ParseStoredEnum<SchedulingRuleOrigin>(reader.GetString(3)),
+                    ParseStoredEnum<SchedulingEnvironmentScope>(reader.GetString(4)), reader.GetString(5),
                     DateOnly.FromDateTime(reader.GetDateTime(6)), reader.IsDBNull(7) ? null : DateOnly.FromDateTime(reader.GetDateTime(7)),
-                    Enum.Parse<SchedulingRuleProfileStatus>(reader.GetString(8), true), reader.GetString(9));
+                    ParseStoredEnum<SchedulingRuleProfileStatus>(reader.GetString(8)), reader.GetString(9));
                 builders.Add(id, builder);
             }
             if (!reader.IsDBNull(12))
@@ -291,6 +346,13 @@ JOIN scheduling_rule_profiles p ON p.id=e.rule_profile_id WHERE schedule_version
     {
         using var document = JsonDocument.Parse(json);
         return document.RootElement.Clone();
+    }
+
+    private static T ParseStoredEnum<T>(string value) where T : struct, Enum
+    {
+        if (!Enum.GetNames<T>().Contains(value, StringComparer.Ordinal) || !Enum.TryParse<T>(value, out var parsed))
+            throw new SchedulingRuleContractException();
+        return parsed;
     }
 
     private sealed record ProfileBuilder(long Id, string ProfileCode, int Version, SchedulingRuleOrigin Origin,

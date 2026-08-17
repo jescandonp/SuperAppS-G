@@ -158,6 +158,29 @@ function Test-RuleEndpointSecurityLinkage {
         $EndpointContent -notmatch '(?s)catch\s*\([^)]*Exception[^)]*\).*?exception\.Message'
 }
 
+function Test-RuleProfileCreateLinkage {
+    param([string]$EndpointContent, [string]$RepositoryContent)
+    return $EndpointContent -match '(?s)MapPost\s*\(\s*"/api/portal/scheduling/rule-profiles".*?RequireAsync\s*\(\s*"SCHEDULING"\s*,\s*"CONFIGURE".*?ComputeChecksum\s*\(.*?repository\.CreateDraftAsync' -and
+        $RepositoryContent -match '(?s)CreateDraftAsync.*?_validator\.Validate.*?BeginTransactionAsync.*?INSERT\s+INTO\s+scheduling_rule_profiles.*?INSERT\s+INTO\s+scheduling_rule_profile_entries.*?CommitAsync' -and
+        $RepositoryContent -match '(?s)catch.*?RollbackAsync\s*\(\s*CancellationToken\.None\s*\)' -and $RepositoryContent -match 'NpgsqlDbType\.Jsonb'
+}
+
+function Test-AnonymousFactsAllowlistLinkage {
+    param([string]$EvaluatorContent)
+    return $EvaluatorContent -match '(?s)RootFactsByRule.*?I9-R01.*?I9-R07' -and
+        $EvaluatorContent -match '(?s)AllowedRootFacts.*?AllowedNestedFacts.*?if\s*\(\s*!allowed\.Contains\s*\(\s*property\.Name\s*\)\s*\).*?throw' -and
+        $EvaluatorContent -match '(?s)SanitizeFacts\s*\(\s*entry\.RuleCode\s*,\s*facts\s*\).*?ComputeScopeHash\s*\(.*?sanitizedFacts.*?sanitizedFacts' -and
+        $EvaluatorContent -notmatch '(?i)PiiFieldNames|blacklist|denylist'
+}
+
+function Test-StoredEnumFailClosedLinkage {
+    param([string]$RepositoryContent, [string]$HttpRepositoryContent, [string]$EndpointContent)
+    return $RepositoryContent -match '(?s)ParseStoredEnum.*?Enum\.GetNames.*?Enum\.TryParse.*?SchedulingRuleContractException' -and
+        $HttpRepositoryContent -match '(?s)ParseStoredEnum.*?Enum\.GetNames.*?Enum\.TryParse.*?SchedulingRuleContractException' -and
+        $RepositoryContent -notmatch 'Enum\.Parse<' -and $HttpRepositoryContent -notmatch 'Enum\.Parse<' -and
+        $EndpointContent -match '(?s)catch\s*\(\s*SchedulingRuleContractException\s*\).*?ContractProblem.*?Results\.Problem'
+}
+
 function ConvertTo-I9CanonicalStringSelfTest {
     param([string]$Value)
     $builder = New-Object System.Text.StringBuilder
@@ -311,6 +334,20 @@ if (-not (Test-RuleEndpointSecurityLinkage $endpointLinkagePositive) -or
     (Test-RuleEndpointSecurityLinkage $endpointLinkageNegative)) {
     throw 'I9 MVP rules verifier HTTP security linkage self-test failed.'
 }
+$createLinkagePositive = Test-RuleProfileCreateLinkage 'MapPost("/api/portal/scheduling/rule-profiles", RequireAsync("SCHEDULING", "CONFIGURE"); validator.ComputeChecksum(profile); repository.CreateDraftAsync(profile));' 'CreateDraftAsync { _validator.Validate(); BeginTransactionAsync(); INSERT INTO scheduling_rule_profiles; INSERT INTO scheduling_rule_profile_entries; NpgsqlDbType.Jsonb; CommitAsync(); } catch { RollbackAsync(CancellationToken.None); }'
+$createLinkageNegative = Test-RuleProfileCreateLinkage 'MapPost("/api/portal/scheduling/rule-profiles", repository.Insert());' 'INSERT INTO scheduling_rule_profiles'
+if (-not $createLinkagePositive -or $createLinkageNegative) { throw 'I9 MVP rules verifier profile-create linkage self-test failed.' }
+$factsLinkagePositive = 'RootFactsByRule I9-R01 I9-R07; AllowedRootFacts; AllowedNestedFacts; if (!allowed.Contains(property.Name)) throw; sanitizedFacts = SanitizeFacts(entry.RuleCode, facts); ComputeScopeHash(profile, sanitizedFacts); return sanitizedFacts;'
+$factsLinkageNegative = 'PiiFieldNames blacklist; ComputeScopeHash(profile, facts); return facts.Clone();'
+if (-not (Test-AnonymousFactsAllowlistLinkage $factsLinkagePositive) -or (Test-AnonymousFactsAllowlistLinkage $factsLinkageNegative)) { throw 'I9 MVP rules verifier facts-allowlist linkage self-test failed.' }
+$anonymousFactNames = @('assignmentId','dailyHours','employeeId','positionCode','templateCode')
+foreach ($forbiddenFactName in @('nombre','correo','employeeName','address')) {
+    if ($anonymousFactNames -contains $forbiddenFactName) { throw 'I9 MVP rules verifier unknown/PII fact-name negative self-test failed.' }
+}
+$enumLinkagePositive = 'ParseStoredEnum { Enum.GetNames; Enum.TryParse; throw new SchedulingRuleContractException(); }'
+$enumEndpointPositive = 'catch (SchedulingRuleContractException) { return ContractProblem(); } ContractProblem() => Results.Problem();'
+if (-not (Test-StoredEnumFailClosedLinkage $enumLinkagePositive $enumLinkagePositive $enumEndpointPositive) -or
+    (Test-StoredEnumFailClosedLinkage 'Enum.Parse<Value>(text)' 'Enum.Parse<Value>(text)' 'return Results.Ok();')) { throw 'I9 MVP rules verifier stored-enum linkage self-test failed.' }
 
 Assert-FileContains 'Versioned rule profile persistence' 'db/migrations/012_i9_mvp_rule_profiles.sql' @(
     (Pattern 'scheduling_rule_profiles' '(?i)\bscheduling_rule_profiles\b'),
@@ -465,8 +502,23 @@ if ((Test-Path -LiteralPath $ruleEndpointPath -PathType Leaf) -and
     -not (Test-RuleEndpointSecurityLinkage (Get-EffectiveContent $ruleEndpointPath))) {
     $failures.Add('Rule profile HTTP endpoints: permissions, production gate, validation, repository and evaluator are not linked')
 }
+$createRepositoryPath = Join-Path $repoRoot 'apps/sg-superapp-api/Services/SchedulingRuleProfileRepository.cs'
+if ((Test-Path -LiteralPath $ruleEndpointPath) -and (Test-Path -LiteralPath $createRepositoryPath) -and
+    -not (Test-RuleProfileCreateLinkage (Get-EffectiveContent $ruleEndpointPath) (Get-EffectiveContent $createRepositoryPath))) {
+    $failures.Add('Rule profile HTTP create: CONFIGURE, checksum and transactional repository creation are not linked')
+}
+if ((Test-Path -LiteralPath $evaluatorPath) -and
+    -not (Test-AnonymousFactsAllowlistLinkage (Get-EffectiveContent $evaluatorPath))) {
+    $failures.Add('Common evaluator: anonymous facts allowlist, minimized snapshot and scopeHash are not linked')
+}
+if ((Test-Path -LiteralPath $createRepositoryPath) -and (Test-Path -LiteralPath $evaluatorPath) -and (Test-Path -LiteralPath $ruleEndpointPath) -and
+    -not (Test-StoredEnumFailClosedLinkage (Get-EffectiveContent $createRepositoryPath) (Get-EffectiveContent $evaluatorPath) (Get-EffectiveContent $ruleEndpointPath))) {
+    $failures.Add('Rule profile reads: stored enums are not parsed fail-closed into stable ProblemDetails')
+}
 Assert-FileContains 'Rule HTTP contracts' 'apps/sg-superapp-api/Contracts/Portal/SchedulingRuleContracts.cs' @(
     (Pattern 'RuleProfile' '(?i)RuleProfile'), (Pattern 'RuleEvaluation summary' '(?i)(RuleEvaluation|RuleSummary)'),
+    (Pattern 'profile create request' '(?i)CreateSchedulingRuleProfileRequest'),
+    (Pattern 'profile create entries' '(?i)CreateSchedulingRuleProfileEntryRequest'),
     (Pattern 'scopeHash' '(?i)scopeHash'), (Pattern 'simulated' '(?i)simulated')
 )
 Assert-FileContains 'Endpoint registration' 'apps/sg-superapp-api/Program.cs' @(

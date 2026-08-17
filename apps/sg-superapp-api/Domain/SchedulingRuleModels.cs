@@ -8,6 +8,11 @@ public enum SchedulingRuleProfileStatus { DRAFT, ACTIVE, RETIRED }
 public enum SchedulingRuleOutcome { COMPLIANT, BLOCKED, EXCEPTION_REQUIRED, WARNING, NOT_APPLICABLE }
 public enum SchedulingRuleSeverity { INFO, WARNING, ERROR, BLOCKING }
 
+public sealed class SchedulingRuleContractException : Exception
+{
+    public SchedulingRuleContractException() : base("Stored scheduling rule data violates its contract.") { }
+}
+
 public sealed record SchedulingRuleProfileEntry(
     string RuleCode,
     JsonElement Parameters,

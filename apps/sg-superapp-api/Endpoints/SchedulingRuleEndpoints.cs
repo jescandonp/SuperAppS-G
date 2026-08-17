@@ -11,6 +11,31 @@ public static class SchedulingRuleEndpoints
 {
     public static IEndpointRouteBuilder MapSchedulingRuleEndpoints(this IEndpointRouteBuilder app)
     {
+        app.MapPost("/api/portal/scheduling/rule-profiles", async (
+            CreateSchedulingRuleProfileRequest request,
+            PortalAuthorizationService authorization,
+            RequestUserContext userContext,
+            SchedulingRuleProfileValidator validator,
+            SchedulingRuleProfileRepository repository,
+            CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("SCHEDULING", "CONFIGURE", cancellationToken);
+            if (denied is not null) return denied;
+            if (!TryParseCreateRequest(request, out var profile))
+                return Results.BadRequest(new { message = "El perfil de reglas enviado no es valido." });
+            try
+            {
+                var checksum = validator.ComputeChecksum(profile!);
+                var created = await repository.CreateDraftAsync(profile! with { Checksum = checksum },
+                    userContext.User!.Username, cancellationToken);
+                return Results.Created($"/api/portal/scheduling/rule-profiles/{created.Id}", ToProfileResponse(created));
+            }
+            catch (InvalidOperationException) { return Results.BadRequest(new { message = "El perfil de reglas no cumple el contrato del MVP." }); }
+            catch (PostgresException exception) when (exception.SqlState is PostgresErrorCodes.UniqueViolation or PostgresErrorCodes.CheckViolation or "23000")
+            { return Results.Conflict(new { message = "El perfil entra en conflicto con una version existente." }); }
+            catch (NpgsqlException) { return DatabaseUnavailable(); }
+        });
+
         app.MapGet("/api/portal/scheduling/rule-profiles", async (
             string projectCode,
             string period,
@@ -28,6 +53,7 @@ public static class SchedulingRuleEndpoints
                 var profiles = await httpRepository.LoadProfilesAsync(projectCode, parsedPeriod, environment, cancellationToken);
                 return Results.Ok(profiles.Select(ToProfileResponse));
             }
+            catch (SchedulingRuleContractException) { return ContractProblem(); }
             catch (InvalidOperationException) { return Results.Conflict(new { message = "La configuracion solicitada no cumple los limites seguros del MVP." }); }
             catch (ArgumentException) { return Results.Conflict(new { message = "La configuracion solicitada no cumple el contrato del MVP." }); }
             catch (JsonException) { return Results.Conflict(new { message = "La configuracion solicitada no cumple el contrato del MVP." }); }
@@ -47,6 +73,7 @@ public static class SchedulingRuleEndpoints
                 var profile = await httpRepository.LoadProfileByIdAsync(id, cancellationToken);
                 return profile is null ? Results.NotFound() : Results.Ok(ToProfileResponse(profile));
             }
+            catch (SchedulingRuleContractException) { return ContractProblem(); }
             catch (InvalidOperationException) { return Results.Conflict(new { message = "La configuracion solicitada no cumple los limites seguros del MVP." }); }
             catch (ArgumentException) { return Results.Conflict(new { message = "La configuracion solicitada no cumple el contrato del MVP." }); }
             catch (JsonException) { return Results.Conflict(new { message = "La configuracion solicitada no cumple el contrato del MVP." }); }
@@ -63,6 +90,7 @@ public static class SchedulingRuleEndpoints
             if (denied is not null) return denied;
             if (scheduleVersionId <= 0) return Results.BadRequest(new { message = "La version solicitada no es valida." });
             try { return Results.Ok((await httpRepository.LoadEvaluationsAsync(scheduleVersionId, cancellationToken)).Select(ToEvaluationResponse)); }
+            catch (SchedulingRuleContractException) { return ContractProblem(); }
             catch (JsonException) { return Results.Conflict(new { message = "El historial de evaluacion no cumple el contrato seguro." }); }
             catch (NpgsqlException) { return DatabaseUnavailable(); }
         });
@@ -98,6 +126,7 @@ public static class SchedulingRuleEndpoints
                 if (active.Id != id) return Results.Conflict(new { message = "No fue posible confirmar el perfil activo solicitado." });
                 return Results.Ok(ToProfileResponse(active));
             }
+            catch (SchedulingRuleContractException) { return ContractProblem(); }
             catch (InvalidOperationException) { return Results.Conflict(new { message = "El perfil no cumple el contrato de activacion del MVP." }); }
             catch (JsonException) { return Results.Conflict(new { message = "El perfil no cumple el contrato de activacion del MVP." }); }
             catch (PostgresException exception) when (exception.SqlState is "23000" or PostgresErrorCodes.UniqueViolation or PostgresErrorCodes.CheckViolation)
@@ -148,6 +177,7 @@ public static class SchedulingRuleEndpoints
                     return Results.Conflict(new { message = "El perfil no es el activo para el alcance solicitado." });
                 return Results.Ok(ToEvaluationBatchResponse(evaluator.Evaluate(active, request.ProjectCode, period, request.Facts)));
             }
+            catch (SchedulingRuleContractException) { return ContractProblem(); }
             catch (ArgumentException) { return Results.BadRequest(new { message = "Los datos para preevaluar reglas no son validos." }); }
             catch (InvalidOperationException) { return Results.Conflict(new { message = "No existe una configuracion activa y valida para preevaluar." }); }
             catch (JsonException) { return Results.Conflict(new { message = "El perfil activo no cumple el contrato seguro." }); }
@@ -164,8 +194,45 @@ public static class SchedulingRuleEndpoints
         Enum.TryParse(environmentScope, true, out environment) &&
         Enum.IsDefined(typeof(SchedulingEnvironmentScope), environment);
 
+    private static bool TryParseCreateRequest(CreateSchedulingRuleProfileRequest request,
+        out SchedulingRuleProfile? profile)
+    {
+        profile = null;
+        if (request is null || string.IsNullOrWhiteSpace(request.ProfileCode) || string.IsNullOrWhiteSpace(request.ScopeCode) ||
+            request.Entries is null || request.Version <= 0 ||
+            !TryParseNamedEnum(request.Origin, out SchedulingRuleOrigin origin) ||
+            !TryParseNamedEnum(request.EnvironmentScope, out SchedulingEnvironmentScope environment) ||
+            !DateOnly.TryParseExact(request.EffectiveFrom, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var effectiveFrom)) return false;
+        DateOnly? effectiveTo = null;
+        if (!string.IsNullOrWhiteSpace(request.EffectiveTo))
+        {
+            if (!DateOnly.TryParseExact(request.EffectiveTo, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var parsedEffectiveTo)) return false;
+            effectiveTo = parsedEffectiveTo;
+        }
+        profile = new SchedulingRuleProfile(0, request.ProfileCode.Trim(), request.Version, origin, environment,
+            request.ScopeCode.Trim(), effectiveFrom, effectiveTo, SchedulingRuleProfileStatus.DRAFT,
+            new string('0', 64), request.Entries.Select(entry => new SchedulingRuleProfileEntry(
+                entry.RuleCode?.Trim() ?? string.Empty, entry.Parameters.Clone(), entry.CatalogSnapshot.Clone(), entry.Enabled)).ToArray());
+        return true;
+    }
+
+    private static bool TryParseNamedEnum<T>(string value, out T parsed) where T : struct, Enum
+    {
+        if (value is not null && Enum.GetNames<T>().Contains(value.Trim(), StringComparer.Ordinal) &&
+            Enum.TryParse(value.Trim(), out parsed)) return true;
+        parsed = default;
+        return false;
+    }
+
     private static IResult DatabaseUnavailable() =>
         Results.Problem("No fue posible acceder a la configuracion de reglas.", statusCode: StatusCodes.Status503ServiceUnavailable);
+
+    private static IResult ContractProblem() => Results.Problem(
+        title: "Configuracion de reglas invalida",
+        detail: "Los datos persistidos no cumplen el contrato seguro del MVP.",
+        statusCode: StatusCodes.Status409Conflict);
 
     private static SchedulingRuleProfileResponse ToProfileResponse(SchedulingRuleProfile profile) => new(
         profile.Id, profile.ProfileCode, profile.Version, profile.Origin.ToString(), profile.EnvironmentScope.ToString(),
