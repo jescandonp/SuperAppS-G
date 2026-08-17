@@ -6,6 +6,7 @@ DO $$
 DECLARE
     profile_id BIGINT;
     evaluation_id BIGINT;
+    retirement_date DATE := CURRENT_DATE + 30;
 BEGIN
     IF EXISTS (
         SELECT 1
@@ -82,11 +83,54 @@ BEGIN
     EXCEPTION WHEN SQLSTATE '55000' THEN NULL; END;
 
     BEGIN
+        DELETE FROM scheduling_rule_profiles WHERE id = profile_id;
+        RAISE EXCEPTION 'ACTIVE profile deletion was accepted';
+    EXCEPTION WHEN SQLSTATE '55000' THEN NULL; END;
+
+    BEGIN
         UPDATE scheduling_rule_profile_entries
            SET parameters = jsonb_set(parameters, '{tampered}', 'true'::jsonb)
          WHERE rule_profile_id = profile_id AND rule_code = 'I9-R01';
         RAISE EXCEPTION 'ACTIVE profile entry immutability failed';
     EXCEPTION WHEN SQLSTATE '55000' THEN NULL; END;
+
+    UPDATE scheduling_rule_profiles
+       SET status = 'RETIRED', effective_to = retirement_date
+     WHERE id = profile_id;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM scheduling_rule_profiles
+        WHERE id = profile_id AND status = 'RETIRED'
+          AND effective_to = retirement_date
+    ) THEN
+        RAISE EXCEPTION 'Controlled ACTIVE to RETIRED transition failed';
+    END IF;
+
+    INSERT INTO scheduling_rule_profiles (
+        profile_code, version, origin, environment_scope, scope_code,
+        effective_from, status, checksum, created_by,
+        activated_by, activated_at, approval_evidence
+    ) SELECT
+        profile_code, 2, origin, environment_scope, scope_code,
+        retirement_date + 1, 'ACTIVE', repeat('c', 64), 'contract.i9',
+        'contract.i9', clock_timestamp(), '{}'::jsonb
+    FROM scheduling_rule_profiles WHERE id = profile_id;
+
+    IF EXISTS (
+        SELECT 1
+        FROM scheduling_rule_profiles retired
+        JOIN scheduling_rule_profiles replacement
+          ON replacement.profile_code = retired.profile_code
+         AND replacement.scope_code = retired.scope_code
+         AND replacement.environment_scope = retired.environment_scope
+         AND replacement.version = 2
+        WHERE retired.id = profile_id
+          AND daterange(retired.effective_from, retired.effective_to + 1, '[)')
+              && daterange(replacement.effective_from,
+                           coalesce(replacement.effective_to + 1, 'infinity'::date), '[)')
+    ) THEN
+        RAISE EXCEPTION 'Replacement ACTIVE profile overlaps retired profile validity';
+    END IF;
 
     INSERT INTO scheduling_rule_evaluations (
         rule_profile_id, rule_code, outcome, severity, message_code,

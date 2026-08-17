@@ -205,7 +205,29 @@ CREATE TRIGGER scheduling_rule_profiles_active_overlap BEFORE INSERT OR UPDATE O
 CREATE OR REPLACE FUNCTION reject_active_rule_profile_change()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
- IF OLD.status='ACTIVE' THEN RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='ACTIVE rule profile is immutable'; END IF;
+ IF OLD.status='ACTIVE' THEN
+  IF TG_OP='UPDATE'
+     AND NEW.status='RETIRED'
+     AND NEW.effective_to IS NOT NULL
+     AND NEW.effective_to>=OLD.effective_from
+     AND (OLD.effective_to IS NULL OR NEW.effective_to<=OLD.effective_to)
+     AND NEW.id IS NOT DISTINCT FROM OLD.id
+     AND NEW.profile_code IS NOT DISTINCT FROM OLD.profile_code
+     AND NEW.version IS NOT DISTINCT FROM OLD.version
+     AND NEW.origin IS NOT DISTINCT FROM OLD.origin
+     AND NEW.environment_scope IS NOT DISTINCT FROM OLD.environment_scope
+     AND NEW.scope_code IS NOT DISTINCT FROM OLD.scope_code
+     AND NEW.effective_from IS NOT DISTINCT FROM OLD.effective_from
+     AND NEW.checksum IS NOT DISTINCT FROM OLD.checksum
+     AND NEW.created_by IS NOT DISTINCT FROM OLD.created_by
+     AND NEW.created_at IS NOT DISTINCT FROM OLD.created_at
+     AND NEW.activated_by IS NOT DISTINCT FROM OLD.activated_by
+     AND NEW.activated_at IS NOT DISTINCT FROM OLD.activated_at
+     AND NEW.approval_evidence IS NOT DISTINCT FROM OLD.approval_evidence THEN
+   RETURN NEW;
+  END IF;
+  RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='ACTIVE rule profile is immutable except for controlled retirement';
+ END IF;
  RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
 END $$;
 DROP TRIGGER IF EXISTS scheduling_rule_profiles_immutable_active ON scheduling_rule_profiles;
