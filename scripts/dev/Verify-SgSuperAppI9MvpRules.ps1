@@ -207,7 +207,7 @@ function Test-ProfileReadValidationLinkage {
     $evaluations = $blocks['/api/portal/scheduling/rules/evaluations"']
     return $collection -match '(?s)LoadProfilesAsync.*?validator\.Validate\s*\(\s*profile\s*,\s*environment\s*\).*?Results\.Ok' -and
         $detail -match '(?s)LoadProfileByIdAsync.*?validator\.Validate\s*\(\s*profile\s*,\s*profile\.EnvironmentScope\s*\).*?Results\.Ok' -and
-        $evaluations -match '(?s)LoadProfilesForEvaluationsAsync.*?validator\.Validate\s*\(\s*profile\s*,\s*profile\.EnvironmentScope\s*\).*?LoadEvaluationsAsync.*?Results\.Ok' -and
+        $evaluations -match '(?s)LoadProfilesForEvaluationsAsync.*?validator\.Validate\s*\(\s*profile\s*,\s*profile\.EnvironmentScope\s*\).*?Results\.Ok\s*\(.*?LoadEvaluationsAsync' -and
         $EndpointContent -match '(?s)catch\s*\(\s*InvalidOperationException\s*\)\s*\{\s*return\s+ContractProblem\s*\(\s*\)'
 }
 
@@ -382,7 +382,7 @@ $nullEntryPositive = 'try { TryParseCreateRequest(request); } request.Entries is
 $nullEntryNegative = 'request.Entries.Select(entry => entry.Value); entries:[null]'
 if (-not (Test-NullCreateEntryRejectionLinkage $nullEntryPositive) -or
     (Test-NullCreateEntryRejectionLinkage $nullEntryNegative)) { throw 'I9 MVP rules verifier null create-entry negative self-test failed.' }
-$profileReadPositive = 'app.MapGet("/api/portal/scheduling/rule-profiles", LoadProfilesAsync(); validator.Validate(profile, environment); Results.Ok()); app.MapGet("/api/portal/scheduling/rule-profiles/{id:long}", LoadProfileByIdAsync(); validator.Validate(profile, profile.EnvironmentScope); Results.Ok()); app.MapGet("/api/portal/scheduling/rules/evaluations", LoadProfilesForEvaluationsAsync(); validator.Validate(profile, profile.EnvironmentScope); LoadEvaluationsAsync(); Results.Ok()); catch (InvalidOperationException) { return ContractProblem(); }'
+$profileReadPositive = 'app.MapGet("/api/portal/scheduling/rule-profiles", LoadProfilesAsync(); validator.Validate(profile, environment); Results.Ok()); app.MapGet("/api/portal/scheduling/rule-profiles/{id:long}", LoadProfileByIdAsync(); validator.Validate(profile, profile.EnvironmentScope); Results.Ok()); app.MapGet("/api/portal/scheduling/rules/evaluations", LoadProfilesForEvaluationsAsync(); validator.Validate(profile, profile.EnvironmentScope); Results.Ok(LoadEvaluationsAsync())); catch (InvalidOperationException) { return ContractProblem(); }'
 $profileReadNegative = 'app.MapGet("/api/portal/scheduling/rule-profiles", LoadProfilesAsync(); Results.Ok()); app.MapGet("/api/portal/scheduling/rule-profiles/{id:long}", LoadProfileByIdAsync(); Results.Ok()); app.MapGet("/api/portal/scheduling/rules/evaluations", LoadEvaluationsAsync(); Results.Ok());'
 if (-not (Test-ProfileReadValidationLinkage $profileReadPositive) -or
     (Test-ProfileReadValidationLinkage $profileReadNegative)) { throw 'I9 MVP rules verifier profile-read validation negative self-test failed.' }
