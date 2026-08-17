@@ -522,12 +522,16 @@ if ((Test-Path -LiteralPath $evaluatorPath -PathType Leaf) -and
 }
 
 $implementations = @(
-    @{ R='I9-R01/R02 rules'; P='apps/sg-superapp-api/Services/SchedulingWorkRestRules.cs'; X=@((Pattern 'I9-R01' 'I9-R01'),(Pattern 'I9-R02' 'I9-R02'),(Pattern '8' '\b8\b'),(Pattern '10' '\b10\b'),(Pattern '12' '\b12\b'),(Pattern '42' '\b42\b'),(Pattern '60' '\b60\b'),(Pattern 'rest' '(?i)(rest|descanso)')) },
+    @{ R='I9-R01/R02 rules'; P='apps/sg-superapp-api/Services/SchedulingWorkRestRules.cs'; X=@((Pattern 'R01 evaluator' 'EvaluateR01\s*\('),(Pattern 'R02 evaluator' 'EvaluateR02\s*\('),(Pattern 'ordinary daily limit' 'ordinaryDailyHours'),(Pattern 'approval daily threshold' 'approvalFromDailyHours'),(Pattern 'absolute daily limit' 'absoluteDailyHours'),(Pattern 'ordinary weekly limit' 'ordinaryWeeklyHours'),(Pattern 'absolute weekly limit' 'absoluteWeeklyHours'),(Pattern 'written agreement' 'writtenAgreement'),(Pattern 'minimum rest' 'minimumRestHours'),(Pattern 'BLOCKED' 'SchedulingRuleOutcome\.BLOCKED'),(Pattern 'EXCEPTION_REQUIRED' 'SchedulingRuleOutcome\.EXCEPTION_REQUIRED')) },
     @{ R='I9-R03/R05 rules'; P='apps/sg-superapp-api/Services/SchedulingOverlapTravelRules.cs'; X=@((Pattern 'I9-R03' 'I9-R03'),(Pattern 'I9-R05' 'I9-R05'),(Pattern 'overlap' '(?i)(overlap|solap)'),(Pattern 'directional' '(?i)(direction|direcc|travel|traslado)'),(Pattern 'prohibited' '(?i)(prohibit|prohibid)')) },
     @{ R='I9-R04/R06 rules'; P='apps/sg-superapp-api/Services/SchedulingNoveltyRequirementRules.cs'; X=@((Pattern 'I9-R04' 'I9-R04'),(Pattern 'I9-R06' 'I9-R06'),(Pattern 'unknown' '(?i)(UNKNOWN|UNVERIFIED)'),(Pattern 'employeeId' '(?i)employeeId'),(Pattern 'position' '(?i)(position|puesto)'),(Pattern 'requirement' '(?i)(requirement|requisito)'),(Pattern 'evidence' '(?i)(evidence|evidencia)'),(Pattern 'validity' '(?i)(valid|vigencia|expiry|expires)')) },
     @{ R='I9-R07 rule'; P='apps/sg-superapp-api/Services/SchedulingTemplateDeviationRule.cs'; X=@((Pattern 'I9-R07' 'I9-R07'),(Pattern 'template' '(?i)(template|plantilla)'),(Pattern 'version' '(?i)version'),(Pattern 'anchor' '(?i)(anchor|anclaje)'),(Pattern 'expected' '(?i)(expected|esperado)'),(Pattern 'proposed' '(?i)(proposed|propuesto)'),(Pattern 'cell' '(?i)(cell|celda)'),(Pattern 'scopeHash' '(?i)scopeHash')) }
 )
 foreach ($item in $implementations) { Assert-FileContains $item.R $item.P $item.X }
+Assert-FileContains 'Common evaluator R01/R02 linkage' 'apps/sg-superapp-api/Services/SchedulingRuleEvaluator.cs' @(
+    (Pattern 'R01 real evaluator call' 'SchedulingWorkRestRules\.EvaluateR01\s*\('),
+    (Pattern 'R02 real evaluator call' 'SchedulingWorkRestRules\.EvaluateR02\s*\(')
+)
 
 Assert-FileContains 'Rule profile HTTP endpoints' 'apps/sg-superapp-api/Endpoints/SchedulingRuleEndpoints.cs' @(
     (Pattern 'GET mapping' '(?i)MapGet'), (Pattern 'POST mapping' '(?i)MapPost'),

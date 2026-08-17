@@ -61,7 +61,7 @@ public sealed class SchedulingRuleEvaluator
         var results = profile.Entries
             .Where(entry => entry.Enabled)
             .OrderBy(entry => entry.RuleCode, StringComparer.Ordinal)
-            .Select(entry => CreateUnverifiedEvaluation(profile, entry, projectCode, period, facts))
+            .Select(entry => CreateEvaluation(profile, entry, projectCode, period, facts))
             .ToArray();
 
         var summary = new SchedulingRuleEvaluationSummary(
@@ -155,7 +155,7 @@ public sealed class SchedulingRuleEvaluator
 
     private static HashSet<string> Fields(params string[] names) => new(names, StringComparer.Ordinal);
 
-    private static RuleEvaluation CreateUnverifiedEvaluation(
+    private static RuleEvaluation CreateEvaluation(
         SchedulingRuleProfile profile,
         SchedulingRuleProfileEntry entry,
         string projectCode,
@@ -164,6 +164,25 @@ public sealed class SchedulingRuleEvaluator
     {
         var sanitizedFacts = SanitizeFacts(entry.RuleCode, facts);
         var scopeHash = ComputeScopeHash(profile, entry, projectCode, period, sanitizedFacts);
+        var decision = entry.RuleCode switch
+        {
+            "I9-R01" => SchedulingWorkRestRules.EvaluateR01(entry.Parameters, sanitizedFacts),
+            "I9-R02" => SchedulingWorkRestRules.EvaluateR02(entry.Parameters, sanitizedFacts),
+            _ => null
+        };
+        if (decision is not null)
+            return new RuleEvaluation(
+                entry.RuleCode,
+                profile.Version,
+                decision.Outcome,
+                decision.Severity,
+                decision.MessageCode,
+                decision.Explanation,
+                scopeHash,
+                entry.Parameters.Clone(),
+                sanitizedFacts,
+                decision.ExceptionAllowed);
+
         return new RuleEvaluation(
             entry.RuleCode,
             profile.Version,
