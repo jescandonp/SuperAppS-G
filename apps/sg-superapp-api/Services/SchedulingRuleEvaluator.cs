@@ -314,6 +314,29 @@ JOIN scheduling_rule_profiles p ON p.id=e.rule_profile_id WHERE schedule_version
         return results;
     }
 
+    public async Task<IReadOnlyList<SchedulingRuleProfile>> LoadProfilesForEvaluationsAsync(long scheduleVersionId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = "SELECT DISTINCT rule_profile_id FROM scheduling_rule_evaluations WHERE schedule_version_id=@version ORDER BY rule_profile_id";
+        var profileIds = new List<long>();
+        await using (var connection = new NpgsqlConnection(_connectionString))
+        {
+            await connection.OpenAsync(cancellationToken);
+            await using var command = new NpgsqlCommand(sql, connection);
+            command.Parameters.AddWithValue("version", scheduleVersionId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken)) profileIds.Add(reader.GetInt64(0));
+        }
+        var profiles = new List<SchedulingRuleProfile>(profileIds.Count);
+        foreach (var profileId in profileIds)
+        {
+            var profile = await LoadProfileByIdAsync(profileId, cancellationToken);
+            if (profile is null) throw new SchedulingRuleContractException();
+            profiles.Add(profile);
+        }
+        return profiles;
+    }
+
     private static async Task<IReadOnlyList<SchedulingRuleProfile>> ReadProfilesAsync(NpgsqlCommand command,
         CancellationToken cancellationToken)
     {

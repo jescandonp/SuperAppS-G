@@ -189,6 +189,28 @@ function Test-NullCreateEntryRejectionLinkage {
         $EndpointContent -match '(?s)InvalidCreateRequestProblem\s*\(\s*\).*?Results\.Problem.*?StatusCodes\.Status400BadRequest'
 }
 
+function Test-ProfileReadValidationLinkage {
+    param([string]$EndpointContent)
+    $blocks = @{}
+    foreach ($route in @(
+        '/api/portal/scheduling/rule-profiles"',
+        '/api/portal/scheduling/rule-profiles/{id:long}"',
+        '/api/portal/scheduling/rules/evaluations"')) {
+        $start = $EndpointContent.IndexOf('app.MapGet("' + $route, [System.StringComparison]::Ordinal)
+        if ($start -lt 0) { return $false }
+        $next = $EndpointContent.IndexOf('app.Map', $start + 10, [System.StringComparison]::Ordinal)
+        if ($next -lt 0) { $next = $EndpointContent.Length }
+        $blocks[$route] = $EndpointContent.Substring($start, $next - $start)
+    }
+    $collection = $blocks['/api/portal/scheduling/rule-profiles"']
+    $detail = $blocks['/api/portal/scheduling/rule-profiles/{id:long}"']
+    $evaluations = $blocks['/api/portal/scheduling/rules/evaluations"']
+    return $collection -match '(?s)LoadProfilesAsync.*?validator\.Validate\s*\(\s*profile\s*,\s*environment\s*\).*?Results\.Ok' -and
+        $detail -match '(?s)LoadProfileByIdAsync.*?validator\.Validate\s*\(\s*profile\s*,\s*profile\.EnvironmentScope\s*\).*?Results\.Ok' -and
+        $evaluations -match '(?s)LoadProfilesForEvaluationsAsync.*?validator\.Validate\s*\(\s*profile\s*,\s*profile\.EnvironmentScope\s*\).*?LoadEvaluationsAsync.*?Results\.Ok' -and
+        $EndpointContent -match '(?s)catch\s*\(\s*InvalidOperationException\s*\)\s*\{\s*return\s+ContractProblem\s*\(\s*\)'
+}
+
 function ConvertTo-I9CanonicalStringSelfTest {
     param([string]$Value)
     $builder = New-Object System.Text.StringBuilder
@@ -360,6 +382,10 @@ $nullEntryPositive = 'try { TryParseCreateRequest(request); } request.Entries is
 $nullEntryNegative = 'request.Entries.Select(entry => entry.Value); entries:[null]'
 if (-not (Test-NullCreateEntryRejectionLinkage $nullEntryPositive) -or
     (Test-NullCreateEntryRejectionLinkage $nullEntryNegative)) { throw 'I9 MVP rules verifier null create-entry negative self-test failed.' }
+$profileReadPositive = 'app.MapGet("/api/portal/scheduling/rule-profiles", LoadProfilesAsync(); validator.Validate(profile, environment); Results.Ok()); app.MapGet("/api/portal/scheduling/rule-profiles/{id:long}", LoadProfileByIdAsync(); validator.Validate(profile, profile.EnvironmentScope); Results.Ok()); app.MapGet("/api/portal/scheduling/rules/evaluations", LoadProfilesForEvaluationsAsync(); validator.Validate(profile, profile.EnvironmentScope); LoadEvaluationsAsync(); Results.Ok()); catch (InvalidOperationException) { return ContractProblem(); }'
+$profileReadNegative = 'app.MapGet("/api/portal/scheduling/rule-profiles", LoadProfilesAsync(); Results.Ok()); app.MapGet("/api/portal/scheduling/rule-profiles/{id:long}", LoadProfileByIdAsync(); Results.Ok()); app.MapGet("/api/portal/scheduling/rules/evaluations", LoadEvaluationsAsync(); Results.Ok());'
+if (-not (Test-ProfileReadValidationLinkage $profileReadPositive) -or
+    (Test-ProfileReadValidationLinkage $profileReadNegative)) { throw 'I9 MVP rules verifier profile-read validation negative self-test failed.' }
 
 Assert-FileContains 'Versioned rule profile persistence' 'db/migrations/012_i9_mvp_rule_profiles.sql' @(
     (Pattern 'scheduling_rule_profiles' '(?i)\bscheduling_rule_profiles\b'),
@@ -530,6 +556,10 @@ if ((Test-Path -LiteralPath $createRepositoryPath) -and (Test-Path -LiteralPath 
 if ((Test-Path -LiteralPath $ruleEndpointPath) -and
     -not (Test-NullCreateEntryRejectionLinkage (Get-EffectiveContent $ruleEndpointPath))) {
     $failures.Add('Rule profile HTTP create: entries:[null] is not rejected as stable 400 ProblemDetails before dereference')
+}
+if ((Test-Path -LiteralPath $ruleEndpointPath) -and
+    -not (Test-ProfileReadValidationLinkage (Get-EffectiveContent $ruleEndpointPath))) {
+    $failures.Add('Rule profile HTTP reads: collection, detail or evaluation source can return without profile validation')
 }
 Assert-FileContains 'Rule HTTP contracts' 'apps/sg-superapp-api/Contracts/Portal/SchedulingRuleContracts.cs' @(
     (Pattern 'RuleProfile' '(?i)RuleProfile'), (Pattern 'RuleEvaluation summary' '(?i)(RuleEvaluation|RuleSummary)'),

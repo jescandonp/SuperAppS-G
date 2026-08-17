@@ -43,6 +43,7 @@ public static class SchedulingRuleEndpoints
             string environmentScope,
             PortalAuthorizationService authorization,
             SchedulingRuleHttpRepository httpRepository,
+            SchedulingRuleProfileValidator validator,
             CancellationToken cancellationToken) =>
         {
             var denied = await authorization.RequireAsync("SCHEDULING", "VIEW", cancellationToken);
@@ -52,10 +53,11 @@ public static class SchedulingRuleEndpoints
             try
             {
                 var profiles = await httpRepository.LoadProfilesAsync(projectCode, parsedPeriod, environment, cancellationToken);
+                foreach (var profile in profiles) validator.Validate(profile, environment);
                 return Results.Ok(profiles.Select(ToProfileResponse));
             }
             catch (SchedulingRuleContractException) { return ContractProblem(); }
-            catch (InvalidOperationException) { return Results.Conflict(new { message = "La configuracion solicitada no cumple los limites seguros del MVP." }); }
+            catch (InvalidOperationException) { return ContractProblem(); }
             catch (ArgumentException) { return Results.Conflict(new { message = "La configuracion solicitada no cumple el contrato del MVP." }); }
             catch (JsonException) { return Results.Conflict(new { message = "La configuracion solicitada no cumple el contrato del MVP." }); }
             catch (NpgsqlException) { return DatabaseUnavailable(); }
@@ -65,6 +67,7 @@ public static class SchedulingRuleEndpoints
             long id,
             PortalAuthorizationService authorization,
             SchedulingRuleHttpRepository httpRepository,
+            SchedulingRuleProfileValidator validator,
             CancellationToken cancellationToken) =>
         {
             var denied = await authorization.RequireAsync("SCHEDULING", "VIEW", cancellationToken);
@@ -72,10 +75,12 @@ public static class SchedulingRuleEndpoints
             try
             {
                 var profile = await httpRepository.LoadProfileByIdAsync(id, cancellationToken);
-                return profile is null ? Results.NotFound() : Results.Ok(ToProfileResponse(profile));
+                if (profile is null) return Results.NotFound();
+                validator.Validate(profile, profile.EnvironmentScope);
+                return Results.Ok(ToProfileResponse(profile));
             }
             catch (SchedulingRuleContractException) { return ContractProblem(); }
-            catch (InvalidOperationException) { return Results.Conflict(new { message = "La configuracion solicitada no cumple los limites seguros del MVP." }); }
+            catch (InvalidOperationException) { return ContractProblem(); }
             catch (ArgumentException) { return Results.Conflict(new { message = "La configuracion solicitada no cumple el contrato del MVP." }); }
             catch (JsonException) { return Results.Conflict(new { message = "La configuracion solicitada no cumple el contrato del MVP." }); }
             catch (NpgsqlException) { return DatabaseUnavailable(); }
@@ -85,13 +90,20 @@ public static class SchedulingRuleEndpoints
             long scheduleVersionId,
             PortalAuthorizationService authorization,
             SchedulingRuleHttpRepository httpRepository,
+            SchedulingRuleProfileValidator validator,
             CancellationToken cancellationToken) =>
         {
             var denied = await authorization.RequireAsync("SCHEDULING", "VIEW", cancellationToken);
             if (denied is not null) return denied;
             if (scheduleVersionId <= 0) return Results.BadRequest(new { message = "La version solicitada no es valida." });
-            try { return Results.Ok((await httpRepository.LoadEvaluationsAsync(scheduleVersionId, cancellationToken)).Select(ToEvaluationResponse)); }
+            try
+            {
+                var profiles = await httpRepository.LoadProfilesForEvaluationsAsync(scheduleVersionId, cancellationToken);
+                foreach (var profile in profiles) validator.Validate(profile, profile.EnvironmentScope);
+                return Results.Ok((await httpRepository.LoadEvaluationsAsync(scheduleVersionId, cancellationToken)).Select(ToEvaluationResponse));
+            }
             catch (SchedulingRuleContractException) { return ContractProblem(); }
+            catch (InvalidOperationException) { return ContractProblem(); }
             catch (JsonException) { return Results.Conflict(new { message = "El historial de evaluacion no cumple el contrato seguro." }); }
             catch (NpgsqlException) { return DatabaseUnavailable(); }
         });
