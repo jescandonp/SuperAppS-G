@@ -265,6 +265,34 @@ BEGIN
  RETURN canonical;
 END $$;
 
+DO $$
+BEGIN
+ IF EXISTS(SELECT 1 FROM scheduling_rule_profile_entries
+           WHERE octet_length(convert_to(parameters::TEXT,'UTF8'))>65536
+              OR octet_length(convert_to(catalog_snapshot::TEXT,'UTF8'))>262144) THEN
+  RAISE EXCEPTION 'I9_MVP_PARTIAL_SCHEMA_INCOMPATIBLE: rule profile JSON payload exceeds UTF8 limits';
+ END IF;
+ IF EXISTS(SELECT 1 FROM scheduling_rule_profile_entries GROUP BY rule_profile_id HAVING count(*)>7) THEN
+  RAISE EXCEPTION 'I9_MVP_PARTIAL_SCHEMA_INCOMPATIBLE: rule profile exceeds seven R01-R07 entries';
+ END IF;
+END $$;
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_profile_entries','ck_scheduling_rule_profile_entries_payload_size','c',
+ $d$CHECK (octet_length(convert_to(parameters::TEXT,'UTF8'))<=65536 AND octet_length(convert_to(catalog_snapshot::TEXT,'UTF8'))<=262144)$d$);
+
+CREATE OR REPLACE FUNCTION enforce_rule_profile_entry_limit()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+ PERFORM pg_advisory_xact_lock(NEW.rule_profile_id);
+ IF (SELECT count(*) FROM scheduling_rule_profile_entries
+     WHERE rule_profile_id=NEW.rule_profile_id AND id<>coalesce(NEW.id,-1))>=7 THEN
+  RAISE EXCEPTION USING ERRCODE='23514',MESSAGE='rule profile cannot exceed seven R01-R07 entries';
+ END IF;
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS scheduling_rule_profile_entries_max_count ON scheduling_rule_profile_entries;
+CREATE TRIGGER scheduling_rule_profile_entries_max_count BEFORE INSERT OR UPDATE OF rule_profile_id
+ ON scheduling_rule_profile_entries FOR EACH ROW EXECUTE FUNCTION enforce_rule_profile_entry_limit();
+
 CREATE OR REPLACE FUNCTION enforce_single_active_rule_profile()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN

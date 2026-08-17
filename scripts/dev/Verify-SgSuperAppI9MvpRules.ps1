@@ -130,6 +130,17 @@ function Test-AllSha256DigestsUseExplicitUtf8 {
     return $allDigests -gt 0 -and $allDigests -eq $utf8Digests
 }
 
+function Test-RuleProfilePayloadBoundsLinkage {
+    param([string]$RepositoryContent, [string]$ValidatorContent, [string]$MigrationContent, [string]$TestContent)
+    return $ValidatorContent -match 'MaximumParametersUtf8Bytes\s*=\s*64\s*\*\s*1024' -and
+        $ValidatorContent -match 'MaximumCatalogSnapshotUtf8Bytes\s*=\s*256\s*\*\s*1024' -and
+        $ValidatorContent -match 'MaximumProfileEntries\s*=\s*7' -and
+        $RepositoryContent -match '(?s)payload_within_limits.*?MaximumParametersUtf8Bytes.*?MaximumCatalogSnapshotUtf8Bytes.*?ReadJson' -and
+        $MigrationContent -match 'ck_scheduling_rule_profile_entries_payload_size' -and
+        $MigrationContent -match 'scheduling_rule_profile_entries_max_count' -and
+        $TestContent -match '(?s)repeat\s*\(\s*''x''\s*,\s*65537\s*\).*?repeat\s*\(\s*''x''\s*,\s*262145\s*\).*?Eighth rule profile entry'
+}
+
 function ConvertTo-I9CanonicalStringSelfTest {
     param([string]$Value)
     $builder = New-Object System.Text.StringBuilder
@@ -260,6 +271,17 @@ if (-not (Test-AllSha256DigestsUseExplicitUtf8 "digest(convert_to('Bogota ñ','U
     (Test-AllSha256DigestsUseExplicitUtf8 "digest('Bogota ñ','sha256')")) {
     throw 'I9 MVP rules verifier explicit UTF8 digest self-test failed.'
 }
+$payloadBoundsPositive = Test-RuleProfilePayloadBoundsLinkage `
+    -RepositoryContent 'payload_within_limits MaximumParametersUtf8Bytes MaximumCatalogSnapshotUtf8Bytes ReadJson' `
+    -ValidatorContent 'MaximumParametersUtf8Bytes = 64 * 1024; MaximumCatalogSnapshotUtf8Bytes = 256 * 1024; MaximumProfileEntries = 7;' `
+    -MigrationContent 'ck_scheduling_rule_profile_entries_payload_size scheduling_rule_profile_entries_max_count' `
+    -TestContent "repeat('x',65537); repeat('x',262145); Eighth rule profile entry"
+$payloadBoundsNegative = Test-RuleProfilePayloadBoundsLinkage `
+    -RepositoryContent 'ReadJson without size metadata' -ValidatorContent 'no limits' `
+    -MigrationContent 'no checks' -TestContent 'no negative tests'
+if (-not $payloadBoundsPositive -or $payloadBoundsNegative) {
+    throw 'I9 MVP rules verifier payload-bounds negative self-test failed.'
+}
 
 Assert-FileContains 'Versioned rule profile persistence' 'db/migrations/012_i9_mvp_rule_profiles.sql' @(
     (Pattern 'scheduling_rule_profiles' '(?i)\bscheduling_rule_profiles\b'),
@@ -271,7 +293,11 @@ Assert-FileContains 'Versioned rule profile persistence' 'db/migrations/012_i9_m
     (Pattern 'schedule profile reference' '(?i)\b(rule_profile|rule_profile_id|rule_profile_version)\b'),
     (Pattern 'simulated marker' '(?i)\bsimulated\b'),
     (Pattern 'immutable canonical JSONB function' '(?is)FUNCTION\s+i9_mvp_canonical_jsonb.*?IMMUTABLE'),
-    (Pattern 'canonical number function' '(?i)FUNCTION\s+i9_mvp_canonical_number')
+    (Pattern 'canonical number function' '(?i)FUNCTION\s+i9_mvp_canonical_number'),
+    (Pattern 'named payload size check' '(?i)ck_scheduling_rule_profile_entries_payload_size'),
+    (Pattern 'entry count trigger' '(?i)scheduling_rule_profile_entries_max_count'),
+    (Pattern 'parameters 64 KiB' '(?i)parameters::TEXT.*?65536'),
+    (Pattern 'catalog 256 KiB' '(?i)catalog_snapshot::TEXT.*?262144')
 )
 Assert-FileContains 'Simulated MVP profile seed' 'db/seeds/011_i9_mvp_simulated_rule_profile.sql' @(
     (Pattern 'SIMULATED' '(?i)\bSIMULATED\b'), (Pattern 'MVP_TEST' '(?i)\bMVP_TEST\b'),
@@ -289,7 +315,10 @@ Assert-FileContains 'Versioned profile database contract' 'db/tests/008_i9_mvp_r
     (Pattern 'canonical seed checksum' '(?i)Seed checksum.*canonical executable'),
     (Pattern 'U+000B lowercase escape' '(?is)to_jsonb\s*\(\s*chr\s*\(\s*11\s*\)\s*\).*?u000b'),
     (Pattern 'nested duplicate last-wins' '(?is)"outer".*?"dup"\s*:\s*1.*?"dup"\s*:\s*2.*?"dup"\s*:\s*2'),
-    (Pattern 'non-ASCII UTF8 digest vector' '(?is)convert_to\s*\(.*?ñ.*?,\s*''UTF8''\s*\).*?1141a262')
+    (Pattern 'non-ASCII UTF8 digest vector' '(?is)convert_to\s*\(.*?ñ.*?,\s*''UTF8''\s*\).*?1141a262'),
+    (Pattern 'oversized parameters rejection' '(?is)repeat\s*\(\s*''x''\s*,\s*65537\s*\).*?Oversized parameters'),
+    (Pattern 'oversized catalog rejection' '(?is)repeat\s*\(\s*''x''\s*,\s*262145\s*\).*?Oversized catalog'),
+    (Pattern 'entry count rejection' '(?i)Eighth rule profile entry')
 )
 $migrationChecksumPath = Join-Path $repoRoot 'db/migrations/012_i9_mvp_rule_profiles.sql'
 $seedChecksumPath = Join-Path $repoRoot 'db/seeds/011_i9_mvp_simulated_rule_profile.sql'
@@ -323,7 +352,10 @@ Assert-FileContains 'Profile repository' 'apps/sg-superapp-api/Services/Scheduli
     (Pattern 'period' '(?i)(period|periodo)'), (Pattern 'environment' '(?i)(environment|ambiente)'),
     (Pattern 'profile entries' '(?i)SchedulingRuleProfileEntr'),
     (Pattern 'exactly one fail closed' '(?i)Count\s*!=\s*1'),
-    (Pattern 'shared profile validation' '(?i)_validator\.Validate\s*\(')
+    (Pattern 'shared profile validation' '(?i)_validator\.Validate\s*\('),
+    (Pattern 'server-side payload metadata' '(?i)payload_within_limits'),
+    (Pattern 'server-side UTF8 byte length' '(?is)octet_length\s*\(\s*convert_to'),
+    (Pattern 'payload filter before JSON' '(?i)maximum_parameters_bytes')
 )
 Assert-FileContains 'Profile validation and environment gate' 'apps/sg-superapp-api/Services/SchedulingRuleProfileValidator.cs' @(
     (Pattern 'SIMULATED' '(?i)SIMULATED'), (Pattern 'MVP_TEST' '(?i)MVP_TEST'),
@@ -336,6 +368,9 @@ Assert-FileContains 'Profile validation and environment gate' 'apps/sg-superapp-
     (Pattern 'canonical string serializer' '(?i)CanonicalizeJsonString'),
     (Pattern 'lowercase control hex' '(?i)ToString\s*\(\s*"x4"'),
     (Pattern 'duplicate last-wins dictionary' '(?s)Dictionary<string,\s*JsonElement>.*?\[\s*property\.Name\s*\]\s*=\s*property\.Value'),
+    (Pattern '64 KiB parameter limit' '(?i)MaximumParametersUtf8Bytes\s*=\s*64\s*\*\s*1024'),
+    (Pattern '256 KiB catalog limit' '(?i)MaximumCatalogSnapshotUtf8Bytes\s*=\s*256\s*\*\s*1024'),
+    (Pattern 'JSON depth limit' '(?i)MaximumJsonDepth'), (Pattern 'JSON node limit' '(?i)MaximumJsonNodesPerEntry'),
     (Pattern 'overlap validation' '(?i)RangesOverlap'),
     (Pattern 'I9-R01' 'I9-R01'), (Pattern 'I9-R02' 'I9-R02'), (Pattern 'I9-R03' 'I9-R03'),
     (Pattern 'I9-R04' 'I9-R04'), (Pattern 'I9-R05' 'I9-R05'), (Pattern 'I9-R06' 'I9-R06'),
@@ -354,6 +389,17 @@ if ((Test-Path -LiteralPath $validatorPath -PathType Leaf) -and
 if ((Test-Path -LiteralPath $validatorPath -PathType Leaf) -and
     -not (Test-StringAndDuplicateCanonicalizationLinkage (Get-EffectiveContent $validatorPath))) {
     $failures.Add('Rule profile checksum contract: strings or duplicate keys are not PostgreSQL-compatible')
+}
+if ((Test-Path -LiteralPath $repositoryPath) -and (Test-Path -LiteralPath $validatorPath) -and
+    (Test-Path -LiteralPath $migrationChecksumPath) -and (Test-Path -LiteralPath $testChecksumPath)) {
+    $payloadBoundsLinked = Test-RuleProfilePayloadBoundsLinkage `
+        -RepositoryContent (Get-EffectiveContent $repositoryPath) `
+        -ValidatorContent (Get-EffectiveContent $validatorPath) `
+        -MigrationContent (Get-EffectiveContent $migrationChecksumPath) `
+        -TestContent (Get-EffectiveContent $testChecksumPath)
+    if (-not $payloadBoundsLinked) {
+        $failures.Add('Rule profile payload bounds: repository, validator, migration and SQL tests are not linked')
+    }
 }
 Assert-FileContains 'Rule profile dependency registration' 'apps/sg-superapp-api/Program.cs' @(
     (Pattern 'profile validator DI' '(?i)AddSingleton<SchedulingRuleProfileValidator>'),

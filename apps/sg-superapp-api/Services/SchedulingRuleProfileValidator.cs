@@ -8,6 +8,11 @@ namespace Sg.SuperApp.Api.Services;
 
 public sealed class SchedulingRuleProfileValidator
 {
+    public const int MaximumProfileEntries = 7;
+    public const int MaximumParametersUtf8Bytes = 64 * 1024;
+    public const int MaximumCatalogSnapshotUtf8Bytes = 256 * 1024;
+    public const int MaximumJsonDepth = 32;
+    public const int MaximumJsonNodesPerEntry = 4096;
     private const int MaximumNumberDigits = 1000;
     private const int MaximumNumberScale = 1000;
     private static readonly string[] RequiredRules =
@@ -16,6 +21,7 @@ public sealed class SchedulingRuleProfileValidator
     public void Validate(SchedulingRuleProfile profile, SchedulingEnvironmentScope requestedEnvironment,
         IEnumerable<SchedulingRuleProfile>? otherProfiles = null)
     {
+        ValidatePayloadBounds(profile);
         if (string.IsNullOrWhiteSpace(profile.ProfileCode) || string.IsNullOrWhiteSpace(profile.ScopeCode) ||
             profile.Version <= 0 ||
             profile.EffectiveTo.HasValue && profile.EffectiveTo.Value < profile.EffectiveFrom)
@@ -45,6 +51,38 @@ public sealed class SchedulingRuleProfileValidator
 
         if (!string.Equals(profile.Checksum, ComputeChecksum(profile), StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("The scheduling rule profile checksum is invalid.");
+    }
+
+    private static void ValidatePayloadBounds(SchedulingRuleProfile profile)
+    {
+        if (profile.Entries.Count > MaximumProfileEntries)
+            throw new InvalidOperationException($"A scheduling rule profile cannot exceed {MaximumProfileEntries} entries.");
+        foreach (var entry in profile.Entries)
+        {
+            ValidateJsonBounds(entry.Parameters, MaximumParametersUtf8Bytes, "parameters");
+            ValidateJsonBounds(entry.CatalogSnapshot, MaximumCatalogSnapshotUtf8Bytes, "catalog snapshot");
+        }
+    }
+
+    private static void ValidateJsonBounds(JsonElement root, int maximumUtf8Bytes, string label)
+    {
+        var rawJson = root.GetRawText();
+        if (Encoding.UTF8.GetByteCount(rawJson) > maximumUtf8Bytes)
+            throw new InvalidOperationException($"Rule profile {label} exceeds the UTF8 byte limit.");
+
+        var pending = new Stack<(JsonElement Element, int Depth)>();
+        pending.Push((root, 1));
+        var nodes = 0;
+        while (pending.Count > 0)
+        {
+            var current = pending.Pop();
+            if (++nodes > MaximumJsonNodesPerEntry || current.Depth > MaximumJsonDepth)
+                throw new InvalidOperationException($"Rule profile {label} exceeds structural limits.");
+            if (current.Element.ValueKind == JsonValueKind.Object)
+                foreach (var property in current.Element.EnumerateObject()) pending.Push((property.Value, current.Depth + 1));
+            else if (current.Element.ValueKind == JsonValueKind.Array)
+                foreach (var item in current.Element.EnumerateArray()) pending.Push((item, current.Depth + 1));
+        }
     }
 
     public string ComputeChecksum(SchedulingRuleProfile profile)

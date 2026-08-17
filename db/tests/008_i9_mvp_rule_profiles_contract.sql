@@ -149,6 +149,26 @@ BEGIN
     ) RETURNING id INTO draft_profile_id;
 
     BEGIN
+        INSERT INTO scheduling_rule_profile_entries(rule_profile_id,rule_code,parameters,catalog_snapshot,enabled)
+        VALUES(draft_profile_id,'I9-R01',jsonb_build_object('payload',repeat('x',65537)),'{}'::jsonb,TRUE);
+        RAISE EXCEPTION 'Oversized parameters JSON was accepted';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+
+    BEGIN
+        INSERT INTO scheduling_rule_profile_entries(rule_profile_id,rule_code,parameters,catalog_snapshot,enabled)
+        VALUES(draft_profile_id,'I9-R01','{}'::jsonb,jsonb_build_object('payload',repeat('x',262145)),TRUE);
+        RAISE EXCEPTION 'Oversized catalog snapshot JSON was accepted';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+
+    INSERT INTO scheduling_rule_profile_entries(rule_profile_id,rule_code,parameters,catalog_snapshot,enabled)
+    SELECT draft_profile_id,'I9-R0'||number,'{}'::jsonb,'{}'::jsonb,TRUE FROM generate_series(1,7) number;
+    BEGIN
+        INSERT INTO scheduling_rule_profile_entries(rule_profile_id,rule_code,parameters,catalog_snapshot,enabled)
+        VALUES(draft_profile_id,'I9-R01','{}'::jsonb,'{}'::jsonb,FALSE);
+        RAISE EXCEPTION 'Eighth rule profile entry was accepted';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+
+    BEGIN
         UPDATE scheduling_rule_profile_entries
            SET rule_profile_id = draft_profile_id
          WHERE rule_profile_id = profile_id AND rule_code = 'I9-R01';
