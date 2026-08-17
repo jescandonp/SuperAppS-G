@@ -135,6 +135,14 @@ $selfTest = (Remove-FullLineComments -Lines @(
 if ($selfTest -match 'RuleProfile|ScopeHash|I9-R01|\bPASS\b|\bACTIVE\b|immutable' -or $selfTest -notmatch 'RealContract') {
     throw 'I9 MVP rules verifier comment-filter self-test failed.'
 }
+$immutabilityPattern = '(?i)(immutab|inmutab|reject|rechaz)'
+$immutabilitySelfTest = (Remove-FullLineComments -Lines @(
+    '-- immutability must not pass from a comment',
+    "RAISE EXCEPTION 'ACTIVE profile immutability failed';"
+) -Extension '.sql') -join "`n"
+if ($immutabilitySelfTest -match 'must not pass' -or $immutabilitySelfTest -notmatch $immutabilityPattern) {
+    throw 'I9 MVP rules verifier immutability terminology self-test failed.'
+}
 
 Assert-FileContains 'Versioned rule profile persistence' 'db/migrations/012_i9_mvp_rule_profiles.sql' @(
     (Pattern 'scheduling_rule_profiles' '(?i)\bscheduling_rule_profiles\b'),
@@ -154,7 +162,7 @@ Assert-FileContains 'Simulated MVP profile seed' 'db/seeds/011_i9_mvp_simulated_
 )
 Assert-FileContains 'Versioned profile database contract' 'db/tests/008_i9_mvp_rule_profiles_contract.sql' @(
     (Pattern 'executable SQL' '(?i)\b(DO|BEGIN|SELECT)\b'), (Pattern 'active uniqueness' '(?i)(unique|overlap|superpuest|vigencia)'),
-    (Pattern 'immutability' '(?i)(immutable|inmutab|reject|rechaz)'), (Pattern 'evaluation history' '(?i)evaluat')
+    (Pattern 'immutability' $immutabilityPattern), (Pattern 'evaluation history' '(?i)evaluat')
 )
 
 Assert-FileContains 'Typed profile and result contracts' 'apps/sg-superapp-api/Domain/SchedulingRuleModels.cs' @(
@@ -170,14 +178,21 @@ Assert-FileContains 'Typed profile and result contracts' 'apps/sg-superapp-api/D
 Assert-FileContains 'Profile repository' 'apps/sg-superapp-api/Services/SchedulingRuleProfileRepository.cs' @(
     (Pattern 'ACTIVE' '(?i)ACTIVE'), (Pattern 'project' '(?i)(project|proyecto)'),
     (Pattern 'period' '(?i)(period|periodo)'), (Pattern 'environment' '(?i)(environment|ambiente)'),
-    (Pattern 'profile entries' '(?i)SchedulingRuleProfileEntr')
+    (Pattern 'profile entries' '(?i)SchedulingRuleProfileEntr'),
+    (Pattern 'exactly one fail closed' '(?i)Count\s*!=\s*1')
 )
 Assert-FileContains 'Profile validation and environment gate' 'apps/sg-superapp-api/Services/SchedulingRuleProfileValidator.cs' @(
     (Pattern 'SIMULATED' '(?i)SIMULATED'), (Pattern 'MVP_TEST' '(?i)MVP_TEST'),
     (Pattern 'PRODUCTION' '(?i)PRODUCTION'), (Pattern 'checksum' '(?i)checksum'),
+    (Pattern 'canonical property order' '(?i)OrderBy\s*\('), (Pattern 'SHA-256 checksum' '(?i)SHA256'),
+    (Pattern 'overlap validation' '(?i)RangesOverlap'),
     (Pattern 'I9-R01' 'I9-R01'), (Pattern 'I9-R02' 'I9-R02'), (Pattern 'I9-R03' 'I9-R03'),
     (Pattern 'I9-R04' 'I9-R04'), (Pattern 'I9-R05' 'I9-R05'), (Pattern 'I9-R06' 'I9-R06'),
     (Pattern 'I9-R07' 'I9-R07')
+)
+Assert-FileContains 'Rule profile dependency registration' 'apps/sg-superapp-api/Program.cs' @(
+    (Pattern 'profile validator DI' '(?i)AddSingleton<SchedulingRuleProfileValidator>'),
+    (Pattern 'profile repository DI' '(?i)AddSingleton<SchedulingRuleProfileRepository>')
 )
 Assert-FileContains 'Common evaluator' 'apps/sg-superapp-api/Services/SchedulingRuleEvaluator.cs' @(
     (Pattern 'BLOCKED precedence' '(?i)BLOCKED'), (Pattern 'I9-R03' 'I9-R03'),

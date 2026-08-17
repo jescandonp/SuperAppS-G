@@ -14,6 +14,8 @@ builder.Services.AddSingleton<ShiftCycleProjector>();
 builder.Services.AddSingleton<SchedulingEligibilityService>();
 builder.Services.AddSingleton<SchedulingRecommendationEngine>();
 builder.Services.AddSingleton<SchedulingExportService>();
+builder.Services.AddSingleton<SchedulingRuleProfileValidator>();
+builder.Services.AddSingleton<SchedulingRuleProfileRepository>();
 builder.Services.AddScoped<RequestUserContext>();
 builder.Services.AddScoped<PortalAuthorizationService>();
 builder.Services.AddCors(options =>
