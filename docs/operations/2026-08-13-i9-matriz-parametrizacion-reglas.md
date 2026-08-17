@@ -127,6 +127,7 @@ preparado para diligenciamiento; todos los campos de decision permanecen
 | Responsable de subsanacion | PENDIENTE | Rol autorizado |
 | Mensajes y pruebas | PENDIENTE | Cumplido, faltante, vencido, no verificado e informativo |
 | Parametros, mensajes y pruebas | APROBADO_FUNCIONALMENTE_NO_EJECUTABLE | `docs/operations/2026-08-14-i9-r06-parametros-mensajes-pruebas.md`; casos R06-T01 a R06-T23; aprobacion explicita del usuario |
+| Formato de requisitos institucionales | LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_TH_OPERACIONES_NO_EJECUTABLE | `docs/operations/2026-08-14-i9-wp-e-formato-requisitos-puesto-r06.md`; codigos, categorias, estados, evidencia, vigencias, subsanabilidad, responsables y fechas limite permanecen PENDIENTE |
 
 ### I9-R07 - Desviacion De Plantilla
 

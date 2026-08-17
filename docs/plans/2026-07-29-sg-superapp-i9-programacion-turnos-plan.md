@@ -446,6 +446,21 @@ estas decisiones, mensajes y casos. Su estado es
 continuan pendientes los catalogos reales I3/I5, mapeos institucionales,
 fuente/version, implementacion TDD y evidencia.
 
+#### Formato Institucional WP-I9-E Preparado
+
+El 2026-08-14 se preparo
+`docs/operations/2026-08-14-i9-wp-e-formato-requisitos-puesto-r06.md` con estado
+`LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_TH_OPERACIONES_NO_EJECUTABLE`. El
+formato controla el contrato I3/I5, el mapeo de codigos y estados, evidencia,
+vigencias, subsanabilidad, responsables, fechas limite, validacion de Talento
+Humano y aprobacion del Director de Operaciones. Todos los valores
+institucionales permanecen `PENDIENTE`; su preparacion no completa WP-I9-E, no
+autoriza implementacion y no activa I9-R06. Task 13 continua abierta y Gate 2
+continua bloqueado.
+
+Controles canonicos: `TECHNICAL_IMPLEMENTATION_AUTHORIZED=NO`,
+`I9_R06_ACTIVE=NO`, `TASK_13_STATUS=OPEN` y `GATE_2_STATUS=BLOCKED`.
+
 ### Parametrizacion I9-R07
 
 El 2026-08-13 el usuario aprobo I9-R07 con plantilla obligatoria por defecto.

@@ -126,6 +126,14 @@ aprueba la excepcion operativa.
 **Criterio de salida:** todos los codigos reales estan mapeados o producen
 `UNVERIFIED`; la ausencia de informacion no acredita cumplimiento.
 
+**Formato preparado:**
+`docs/operations/2026-08-14-i9-wp-e-formato-requisitos-puesto-r06.md`, con
+estado
+`LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_TH_OPERACIONES_NO_EJECUTABLE`. Los
+codigos, categorias, estados, evidencias, vigencias, subsanabilidad,
+responsables y fechas limite permanecen `PENDIENTE`.
+Su preparacion no completa WP-I9-E ni autoriza implementacion.
+
 ## Orden Tecnico Posterior
 
 El trabajo tecnico comienza solamente despues de aprobar este plan y recibir el

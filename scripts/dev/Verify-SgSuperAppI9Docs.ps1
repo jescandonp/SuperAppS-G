@@ -79,6 +79,60 @@ function Assert-DocumentSectionContains {
     }
 }
 
+function Assert-DocumentSectionDoesNotContain {
+    param(
+        [Parameter(Mandatory)][string]$RelativePath,
+        [Parameter(Mandatory)][string]$SectionPattern,
+        [Parameter(Mandatory)][string[]]$Patterns
+    )
+
+    $path = Join-Path $repoRoot $RelativePath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        $failures.Add("Missing document: $RelativePath")
+        return
+    }
+
+    $content = Get-Content -Raw -LiteralPath $path
+    $sectionMatch = [regex]::Match($content, $SectionPattern)
+    if (-not $sectionMatch.Success) {
+        $failures.Add("$RelativePath missing section: $SectionPattern")
+        return
+    }
+
+    foreach ($pattern in $Patterns) {
+        if ($sectionMatch.Value -match $pattern) {
+            $failures.Add("$RelativePath section contains forbidden pattern: $pattern")
+        }
+    }
+}
+
+function Assert-DocumentSectionPatternCount {
+    param(
+        [Parameter(Mandatory)][string]$RelativePath,
+        [Parameter(Mandatory)][string]$SectionPattern,
+        [Parameter(Mandatory)][string]$Pattern,
+        [Parameter(Mandatory)][int]$ExpectedCount
+    )
+
+    $path = Join-Path $repoRoot $RelativePath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        $failures.Add("Missing document: $RelativePath")
+        return
+    }
+
+    $content = Get-Content -Raw -LiteralPath $path
+    $sectionMatch = [regex]::Match($content, $SectionPattern)
+    if (-not $sectionMatch.Success) {
+        $failures.Add("$RelativePath missing section: $SectionPattern")
+        return
+    }
+
+    $actualCount = [regex]::Matches($sectionMatch.Value, $Pattern).Count
+    if ($actualCount -ne $ExpectedCount) {
+        $failures.Add("$RelativePath section pattern count expected $ExpectedCount but was $actualCount`: $Pattern")
+    }
+}
+
 function Assert-PatternCount {
     param(
         [Parameter(Mandatory = $true)][string]$RelativePath,
@@ -886,6 +940,112 @@ Assert-DocumentContains $parameterMatrixPath @(
     'docs/operations/2026-08-14-i9-wp-d-formato-matriz-traslados-r05\.md',
     '(?is)proyectos, puestos, tiempos, prohibiciones, version, vigencia y decision permanecen PENDIENTE'
 )
+
+$wpI9EPositionRequirementsPath = 'docs/operations/2026-08-14-i9-wp-e-formato-requisitos-puesto-r06.md'
+$wpI9EControlSection = '(?ms)^## Estado Y Decision De Control\s*$.*?(?=^## Identificacion Y Gobierno Del Catalogo\s*$)'
+$wpI9EContractSection = '(?ms)^## Contrato De Integracion I3/I5\s*$.*?(?=^## Categorias Canonicas Y Cobertura\s*$)'
+$wpI9EMappingSection = '(?ms)^## Tabla De Mapeo Institucional\s*$.*?(?=^## Configuracion De Subsanabilidad\s*$)'
+$wpI9ERemediationSection = '(?ms)^## Configuracion De Subsanabilidad\s*$.*?(?=^## Dataset Anonimo De Validacion\s*$)'
+$wpI9EDatasetSection = '(?ms)^## Dataset Anonimo De Validacion\s*$.*?(?=^## Reglas De Integridad Y Seguridad\s*$)'
+$wpI9EDecisionSection = '(?ms)^## Decision Institucional\s*$.*?(?=^## Checklist De Cierre WP-I9-E\s*$)'
+$wpI9EExitSection = '(?ms)^## Criterio De Salida\s*$.*\z'
+$wpI9EMappingPopulatedRowPattern = '(?m)^\|(?!\s*(?:mappingId|---)\s*\|)(?!\s*PENDIENTE(?:\s*\|\s*PENDIENTE){19}\s*\|\s*$)(?:[^|\r\n]*\|){20}\s*$'
+$wpI9EDecisionPopulatedRolePattern = '(?m)^\|\s*(?:Talento Humano|Director de Operaciones)\s*\|(?!\s*PENDIENTE\s*\|\s*PENDIENTE\s*\|\s*PENDIENTE\s*\|\s*PENDIENTE\s*\|\s*PENDIENTE\s*\|\s*$).+$'
+$wpI9EControlRequiredPatterns = @(
+    '(?m)^\| TECHNICAL_IMPLEMENTATION_AUTHORIZED \| NO \|\s*$',
+    '(?m)^\| I9_R06_ACTIVE \| NO \|\s*$',
+    '(?m)^\| TASK_13_STATUS \| OPEN \|\s*$',
+    '(?m)^\| GATE_2_STATUS \| BLOCKED \|\s*$'
+)
+$wpI9ELogControlRequiredPatterns = @(
+    'TECHNICAL_IMPLEMENTATION_AUTHORIZED=NO',
+    'I9_R06_ACTIVE=NO',
+    'TASK_13_STATUS=OPEN',
+    'GATE_2_STATUS=BLOCKED'
+)
+$wpI9ESemanticContradictionPatterns = @(
+    '(?is)\bI9-R06\b\s+autoriza\s+(?:la\s+)?implementacion\s+tecnica\b',
+    '(?is)\bimplementacion\s+tecnica\s+de\s+\bI9-R06\b\s+queda\s+autorizada\b',
+    '(?is)\bI9-R06\b\s+queda\s+autorizado\s+para\s+la\s+implementacion\s+tecnica\b',
+    '(?is)\bautorizacion\s+para\s+la\s+implementacion\s+tecnica\s+de\s+\bI9-R06\b',
+    '(?is)\bI9-R06\b\s+(?:se\s+)?activa\b',
+    '(?is)\bse\s+activa\s+\bI9-R06\b',
+    '(?is)\bI9-R06\b\s+puede\s+activarse\s+ahora\b',
+    '(?is)\bI9-R06\b\s+se\s+debe\s+activar\b',
+    '(?is)\bI9-R06\b\s+queda\s+(?:activada|habilitada)\b',
+    '(?is)\bTask 13\b\s+(?:se\s+)?cierra\b',
+    '(?is)\bse\s+cierra\s+\bTask 13\b',
+    '(?is)\bTask 13\b\s+queda\s+(?:cerrada|completada)\b',
+    '(?is)\bTask 13\b\s+se\s+completa\b',
+    '(?is)\bGate 2\b\s+(?:queda\s+)?(?:cerrado|cerrada|aprobado|aprobada)\b'
+)
+Assert-DocumentContains $wpI9EPositionRequirementsPath @(
+    '(?m)^> Estado: \*\*LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_TH_OPERACIONES_NO_EJECUTABLE\*\*\s*$',
+    '(?is)no constituye catalogo institucional aprobado ni autoriza implementacion, excepciones o activacion de I9-R06',
+    '(?is)sin inventar codigos, estados, evidencias,\s+vigencias, responsables nominales ni fechas limite',
+    '(?is)Talento Humano valida.*Director de Operaciones aprueba la excepcion operativa',
+    '(?is)ausencia de informacion nunca acredita\s+cumplimiento.*codigo o estado\s+desconocido permanece `UNVERIFIED`',
+    '(?is)COURSE.*ACCREDITATION.*CERTIFICATION.*LICENSE_OR_PERMIT.*OTHER_REQUIREMENT'
+)
+Assert-DocumentSectionContains $wpI9EPositionRequirementsPath $wpI9EControlSection $wpI9EControlRequiredPatterns
+Assert-DocumentSectionContains $wpI9EPositionRequirementsPath $wpI9EContractSection @(
+    '(?is)una fila por sistema y version de contrato.*interfaz,\s+ruta o campo no documentado.*`PENDIENTE`',
+    '(?m)^\| Sistema fuente \| Version del contrato \| Interfaz o ruta \| Identificador de puesto \| Codigo de requisito \| Estado \| Evidencia \| Vigencia \| Responsable tecnico \| Evidencia del contrato \|\s*$',
+    '(?m)^\| PENDIENTE(?: \| PENDIENTE){9} \|\s*$'
+)
+Assert-DocumentSectionContains $wpI9EPositionRequirementsPath $wpI9EMappingSection @(
+    '(?is)cada fila conserva\s+su trazabilidad completa y un identificador unico',
+    '(?is)mappingId.*sourceSystem.*sourceRequirementCode.*sourceStatus.*canonicalCategory.*mappingVersion.*effectiveFrom.*effectiveTo.*evidenceType.*verifiedBy.*validationDate.*approvedBy.*approvalDate.*mappingEvidence',
+    '(?m)^\| mappingId \| sourceSystem \| sourceRequirementCode \| sourceStatus \| canonicalCategory \| requirementName \| positionOrScopeId \| evidenceType \| evidenceStatus \| effectiveFrom \| effectiveTo \| mappingVersion \| subsanable \| remediationOwner \| remediationDeadline \| verifiedBy \| validationDate \| approvedBy \| approvalDate \| mappingEvidence \|\s*$'
+)
+Assert-DocumentSectionContains $wpI9EPositionRequirementsPath $wpI9ERemediationSection @(
+    '(?is)`subsanable` requiere configuracion explicita y versionada.*responsable de subsanacion y la fecha limite.*ausencia invalida la configuracion',
+    '(?m)^\| Codigo real \| Estado real \| Subsanable \| Tratamiento autorizado \| Responsable de subsanacion \| Fecha limite \| Fuente \| Version \| Validacion TH \|\s*$',
+    '(?m)^\| PENDIENTE(?: \| PENDIENTE){8} \|\s*$'
+)
+Assert-DocumentSectionContains $wpI9EPositionRequirementsPath $wpI9EDatasetSection @(
+    '(?is)identificadores anonimos.*no incluir datos personales ni\s+evidencia sensible',
+    '(?is)Requisito vigente.*COMPLIANT.*Requisito faltante.*MISSING.*Requisito vencido.*EXPIRED.*Codigo o estado desconocido.*UNVERIFIED.*Subsanable informativo.*INFORMATIVE_REMEDIABLE'
+)
+Assert-DocumentSectionContains $wpI9EPositionRequirementsPath $wpI9EDecisionSection @(
+    '(?m)^\|\s*Talento Humano\s*\|\s*PENDIENTE\s*\|\s*PENDIENTE\s*\|\s*PENDIENTE\s*\|\s*PENDIENTE\s*\|\s*PENDIENTE\s*\|\s*$',
+    '(?m)^\|\s*Director de Operaciones\s*\|\s*PENDIENTE\s*\|\s*PENDIENTE\s*\|\s*PENDIENTE\s*\|\s*PENDIENTE\s*\|\s*PENDIENTE\s*\|\s*$'
+)
+Assert-DocumentSectionContains $wpI9EPositionRequirementsPath $wpI9EExitSection @(
+    '(?is)WP-I9-E solo puede proponerse como completo.*catalogos reales I3/I5.*contrato de integracion.*Talento Humano.*Director de Operaciones',
+    '(?is)I9-R06 permanece no ejecutable.*Gate 2 sigue bloqueado'
+)
+Assert-PatternCount $wpI9EPositionRequirementsPath '(?m)^\d+\. `REQ-I9-E-(?:0[1-9]|1[0-2])`:' 12
+Assert-PatternCount $wpI9EPositionRequirementsPath '(?m)^- \[ \] ' 12
+Assert-DocumentSectionPatternCount $wpI9EPositionRequirementsPath $wpI9EDatasetSection '(?m)^\| (?:Requisito vigente|Requisito faltante|Requisito vencido|Codigo o estado desconocido|Subsanable informativo) \|' 5
+Assert-DocumentSectionPatternCount $wpI9EPositionRequirementsPath $wpI9EMappingSection '(?m)^\|\s*PENDIENTE(?:\s*\|\s*PENDIENTE){19}\s*\|\s*$' 1
+Assert-DocumentSectionDoesNotContain $wpI9EPositionRequirementsPath $wpI9EMappingSection @(
+    $wpI9EMappingPopulatedRowPattern
+)
+Assert-DocumentSectionDoesNotContain $wpI9EPositionRequirementsPath $wpI9EDecisionSection @(
+    $wpI9EDecisionPopulatedRolePattern
+)
+Assert-DocumentDoesNotContain $wpI9EPositionRequirementsPath (@(
+    '(?i)I9-R06.*APROBADA_EJECUTABLE',
+    '(?i)Gate 2.*Cerrado'
+) + $wpI9ESemanticContradictionPatterns)
+Assert-DocumentContains $subgate2APlanPath @(
+    'docs/operations/2026-08-14-i9-wp-e-formato-requisitos-puesto-r06\.md',
+    'LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_TH_OPERACIONES_NO_EJECUTABLE',
+    '(?is)codigos, categorias, estados, evidencias, vigencias, subsanabilidad,\s+responsables y fechas limite permanecen `PENDIENTE`.*preparacion no completa WP-I9-E ni autoriza implementacion'
+)
+Assert-DocumentContains $parameterMatrixPath @(
+    'docs/operations/2026-08-14-i9-wp-e-formato-requisitos-puesto-r06\.md',
+    '(?is)codigos, categorias, estados, evidencia, vigencias, subsanabilidad, responsables y fechas limite permanecen PENDIENTE'
+)
+Assert-DocumentSectionContains $planPath '(?ms)^### Parametrizacion I9-R06\s*$.*?(?=^### Parametrizacion I9-R07\s*$)' (@(
+    '(?m)^#### Formato Institucional WP-I9-E Preparado\s*$',
+    'docs/operations/2026-08-14-i9-wp-e-formato-requisitos-puesto-r06\.md',
+    'LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_TH_OPERACIONES_NO_EJECUTABLE',
+    '(?is)Task 13.*continua abierta.*Gate 2.*continua bloqueado',
+    '(?is)no completa WP-I9-E.*no\s+autoriza implementacion'
+) + $wpI9ELogControlRequiredPatterns)
+Assert-DocumentSectionDoesNotContain $planPath '(?ms)^### Parametrizacion I9-R06\s*$.*?(?=^### Parametrizacion I9-R07\s*$)' $wpI9ESemanticContradictionPatterns
 
 $validationActPath = 'docs/operations/2026-07-29-i9-acta-validacion-gate0.md'
 Assert-DocumentContains $validationActPath @(
