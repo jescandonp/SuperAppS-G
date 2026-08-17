@@ -106,6 +106,14 @@ function Test-NumberCanonicalizationLinkage {
         $ValidatorContent -notmatch '(?i)(GetDouble|double\.Parse)'
 }
 
+function Test-SqlChecksumCanonicalizationLinkage {
+    param([string]$MigrationContent, [string]$SeedContent, [string]$TestContent)
+    return $MigrationContent -match '(?s)CREATE\s+OR\s+REPLACE\s+FUNCTION\s+i9_mvp_canonical_jsonb.*?IMMUTABLE' -and
+        $MigrationContent -match '(?s)i9_mvp_canonical_number.*?Maximum|i9_mvp_canonical_number.*?1000' -and
+        $SeedContent -match '(?s)string_agg\s*\(.*?i9_mvp_canonical_jsonb\s*\(\s*e?\.?parameters\s*\).*?i9_mvp_canonical_jsonb\s*\(\s*e?\.?catalog_snapshot\s*\)' -and
+        $TestContent -match '(?s)i9_mvp_canonical_jsonb\s*\(\s*''1e2''::jsonb\s*\).*?i9_mvp_canonical_jsonb\s*\(\s*''100''::jsonb\s*\)'
+}
+
 function ConvertTo-I9CanonicalDecimalSelfTest {
     param([string]$RawNumber)
     if ($RawNumber -notmatch '^(?<sign>-?)(?<integer>0|[1-9][0-9]*)(?:\.(?<fraction>[0-9]+))?(?:[eE](?<exponent>[+-]?[0-9]+))?$') { throw 'unsupported number' }
@@ -190,6 +198,17 @@ foreach ($equivalentSet in $numberEquivalences) {
 $unsupportedNumberRejected = $false
 try { [void](ConvertTo-I9CanonicalDecimalSelfTest '1e1001') } catch { $unsupportedNumberRejected = $true }
 if (-not $unsupportedNumberRejected) { throw 'I9 MVP rules verifier unsupported-number negative self-test failed.' }
+$sqlLinkagePositive = Test-SqlChecksumCanonicalizationLinkage `
+    -MigrationContent 'CREATE OR REPLACE FUNCTION i9_mvp_canonical_jsonb(value jsonb) RETURNS text IMMUTABLE; i9_mvp_canonical_number 1000' `
+    -SeedContent 'string_agg(i9_mvp_canonical_jsonb(parameters) || i9_mvp_canonical_jsonb(catalog_snapshot))' `
+    -TestContent "i9_mvp_canonical_jsonb('1e2'::jsonb) = i9_mvp_canonical_jsonb('100'::jsonb)"
+$sqlLinkageNegative = Test-SqlChecksumCanonicalizationLinkage `
+    -MigrationContent 'CREATE FUNCTION raw_json(value jsonb) RETURNS text IMMUTABLE' `
+    -SeedContent 'string_agg(parameters::text || catalog_snapshot::text)' `
+    -TestContent "i9_mvp_canonical_jsonb('1e2'::jsonb) = i9_mvp_canonical_jsonb('100'::jsonb)"
+if (-not $sqlLinkagePositive -or $sqlLinkageNegative) {
+    throw 'I9 MVP rules verifier SQL checksum canonicalization linkage self-test failed.'
+}
 
 Assert-FileContains 'Versioned rule profile persistence' 'db/migrations/012_i9_mvp_rule_profiles.sql' @(
     (Pattern 'scheduling_rule_profiles' '(?i)\bscheduling_rule_profiles\b'),
@@ -199,18 +218,36 @@ Assert-FileContains 'Versioned rule profile persistence' 'db/migrations/012_i9_m
     (Pattern 'exception rule code' '(?i)\brule_code\b'), (Pattern 'exception evaluation id' '(?i)\bevaluation_id\b'),
     (Pattern 'exception scope hash' '(?i)\bscope_hash\b'),
     (Pattern 'schedule profile reference' '(?i)\b(rule_profile|rule_profile_id|rule_profile_version)\b'),
-    (Pattern 'simulated marker' '(?i)\bsimulated\b')
+    (Pattern 'simulated marker' '(?i)\bsimulated\b'),
+    (Pattern 'immutable canonical JSONB function' '(?is)FUNCTION\s+i9_mvp_canonical_jsonb.*?IMMUTABLE'),
+    (Pattern 'canonical number function' '(?i)FUNCTION\s+i9_mvp_canonical_number')
 )
 Assert-FileContains 'Simulated MVP profile seed' 'db/seeds/011_i9_mvp_simulated_rule_profile.sql' @(
     (Pattern 'SIMULATED' '(?i)\bSIMULATED\b'), (Pattern 'MVP_TEST' '(?i)\bMVP_TEST\b'),
     (Pattern 'I9-R01' 'I9-R01'), (Pattern 'I9-R02' 'I9-R02'), (Pattern 'I9-R03' 'I9-R03'),
     (Pattern 'I9-R04' 'I9-R04'), (Pattern 'I9-R05' 'I9-R05'), (Pattern 'I9-R06' 'I9-R06'),
-    (Pattern 'I9-R07' 'I9-R07')
+    (Pattern 'I9-R07' 'I9-R07'),
+    (Pattern 'canonical parameters checksum' '(?i)i9_mvp_canonical_jsonb\s*\(\s*e?\.?parameters\s*\)'),
+    (Pattern 'canonical catalog checksum' '(?i)i9_mvp_canonical_jsonb\s*\(\s*e?\.?catalog_snapshot\s*\)')
 )
 Assert-FileContains 'Versioned profile database contract' 'db/tests/008_i9_mvp_rule_profiles_contract.sql' @(
     (Pattern 'executable SQL' '(?i)\b(DO|BEGIN|SELECT)\b'), (Pattern 'active uniqueness' '(?i)(unique|overlap|superpuest|vigencia)'),
-    (Pattern 'immutability' $immutabilityPattern), (Pattern 'evaluation history' '(?i)evaluat')
+    (Pattern 'immutability' $immutabilityPattern), (Pattern 'evaluation history' '(?i)evaluat'),
+    (Pattern 'semantic number equivalence' "(?is)i9_mvp_canonical_jsonb\s*\(\s*'1e2'::jsonb\s*\).*?i9_mvp_canonical_jsonb\s*\(\s*'100'::jsonb\s*\)"),
+    (Pattern 'canonical seed checksum' '(?i)Seed checksum.*canonical executable')
 )
+$migrationChecksumPath = Join-Path $repoRoot 'db/migrations/012_i9_mvp_rule_profiles.sql'
+$seedChecksumPath = Join-Path $repoRoot 'db/seeds/011_i9_mvp_simulated_rule_profile.sql'
+$testChecksumPath = Join-Path $repoRoot 'db/tests/008_i9_mvp_rule_profiles_contract.sql'
+if ((Test-Path $migrationChecksumPath) -and (Test-Path $seedChecksumPath) -and (Test-Path $testChecksumPath)) {
+    $sqlChecksumLinked = Test-SqlChecksumCanonicalizationLinkage `
+        -MigrationContent (Get-EffectiveContent $migrationChecksumPath) `
+        -SeedContent (Get-EffectiveContent $seedChecksumPath) `
+        -TestContent (Get-EffectiveContent $testChecksumPath)
+    if (-not $sqlChecksumLinked) {
+        $failures.Add('Cross-layer checksum contract: migration, seed and SQL test are not linked to canonical JSONB')
+    }
+}
 
 Assert-FileContains 'Typed profile and result contracts' 'apps/sg-superapp-api/Domain/SchedulingRuleModels.cs' @(
     (Pattern 'ProfileCode' '(?i)ProfileCode'), (Pattern 'Version' '(?i)\bVersion\b'),

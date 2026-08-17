@@ -98,8 +98,7 @@ public sealed class SchedulingRuleProfileValidator
         var decimalIndex = mantissa.IndexOf('.');
         var fractionalDigits = decimalIndex < 0 ? 0 : mantissa.Length - decimalIndex - 1;
         var digits = decimalIndex < 0 ? mantissa : mantissa.Remove(decimalIndex, 1);
-        if (digits.Length == 0 || digits.Length > MaximumNumberDigits ||
-            digits.Any(character => character is < '0' or > '9'))
+        if (digits.Length == 0 || digits.Any(character => character is < '0' or > '9'))
             throw new InvalidOperationException("Rule profile number is unsupported.");
 
         digits = digits.TrimStart('0');
@@ -113,7 +112,7 @@ public sealed class SchedulingRuleProfileValidator
             digits = digits[..^1];
             scale--;
         }
-        if (scale is < -MaximumNumberScale or > MaximumNumberScale)
+        if (digits.Length > MaximumNumberDigits || scale is < -MaximumNumberScale or > MaximumNumberScale)
             throw new InvalidOperationException("Rule profile number scale is unsupported.");
 
         string canonical;

@@ -59,6 +59,35 @@ BEGIN
         RAISE EXCEPTION 'Every seeded rule entry requires complete object JSON';
     END IF;
 
+    IF i9_mvp_canonical_jsonb('1e2'::jsonb) <> i9_mvp_canonical_jsonb('100'::jsonb)
+       OR i9_mvp_canonical_jsonb('1.0'::jsonb) <> i9_mvp_canonical_jsonb('1.00'::jsonb)
+       OR i9_mvp_canonical_jsonb('1.00'::jsonb) <> i9_mvp_canonical_jsonb('1'::jsonb)
+       OR i9_mvp_canonical_jsonb('-0'::jsonb) <> i9_mvp_canonical_jsonb('0'::jsonb)
+       OR i9_mvp_canonical_jsonb('0.0100'::jsonb) <> i9_mvp_canonical_jsonb('0.01'::jsonb) THEN
+        RAISE EXCEPTION 'I9 canonical JSONB number equivalence failed';
+    END IF;
+
+    IF i9_mvp_canonical_jsonb('{"bbb":1,"a":2,"cc":3}'::jsonb)
+       <> '{"a": 2, "cc": 3, "bbb": 1}' THEN
+        RAISE EXCEPTION 'I9 canonical JSONB object ordering failed';
+    END IF;
+    IF i9_mvp_canonical_jsonb('[{"z":1,"a":true},null,"x"]'::jsonb)
+       <> '[{"a": true, "z": 1}, null, "x"]' THEN
+        RAISE EXCEPTION 'I9 canonical JSONB array or scalar preservation failed';
+    END IF;
+
+    BEGIN
+        PERFORM i9_mvp_canonical_jsonb('1e1001'::jsonb);
+        RAISE EXCEPTION 'I9 unsupported canonical number was accepted';
+    EXCEPTION WHEN SQLSTATE '22023' THEN NULL; END;
+
+    IF (SELECT checksum::TEXT FROM scheduling_rule_profiles WHERE id=profile_id)
+       <> (SELECT encode(public.digest(string_agg(rule_code||':'||i9_mvp_canonical_jsonb(parameters)||':'||
+                    i9_mvp_canonical_jsonb(catalog_snapshot),'|' ORDER BY rule_code),'sha256'),'hex')
+             FROM scheduling_rule_profile_entries WHERE rule_profile_id=profile_id) THEN
+        RAISE EXCEPTION 'Seed checksum does not match canonical executable composition';
+    END IF;
+
     BEGIN
         INSERT INTO scheduling_rule_profiles (
             profile_code, version, origin, environment_scope, scope_code,

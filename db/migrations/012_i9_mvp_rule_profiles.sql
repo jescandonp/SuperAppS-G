@@ -198,6 +198,73 @@ END $$;
 SELECT pg_temp.i9_mvp_constraint('schedule_exceptions','schedule_exceptions_evaluation_identity_fkey','f','FOREIGN KEY(evaluation_id,rule_code,scope_hash) REFERENCES scheduling_rule_evaluations(id,rule_code,scope_hash) ON DELETE RESTRICT');
 SELECT pg_temp.i9_mvp_constraint('schedule_exceptions','schedule_exceptions_rule_audit_check','c',$d$CHECK (((evaluation_id IS NULL AND rule_code IS NULL AND scope_hash IS NULL AND motive_code IS NULL) OR (evaluation_id IS NOT NULL AND rule_code ~ '^I9-R0[1-7]$' AND scope_hash ~ '^[0-9a-f]{64}$' AND btrim(motive_code)<>'')) AND jsonb_typeof(decision_detail)='object' AND ((decision IS NULL AND decided_by IS NULL AND decided_at IS NULL) OR (decision IN('APPROVED','REJECTED','CANCELLED') AND btrim(decided_by)<>'' AND decided_at IS NOT NULL)))$d$);
 
+CREATE OR REPLACE FUNCTION i9_mvp_canonical_number(value_text TEXT)
+RETURNS TEXT LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE AS $$
+DECLARE
+ normalized_sign TEXT := '';
+ unsigned_value TEXT;
+ exponent_position INTEGER;
+ mantissa TEXT;
+ exponent_value INTEGER := 0;
+ decimal_position INTEGER;
+ fractional_digits INTEGER;
+ digits TEXT;
+ number_scale INTEGER;
+ canonical TEXT;
+BEGIN
+ IF length(value_text)>1016 OR value_text!~'^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$' THEN
+  RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='I9 canonical number has unsupported form or length';
+ END IF;
+ IF left(value_text,1)='-' THEN normalized_sign:='-'; unsigned_value:=substring(value_text FROM 2); ELSE unsigned_value:=value_text; END IF;
+ exponent_position:=strpos(lower(unsigned_value),'e');
+ IF exponent_position>0 THEN
+  mantissa:=left(unsigned_value,exponent_position-1);
+  BEGIN exponent_value:=substring(unsigned_value FROM exponent_position+1)::INTEGER;
+  EXCEPTION WHEN numeric_value_out_of_range THEN
+   RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='I9 canonical number exponent is unsupported';
+  END;
+ ELSE mantissa:=unsigned_value; END IF;
+ decimal_position:=strpos(mantissa,'.');
+ fractional_digits:=CASE WHEN decimal_position=0 THEN 0 ELSE length(mantissa)-decimal_position END;
+ digits:=replace(mantissa,'.','');
+ IF digits!~'^[0-9]+$' THEN RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='I9 canonical number is unsupported'; END IF;
+ digits:=ltrim(digits,'0');
+ IF digits='' THEN RETURN '0'; END IF;
+ BEGIN number_scale:=fractional_digits-exponent_value;
+ EXCEPTION WHEN numeric_value_out_of_range THEN
+  RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='I9 canonical number scale is unsupported';
+ END;
+ WHILE right(digits,1)='0' LOOP digits:=left(digits,length(digits)-1); number_scale:=number_scale-1; END LOOP;
+ IF length(digits)>1000 OR number_scale < -1000 OR number_scale > 1000 THEN
+  RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='I9 canonical number exceeds supported digits or scale';
+ END IF;
+ IF number_scale<=0 THEN canonical:=digits||repeat('0',-number_scale);
+ ELSIF number_scale>=length(digits) THEN canonical:='0.'||repeat('0',number_scale-length(digits))||digits;
+ ELSE canonical:=overlay(digits PLACING '.' FROM length(digits)-number_scale+1 FOR 0); END IF;
+ RETURN normalized_sign||canonical;
+END $$;
+
+CREATE OR REPLACE FUNCTION i9_mvp_canonical_jsonb(value JSONB)
+RETURNS TEXT LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE AS $$
+DECLARE canonical TEXT;
+BEGIN
+ CASE jsonb_typeof(value)
+  WHEN 'object' THEN
+   SELECT '{'||coalesce(string_agg(to_jsonb(item.key)::TEXT||': '||i9_mvp_canonical_jsonb(item.value),', '
+          ORDER BY octet_length(convert_to(item.key,'UTF8')),convert_to(item.key,'UTF8')),'')||'}'
+     INTO canonical FROM jsonb_each(value) AS item;
+  WHEN 'array' THEN
+   SELECT '['||coalesce(string_agg(i9_mvp_canonical_jsonb(item.value),', ' ORDER BY item.ordinality),'')||']'
+     INTO canonical FROM jsonb_array_elements(value) WITH ORDINALITY AS item(value,ordinality);
+  WHEN 'number' THEN canonical:=i9_mvp_canonical_number(value::TEXT);
+  WHEN 'string' THEN canonical:=value::TEXT;
+  WHEN 'boolean' THEN canonical:=value::TEXT;
+  WHEN 'null' THEN canonical:='null';
+  ELSE RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='I9 canonical JSONB type is unsupported';
+ END CASE;
+ RETURN canonical;
+END $$;
+
 CREATE OR REPLACE FUNCTION enforce_single_active_rule_profile()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
