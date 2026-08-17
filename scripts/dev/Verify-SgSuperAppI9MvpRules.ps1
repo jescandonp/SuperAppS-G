@@ -181,6 +181,14 @@ function Test-StoredEnumFailClosedLinkage {
         $EndpointContent -match '(?s)catch\s*\(\s*SchedulingRuleContractException\s*\).*?ContractProblem.*?Results\.Problem'
 }
 
+function Test-NullCreateEntryRejectionLinkage {
+    param([string]$EndpointContent)
+    return $EndpointContent -match '(?s)try\s*\{.*?TryParseCreateRequest' -and
+        $EndpointContent -match '(?s)request\.Entries\s+is\s+null.*?request\.Entries\.Any\s*\(\s*entry\s*=>\s*entry\s+is\s+null\s*\).*?request\.Entries\.Select' -and
+        $EndpointContent -match '(?s)catch\s*\(\s*(ArgumentException|InvalidOperationException|JsonException)\s*\)\s*\{\s*return\s+InvalidCreateRequestProblem\s*\(\s*\)' -and
+        $EndpointContent -match '(?s)InvalidCreateRequestProblem\s*\(\s*\).*?Results\.Problem.*?StatusCodes\.Status400BadRequest'
+}
+
 function ConvertTo-I9CanonicalStringSelfTest {
     param([string]$Value)
     $builder = New-Object System.Text.StringBuilder
@@ -348,6 +356,10 @@ $enumLinkagePositive = 'ParseStoredEnum { Enum.GetNames; Enum.TryParse; throw ne
 $enumEndpointPositive = 'catch (SchedulingRuleContractException) { return ContractProblem(); } ContractProblem() => Results.Problem();'
 if (-not (Test-StoredEnumFailClosedLinkage $enumLinkagePositive $enumLinkagePositive $enumEndpointPositive) -or
     (Test-StoredEnumFailClosedLinkage 'Enum.Parse<Value>(text)' 'Enum.Parse<Value>(text)' 'return Results.Ok();')) { throw 'I9 MVP rules verifier stored-enum linkage self-test failed.' }
+$nullEntryPositive = 'try { TryParseCreateRequest(request); } request.Entries is null || request.Entries.Any(entry => entry is null); request.Entries.Select(entry => entry.Value); catch (InvalidOperationException) { return InvalidCreateRequestProblem(); } InvalidCreateRequestProblem() => Results.Problem(statusCode: StatusCodes.Status400BadRequest); entries:[null]'
+$nullEntryNegative = 'request.Entries.Select(entry => entry.Value); entries:[null]'
+if (-not (Test-NullCreateEntryRejectionLinkage $nullEntryPositive) -or
+    (Test-NullCreateEntryRejectionLinkage $nullEntryNegative)) { throw 'I9 MVP rules verifier null create-entry negative self-test failed.' }
 
 Assert-FileContains 'Versioned rule profile persistence' 'db/migrations/012_i9_mvp_rule_profiles.sql' @(
     (Pattern 'scheduling_rule_profiles' '(?i)\bscheduling_rule_profiles\b'),
@@ -514,6 +526,10 @@ if ((Test-Path -LiteralPath $evaluatorPath) -and
 if ((Test-Path -LiteralPath $createRepositoryPath) -and (Test-Path -LiteralPath $evaluatorPath) -and (Test-Path -LiteralPath $ruleEndpointPath) -and
     -not (Test-StoredEnumFailClosedLinkage (Get-EffectiveContent $createRepositoryPath) (Get-EffectiveContent $evaluatorPath) (Get-EffectiveContent $ruleEndpointPath))) {
     $failures.Add('Rule profile reads: stored enums are not parsed fail-closed into stable ProblemDetails')
+}
+if ((Test-Path -LiteralPath $ruleEndpointPath) -and
+    -not (Test-NullCreateEntryRejectionLinkage (Get-EffectiveContent $ruleEndpointPath))) {
+    $failures.Add('Rule profile HTTP create: entries:[null] is not rejected as stable 400 ProblemDetails before dereference')
 }
 Assert-FileContains 'Rule HTTP contracts' 'apps/sg-superapp-api/Contracts/Portal/SchedulingRuleContracts.cs' @(
     (Pattern 'RuleProfile' '(?i)RuleProfile'), (Pattern 'RuleEvaluation summary' '(?i)(RuleEvaluation|RuleSummary)'),

@@ -102,9 +102,14 @@ public sealed class SchedulingRuleEvaluator
                     var allowed = current.Depth == 1 ? AllowedRootFacts : AllowedNestedFacts;
                     if (!allowed.Contains(property.Name))
                         throw new ArgumentException("Facts contain a field outside the anonymous rule schema.");
-                    ValidateScalar(property.Name, property.Value);
                     if (property.Value.ValueKind == JsonValueKind.Array)
-                        foreach (var item in property.Value.EnumerateArray()) ValidateScalar(property.Name, item);
+                        foreach (var item in property.Value.EnumerateArray())
+                        {
+                            if (item.ValueKind == JsonValueKind.Array)
+                                throw new ArgumentException("Facts cannot contain nested arrays.");
+                            ValidateScalar(property.Name, item);
+                        }
+                    else ValidateScalar(property.Name, property.Value);
                     pending.Push((property.Value, current.Depth + 1));
                 }
             }

@@ -10,7 +10,7 @@ public sealed record CreateSchedulingRuleProfileRequest(
     string ScopeCode,
     string EffectiveFrom,
     string? EffectiveTo,
-    IReadOnlyList<CreateSchedulingRuleProfileEntryRequest> Entries);
+    IReadOnlyList<CreateSchedulingRuleProfileEntryRequest?> Entries);
 
 public sealed record CreateSchedulingRuleProfileEntryRequest(
     string RuleCode,
