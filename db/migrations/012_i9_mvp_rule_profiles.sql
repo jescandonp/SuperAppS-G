@@ -175,6 +175,7 @@ SELECT pg_temp.i9_mvp_constraint('scheduling_rule_profile_entries','scheduling_r
 SELECT pg_temp.i9_mvp_constraint('scheduling_rule_profile_entries','uq_scheduling_rule_profile_entries_rule','u','UNIQUE(rule_profile_id,rule_code)');
 SELECT pg_temp.i9_mvp_constraint('scheduling_rule_profile_entries','ck_scheduling_rule_profile_entries_values','c',$d$CHECK (rule_code ~ '^I9-R0[1-7]$' AND jsonb_typeof(parameters)='object' AND jsonb_typeof(catalog_snapshot)='object')$d$);
 SELECT pg_temp.i9_mvp_constraint('scheduling_rule_evaluations','scheduling_rule_evaluations_pkey','p','PRIMARY KEY(id)');
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_evaluations','uq_scheduling_rule_evaluations_identity','u','UNIQUE(id,rule_code,scope_hash)');
 SELECT pg_temp.i9_mvp_constraint('scheduling_rule_evaluations','scheduling_rule_evaluations_profile_fkey','f','FOREIGN KEY(rule_profile_id) REFERENCES scheduling_rule_profiles(id) ON DELETE RESTRICT');
 SELECT pg_temp.i9_mvp_constraint('scheduling_rule_evaluations','scheduling_rule_evaluations_schedule_version_fkey','f','FOREIGN KEY(schedule_version_id) REFERENCES schedule_versions(id) ON DELETE RESTRICT');
 SELECT pg_temp.i9_mvp_constraint('scheduling_rule_evaluations','scheduling_rule_evaluations_assignment_fkey','f','FOREIGN KEY(assignment_id) REFERENCES schedule_assignments(id) ON DELETE RESTRICT');
@@ -182,6 +183,19 @@ SELECT pg_temp.i9_mvp_constraint('scheduling_rule_evaluations','ck_scheduling_ru
 SELECT pg_temp.i9_mvp_constraint('schedule_versions','schedule_versions_rule_profile_fkey','f','FOREIGN KEY(rule_profile_id) REFERENCES scheduling_rule_profiles(id) ON DELETE RESTRICT');
 SELECT pg_temp.i9_mvp_constraint('schedule_versions','schedule_versions_rule_profile_audit_check','c',$d$CHECK ((rule_profile_id IS NULL AND rule_profile_version IS NULL AND NOT simulated) OR (rule_profile_id IS NOT NULL AND rule_profile_version>0))$d$);
 SELECT pg_temp.i9_mvp_constraint('schedule_exceptions','schedule_exceptions_evaluation_fkey','f','FOREIGN KEY(evaluation_id) REFERENCES scheduling_rule_evaluations(id) ON DELETE RESTRICT');
+DO $$
+BEGIN
+ IF EXISTS(
+  SELECT 1
+  FROM schedule_exceptions e
+  JOIN scheduling_rule_evaluations v ON v.id=e.evaluation_id
+  WHERE e.evaluation_id IS NOT NULL
+    AND (e.rule_code IS DISTINCT FROM v.rule_code OR e.scope_hash IS DISTINCT FROM v.scope_hash)
+ ) THEN
+  RAISE EXCEPTION 'I9_MVP_PARTIAL_SCHEMA_INCOMPATIBLE: schedule_exceptions rule_code/scope_hash does not match evaluation_id';
+ END IF;
+END $$;
+SELECT pg_temp.i9_mvp_constraint('schedule_exceptions','schedule_exceptions_evaluation_identity_fkey','f','FOREIGN KEY(evaluation_id,rule_code,scope_hash) REFERENCES scheduling_rule_evaluations(id,rule_code,scope_hash) ON DELETE RESTRICT');
 SELECT pg_temp.i9_mvp_constraint('schedule_exceptions','schedule_exceptions_rule_audit_check','c',$d$CHECK (((evaluation_id IS NULL AND rule_code IS NULL AND scope_hash IS NULL AND motive_code IS NULL) OR (evaluation_id IS NOT NULL AND rule_code ~ '^I9-R0[1-7]$' AND scope_hash ~ '^[0-9a-f]{64}$' AND btrim(motive_code)<>'')) AND jsonb_typeof(decision_detail)='object' AND ((decision IS NULL AND decided_by IS NULL AND decided_at IS NULL) OR (decision IN('APPROVED','REJECTED','CANCELLED') AND btrim(decided_by)<>'' AND decided_at IS NOT NULL)))$d$);
 
 CREATE OR REPLACE FUNCTION enforce_single_active_rule_profile()
@@ -235,9 +249,13 @@ CREATE TRIGGER scheduling_rule_profiles_immutable_active BEFORE UPDATE OR DELETE
 
 CREATE OR REPLACE FUNCTION reject_active_rule_profile_entry_change()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
-DECLARE parent_id BIGINT:=CASE WHEN TG_OP='DELETE' THEN OLD.rule_profile_id ELSE NEW.rule_profile_id END;
 BEGIN
- IF EXISTS(SELECT 1 FROM scheduling_rule_profiles WHERE id=parent_id AND status='ACTIVE') THEN
+ IF TG_OP IN('UPDATE','DELETE')
+    AND EXISTS(SELECT 1 FROM scheduling_rule_profiles WHERE id=OLD.rule_profile_id AND status='ACTIVE') THEN
+  RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='ACTIVE rule profile entries are immutable';
+ END IF;
+ IF TG_OP IN('INSERT','UPDATE')
+    AND EXISTS(SELECT 1 FROM scheduling_rule_profiles WHERE id=NEW.rule_profile_id AND status='ACTIVE') THEN
   RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='ACTIVE rule profile entries are immutable';
  END IF;
  RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
