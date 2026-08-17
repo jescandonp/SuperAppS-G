@@ -52,7 +52,8 @@ public sealed class SchedulingRuleEvaluator
         SchedulingRuleProfile profile,
         string projectCode,
         DateOnly period,
-        JsonElement facts)
+        JsonElement facts,
+        IReadOnlySet<string>? approvedExceptionScopeHashes = null)
     {
         if (string.IsNullOrWhiteSpace(projectCode) || facts.ValueKind != JsonValueKind.Object)
             throw new ArgumentException("Project and object-shaped facts are required for rule evaluation.");
@@ -72,7 +73,9 @@ public sealed class SchedulingRuleEvaluator
             results.Count(result => result.Outcome == SchedulingRuleOutcome.WARNING),
             results.Count(result => result.Outcome == SchedulingRuleOutcome.NOT_APPLICABLE),
             CanApproveOrPublish: results.Length > 0 && results.All(result =>
-                result.Outcome is SchedulingRuleOutcome.COMPLIANT or SchedulingRuleOutcome.NOT_APPLICABLE));
+                result.Outcome is SchedulingRuleOutcome.COMPLIANT or SchedulingRuleOutcome.NOT_APPLICABLE ||
+                result.Outcome == SchedulingRuleOutcome.EXCEPTION_REQUIRED && result.ExceptionAllowed &&
+                approvedExceptionScopeHashes?.Contains(result.ScopeHash) == true));
 
         return new SchedulingRuleEvaluationBatch(
             profile.Id,

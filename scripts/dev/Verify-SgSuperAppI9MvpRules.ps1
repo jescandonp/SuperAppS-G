@@ -247,6 +247,12 @@ function ConvertTo-I9CanonicalDecimalSelfTest {
     return $(if ($Matches.sign -eq '-') { '-' + $canonical } else { $canonical })
 }
 
+function Test-FocusedVerifierResult {
+    param([int]$ExitCode, [string]$Output, [string]$PassPattern)
+    return $ExitCode -eq 0 -and $Output -match "(?m)^\s*$PassPattern\s*$" -and
+        $Output -notmatch '(?im)^\s*I9 .* (?:BLOCKED|FAIL|SKIP):'
+}
+
 function Invoke-FocusedVerifier {
     param(
         [Parameter(Mandatory = $true)][string]$Requirement,
@@ -277,7 +283,7 @@ function Invoke-FocusedVerifier {
     }
     $process.WaitForExit()
     $output = $stdoutTask.GetAwaiter().GetResult() + "`n" + $stderrTask.GetAwaiter().GetResult()
-    if ($process.ExitCode -ne 0 -or $output -notmatch $PassPattern) {
+    if (-not (Test-FocusedVerifierResult $process.ExitCode $output $PassPattern)) {
         $failures.Add("$Requirement`: '$RelativePath' did not execute successfully with PASS")
     }
 }
@@ -289,6 +295,11 @@ $selfTest = (Remove-FullLineComments -Lines @(
 ) -Extension '.cs') -join "`n"
 if ($selfTest -match 'RuleProfile|ScopeHash|I9-R01|\bPASS\b|\bACTIVE\b|immutable' -or $selfTest -notmatch 'RealContract') {
     throw 'I9 MVP rules verifier comment-filter self-test failed.'
+}
+if (-not (Test-FocusedVerifierResult 0 "I9 R01 R02 STATIC PASS`nI9 R01 R02 PASS" 'I9 R01 R02 PASS') -or
+    (Test-FocusedVerifierResult 0 "I9 R01 R02 BLOCKED: dotnet unavailable`nI9 R01 R02 PASS" 'I9 R01 R02 PASS') -or
+    (Test-FocusedVerifierResult 2 'I9 R01 R02 PASS' 'I9 R01 R02 PASS')) {
+    throw 'I9 MVP rules verifier focused-runtime negative self-test failed.'
 }
 $immutabilityPattern = '(?i)(immutab|inmutab|reject|rechaz)'
 $immutabilitySelfTest = (Remove-FullLineComments -Lines @(
@@ -530,7 +541,9 @@ $implementations = @(
 foreach ($item in $implementations) { Assert-FileContains $item.R $item.P $item.X }
 Assert-FileContains 'Common evaluator R01/R02 linkage' 'apps/sg-superapp-api/Services/SchedulingRuleEvaluator.cs' @(
     (Pattern 'R01 real evaluator call' 'SchedulingWorkRestRules\.EvaluateR01\s*\('),
-    (Pattern 'R02 real evaluator call' 'SchedulingWorkRestRules\.EvaluateR02\s*\(')
+    (Pattern 'R02 real evaluator call' 'SchedulingWorkRestRules\.EvaluateR02\s*\('),
+    (Pattern 'approved exception scope binding' 'approvedExceptionScopeHashes\?\.Contains\s*\(\s*result\.ScopeHash\s*\)'),
+    (Pattern 'approval limited to exception outcome' 'result\.Outcome\s*==\s*SchedulingRuleOutcome\.EXCEPTION_REQUIRED')
 )
 
 Assert-FileContains 'Rule profile HTTP endpoints' 'apps/sg-superapp-api/Endpoints/SchedulingRuleEndpoints.cs' @(
