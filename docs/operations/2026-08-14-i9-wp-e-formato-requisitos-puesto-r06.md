@@ -51,11 +51,29 @@ decision SDD posterior.
 
 Se debe diligenciar una fila por sistema y version de contrato. Una interfaz,
 ruta o campo no documentado se considera `PENDIENTE` y no puede usarse para
-decidir cumplimiento.
+decidir cumplimiento. El contrato debe exponer los campos que permitan crear
+el registro individual descrito en la seccion siguiente.
+`sourceEmployeeKeyField` identifica el nombre del campo fuente usado para
+obtener o resolver el `employeeId` no nominal de I2. Su valor permanece
+`PENDIENTE`; no puede reemplazarse por nombre, numero de documento, correo,
+telefono ni otro dato personal.
 
-| Sistema fuente | Version del contrato | Interfaz o ruta | Identificador de puesto | Codigo de requisito | Estado | Evidencia | Vigencia | Responsable tecnico | Evidencia del contrato |
-|---|---|---|---|---|---|---|---|---|---|
-| PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE |
+| Sistema fuente | Version del contrato | Interfaz o ruta | sourceEmployeeKeyField | Identificador de puesto | Codigo de requisito | Estado | Evidencia | Vigencia | Responsable tecnico | Evidencia del contrato |
+|---|---|---|---|---|---|---|---|---|---|---|
+| PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE |
+
+## Evaluaciones Individuales I3/I5
+
+Cada acreditacion o evaluacion recibida desde I3/I5 se registra con una clave
+propia `evaluationId`. `employeeId` es la referencia no nominal de I2 que
+correlaciona el requisito con el guarda evaluado; no contiene nombre, documento
+de identidad ni otro dato personal. El registro vincula empleado, requisito,
+puesto o alcance, evidencia, vigencia y snapshot sin modificar el mapeo
+canonico.
+
+| evaluationId | employeeId | sourceSystem | sourceRequirementCode | sourceStatus | positionOrScopeId | evidenceType | evidenceReference | effectiveFrom | effectiveTo | snapshotVersion | evaluatedAt |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE |
 
 ## Categorias Canonicas Y Cobertura
 
@@ -72,8 +90,9 @@ son codigos oficiales de I3/I5 y no permiten inferir un mapeo institucional.
 
 ## Tabla De Mapeo Institucional
 
-Se agrega una fila por combinacion real de codigo y estado. Cada fila conserva
-su trazabilidad completa y un identificador unico. `mappingId`, `sourceSystem`,
+Se agrega una fila por combinacion real de sistema, codigo, estado, alcance y
+periodo. Cada fila conserva su trazabilidad completa y un identificador unico,
+sin depender de un empleado. `mappingId`, `sourceSystem`,
 `sourceRequirementCode`, `sourceStatus`, `canonicalCategory`, `mappingVersion`,
 `effectiveFrom`, `effectiveTo`, `evidenceType`, `verifiedBy`, `validationDate`,
 `approvedBy`, `approvalDate` y `mappingEvidence` son obligatorios antes de
@@ -97,22 +116,23 @@ equivale a cumplimiento.
 
 ## Dataset Anonimo De Validacion
 
-Los casos deben usar identificadores anonimos y no incluir datos personales ni
-evidencia sensible. Los resultados esperados reflejan el contrato funcional;
+Los casos deben usar un `employeeId` anonimo y no incluir datos personales ni
+evidencia sensible. Esta clave correlaciona requisito y guarda sin registrar su
+nombre o documento. Los resultados esperados reflejan el contrato funcional;
 los valores de entrada institucionales permanecen pendientes.
 
-| Caso requerido | Codigo/estado anonimo | Evidencia/vigencia anonima | Configuracion de subsanabilidad | Resultado esperado | Evidencia |
-|---|---|---|---|---|---|
-| Requisito vigente | PENDIENTE | PENDIENTE | PENDIENTE | COMPLIANT solo con evidencia verificable y vigencia durante todo el turno | PENDIENTE |
-| Requisito faltante | PENDIENTE | PENDIENTE | PENDIENTE | MISSING; excepcion PENDIENTE | PENDIENTE |
-| Requisito vencido | PENDIENTE | PENDIENTE | PENDIENTE | EXPIRED; excepcion PENDIENTE | PENDIENTE |
-| Codigo o estado desconocido | PENDIENTE | PENDIENTE | PENDIENTE | UNVERIFIED; nunca presume cumplimiento | PENDIENTE |
-| Subsanable informativo | PENDIENTE | PENDIENTE | PENDIENTE | INFORMATIVE_REMEDIABLE solo con configuracion completa | PENDIENTE |
+| Caso requerido | employeeId anonimo | Codigo/estado anonimo | Evidencia/vigencia anonima | Configuracion de subsanabilidad | Resultado esperado | Evidencia |
+|---|---|---|---|---|---|---|
+| Requisito vigente | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | COMPLIANT solo con evidencia verificable y vigencia durante todo el turno | PENDIENTE |
+| Requisito faltante | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | MISSING; excepcion PENDIENTE | PENDIENTE |
+| Requisito vencido | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | EXPIRED; excepcion PENDIENTE | PENDIENTE |
+| Codigo o estado desconocido | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | UNVERIFIED; nunca presume cumplimiento | PENDIENTE |
+| Subsanable informativo | PENDIENTE | PENDIENTE | PENDIENTE | PENDIENTE | INFORMATIVE_REMEDIABLE solo con configuracion completa | PENDIENTE |
 
 ## Reglas De Integridad Y Seguridad
 
-1. `REQ-I9-E-01`: cada requisito exige sistema fuente, codigo, estado,
-   categoria, alcance, version y vigencia identificados.
+1. `REQ-I9-E-01`: cada evaluacion exige `evaluationId`, `employeeId`, sistema
+   fuente, codigo, estado, alcance, snapshot y vigencia identificados.
 2. `REQ-I9-E-02`: un codigo o estado sin mapeo exacto produce `UNVERIFIED`; no
    se aproxima por nombre, texto, prefijo o semejanza.
 3. `REQ-I9-E-03`: la ausencia de requisito, evidencia, estado o vigencia nunca
@@ -129,8 +149,9 @@ los valores de entrada institucionales permanecen pendientes.
    de la excepcion por el Director de Operaciones.
 9. `REQ-I9-E-09`: una excepcion cubre solo guarda, requisito, puesto, turno y
    version evaluados; nunca se reutiliza.
-10. `REQ-I9-E-10`: cada evaluacion conserva snapshot de codigos, estados,
-    evidencia, vigencias, subsanabilidad, decisiones y version utilizadas.
+10. `REQ-I9-E-10`: cada evaluacion conserva snapshot de `employeeId`, codigos,
+    estados, evidencia, vigencias, subsanabilidad, decisiones y version
+    utilizadas.
 11. `REQ-I9-E-11`: una nueva version no modifica evaluaciones historicas ni
     elude bloqueos absolutos de otras reglas.
 12. `REQ-I9-E-12`: completar este formato no activa I9-R06 ni cierra Gate 2.
@@ -163,7 +184,7 @@ los valores de entrada institucionales permanecen pendientes.
 - [ ] La subsanabilidad esta configurada explicitamente para cada caso aplicable.
 - [ ] Todo subsanable informativo tiene responsable y fecha limite.
 - [ ] La version, alcance y responsable de mantenimiento estan diligenciados.
-- [ ] El dataset anonimo cubre vigente, faltante, vencido, desconocido y subsanable.
+- [ ] Evaluaciones y dataset correlacionan mediante `employeeId` no nominal; el mapeo canonico permanece independiente y el dataset cubre vigente, faltante, vencido, desconocido y subsanable.
 - [ ] Talento Humano registro validacion y evidencia.
 - [ ] El Director de Operaciones registro aprobacion de la excepcion y evidencia.
 - [ ] Existe decision SDD posterior antes de implementar o activar I9-R06.

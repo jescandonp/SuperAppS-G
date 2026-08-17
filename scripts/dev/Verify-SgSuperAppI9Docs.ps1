@@ -943,13 +943,20 @@ Assert-DocumentContains $parameterMatrixPath @(
 
 $wpI9EPositionRequirementsPath = 'docs/operations/2026-08-14-i9-wp-e-formato-requisitos-puesto-r06.md'
 $wpI9EControlSection = '(?ms)^## Estado Y Decision De Control\s*$.*?(?=^## Identificacion Y Gobierno Del Catalogo\s*$)'
-$wpI9EContractSection = '(?ms)^## Contrato De Integracion I3/I5\s*$.*?(?=^## Categorias Canonicas Y Cobertura\s*$)'
+$wpI9EContractSection = '(?ms)^## Contrato De Integracion I3/I5\s*$.*?(?=^## Evaluaciones Individuales I3/I5\s*$)'
+$wpI9EEvaluationSection = '(?ms)^## Evaluaciones Individuales I3/I5\s*$.*?(?=^## Categorias Canonicas Y Cobertura\s*$)'
 $wpI9EMappingSection = '(?ms)^## Tabla De Mapeo Institucional\s*$.*?(?=^## Configuracion De Subsanabilidad\s*$)'
 $wpI9ERemediationSection = '(?ms)^## Configuracion De Subsanabilidad\s*$.*?(?=^## Dataset Anonimo De Validacion\s*$)'
 $wpI9EDatasetSection = '(?ms)^## Dataset Anonimo De Validacion\s*$.*?(?=^## Reglas De Integridad Y Seguridad\s*$)'
 $wpI9EDecisionSection = '(?ms)^## Decision Institucional\s*$.*?(?=^## Checklist De Cierre WP-I9-E\s*$)'
 $wpI9EExitSection = '(?ms)^## Criterio De Salida\s*$.*\z'
+$wpI9EEvaluationPopulatedRowPattern = '(?m)^\|(?!\s*(?:evaluationId|---)\s*\|)(?!\s*PENDIENTE(?:\s*\|\s*PENDIENTE){11}\s*\|\s*$)(?:[^|\r\n]*\|){12}\s*$'
+$wpI9EEvaluationMissingEmployeeIdPattern = '(?m)^\|\s*[^|\r\n]+\|\s*\|(?:[^|\r\n]*\|){10}\s*$'
 $wpI9EMappingPopulatedRowPattern = '(?m)^\|(?!\s*(?:mappingId|---)\s*\|)(?!\s*PENDIENTE(?:\s*\|\s*PENDIENTE){19}\s*\|\s*$)(?:[^|\r\n]*\|){20}\s*$'
+$wpI9EDatasetMissingEmployeeIdPattern = '(?m)^\|\s*(?:Requisito vigente|Requisito faltante|Requisito vencido|Codigo o estado desconocido|Subsanable informativo)\s*\|\s*\|'
+$wpI9EContractHeaderPattern = '(?m)^\| Sistema fuente \| Version del contrato \| Interfaz o ruta \| sourceEmployeeKeyField \| Identificador de puesto \| Codigo de requisito \| Estado \| Evidencia \| Vigencia \| Responsable tecnico \| Evidencia del contrato \|\s*$'
+$wpI9EContractPopulatedRowPattern = '(?m)^\|(?!\s*(?:Sistema fuente|---)\s*\|)(?!\s*PENDIENTE(?:\s*\|\s*PENDIENTE){10}\s*\|\s*$)(?:[^|\r\n]*\|){11}\s*$'
+$wpI9EContractPiiEmployeeKeyPattern = '(?im)^\|(?:[^|\r\n]*\|){3}\s*(?:(?:source|employee|empleado)?[\s_.-]*(?:numero[\s_.-]*documento|documento(?:[\s_.-]*identidad)?|nombre(?:[\s_.-]*completo)?|correo(?:[\s_.-]*electronico)?|e[\s_.-]*mail|telefono|celular))\s*\|'
 $wpI9EDecisionPopulatedRolePattern = '(?m)^\|\s*(?:Talento Humano|Director de Operaciones)\s*\|(?!\s*PENDIENTE\s*\|\s*PENDIENTE\s*\|\s*PENDIENTE\s*\|\s*PENDIENTE\s*\|\s*PENDIENTE\s*\|\s*$).+$'
 $wpI9EControlRequiredPatterns = @(
     '(?m)^\| TECHNICAL_IMPLEMENTATION_AUTHORIZED \| NO \|\s*$',
@@ -990,11 +997,20 @@ Assert-DocumentContains $wpI9EPositionRequirementsPath @(
 Assert-DocumentSectionContains $wpI9EPositionRequirementsPath $wpI9EControlSection $wpI9EControlRequiredPatterns
 Assert-DocumentSectionContains $wpI9EPositionRequirementsPath $wpI9EContractSection @(
     '(?is)una fila por sistema y version de contrato.*interfaz,\s+ruta o campo no documentado.*`PENDIENTE`',
-    '(?m)^\| Sistema fuente \| Version del contrato \| Interfaz o ruta \| Identificador de puesto \| Codigo de requisito \| Estado \| Evidencia \| Vigencia \| Responsable tecnico \| Evidencia del contrato \|\s*$',
-    '(?m)^\| PENDIENTE(?: \| PENDIENTE){9} \|\s*$'
+    '(?is)contrato debe exponer los campos.*registro individual',
+    '(?is)`sourceEmployeeKeyField` identifica el nombre del campo fuente.*obtener o resolver el `employeeId` no nominal de I2.*permanece\s+`PENDIENTE`.*no puede reemplazarse por nombre, numero de documento, correo,\s+telefono ni otro dato personal',
+    $wpI9EContractHeaderPattern,
+    '(?m)^\| PENDIENTE(?: \| PENDIENTE){10} \|\s*$'
+)
+Assert-DocumentSectionContains $wpI9EPositionRequirementsPath $wpI9EEvaluationSection @(
+    '(?is)clave\s+propia `evaluationId`.*`employeeId` es la referencia no nominal de I2.*no contiene nombre, documento\s+de identidad ni otro dato personal',
+    '(?is)vincula empleado, requisito,\s+puesto o alcance, evidencia, vigencia y snapshot.*sin modificar el mapeo\s+canonico',
+    '(?m)^\| evaluationId \| employeeId \| sourceSystem \| sourceRequirementCode \| sourceStatus \| positionOrScopeId \| evidenceType \| evidenceReference \| effectiveFrom \| effectiveTo \| snapshotVersion \| evaluatedAt \|\s*$',
+    '(?m)^\| PENDIENTE(?: \| PENDIENTE){11} \|\s*$'
 )
 Assert-DocumentSectionContains $wpI9EPositionRequirementsPath $wpI9EMappingSection @(
-    '(?is)cada fila conserva\s+su trazabilidad completa y un identificador unico',
+    '(?is)cada fila\s+conserva su trazabilidad completa y un identificador unico',
+    '(?is)sistema, codigo, estado, alcance y\s+periodo.*sin depender de un empleado',
     '(?is)mappingId.*sourceSystem.*sourceRequirementCode.*sourceStatus.*canonicalCategory.*mappingVersion.*effectiveFrom.*effectiveTo.*evidenceType.*verifiedBy.*validationDate.*approvedBy.*approvalDate.*mappingEvidence',
     '(?m)^\| mappingId \| sourceSystem \| sourceRequirementCode \| sourceStatus \| canonicalCategory \| requirementName \| positionOrScopeId \| evidenceType \| evidenceStatus \| effectiveFrom \| effectiveTo \| mappingVersion \| subsanable \| remediationOwner \| remediationDeadline \| verifiedBy \| validationDate \| approvedBy \| approvalDate \| mappingEvidence \|\s*$'
 )
@@ -1004,7 +1020,8 @@ Assert-DocumentSectionContains $wpI9EPositionRequirementsPath $wpI9ERemediationS
     '(?m)^\| PENDIENTE(?: \| PENDIENTE){8} \|\s*$'
 )
 Assert-DocumentSectionContains $wpI9EPositionRequirementsPath $wpI9EDatasetSection @(
-    '(?is)identificadores anonimos.*no incluir datos personales ni\s+evidencia sensible',
+    '(?is)`employeeId` anonimo.*no incluir datos personales ni\s+evidencia sensible.*correlaciona requisito y guarda sin registrar su\s+nombre o documento',
+    '(?m)^\| Caso requerido \| employeeId anonimo \| Codigo/estado anonimo \| Evidencia/vigencia anonima \| Configuracion de subsanabilidad \| Resultado esperado \| Evidencia \|\s*$',
     '(?is)Requisito vigente.*COMPLIANT.*Requisito faltante.*MISSING.*Requisito vencido.*EXPIRED.*Codigo o estado desconocido.*UNVERIFIED.*Subsanable informativo.*INFORMATIVE_REMEDIABLE'
 )
 Assert-DocumentSectionContains $wpI9EPositionRequirementsPath $wpI9EDecisionSection @(
@@ -1018,9 +1035,23 @@ Assert-DocumentSectionContains $wpI9EPositionRequirementsPath $wpI9EExitSection 
 Assert-PatternCount $wpI9EPositionRequirementsPath '(?m)^\d+\. `REQ-I9-E-(?:0[1-9]|1[0-2])`:' 12
 Assert-PatternCount $wpI9EPositionRequirementsPath '(?m)^- \[ \] ' 12
 Assert-DocumentSectionPatternCount $wpI9EPositionRequirementsPath $wpI9EDatasetSection '(?m)^\| (?:Requisito vigente|Requisito faltante|Requisito vencido|Codigo o estado desconocido|Subsanable informativo) \|' 5
+Assert-DocumentSectionPatternCount $wpI9EPositionRequirementsPath $wpI9EContractSection '(?m)^\|\s*PENDIENTE(?:\s*\|\s*PENDIENTE){10}\s*\|\s*$' 1
+Assert-DocumentSectionPatternCount $wpI9EPositionRequirementsPath $wpI9EEvaluationSection '(?m)^\|\s*PENDIENTE(?:\s*\|\s*PENDIENTE){11}\s*\|\s*$' 1
 Assert-DocumentSectionPatternCount $wpI9EPositionRequirementsPath $wpI9EMappingSection '(?m)^\|\s*PENDIENTE(?:\s*\|\s*PENDIENTE){19}\s*\|\s*$' 1
+Assert-DocumentSectionDoesNotContain $wpI9EPositionRequirementsPath $wpI9EContractSection @(
+    $wpI9EContractPopulatedRowPattern,
+    $wpI9EContractPiiEmployeeKeyPattern
+)
+Assert-DocumentSectionDoesNotContain $wpI9EPositionRequirementsPath $wpI9EEvaluationSection @(
+    $wpI9EEvaluationPopulatedRowPattern,
+    $wpI9EEvaluationMissingEmployeeIdPattern
+)
 Assert-DocumentSectionDoesNotContain $wpI9EPositionRequirementsPath $wpI9EMappingSection @(
+    '(?i)\bemployeeId\b',
     $wpI9EMappingPopulatedRowPattern
+)
+Assert-DocumentSectionDoesNotContain $wpI9EPositionRequirementsPath $wpI9EDatasetSection @(
+    $wpI9EDatasetMissingEmployeeIdPattern
 )
 Assert-DocumentSectionDoesNotContain $wpI9EPositionRequirementsPath $wpI9EDecisionSection @(
     $wpI9EDecisionPopulatedRolePattern
