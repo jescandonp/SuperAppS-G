@@ -161,11 +161,12 @@ Assert-FileContains 'I9-R07 rule implementation' 'apps/sg-superapp-api/Services/
 )
 
 Assert-FileContains 'Rule profile HTTP endpoints' 'apps/sg-superapp-api/Endpoints/SchedulingRuleEndpoints.cs' @(
-    (Pattern 'rule-profiles collection route' '(?i)rule-profiles'),
-    (Pattern 'profile create route' '(?is)MapPost.*rule-profiles'),
-    (Pattern 'profile activate route' '(?i)activate'),
-    (Pattern 'profile retire route' '(?i)retire'),
-    (Pattern 'rule evaluate route' '(?i)rules/evaluate'),
+    (Pattern 'GET /api/portal/scheduling/rule-profiles' '(?i)MapGet\s*\(\s*"/api/portal/scheduling/rule-profiles"'),
+    (Pattern 'GET /api/portal/scheduling/rule-profiles/{id}' '(?i)MapGet\s*\(\s*"/api/portal/scheduling/rule-profiles/\{id(?::long)?\}"'),
+    (Pattern 'POST /api/portal/scheduling/rule-profiles' '(?i)MapPost\s*\(\s*"/api/portal/scheduling/rule-profiles"'),
+    (Pattern 'POST /api/portal/scheduling/rule-profiles/{id}/activate' '(?i)MapPost\s*\(\s*"/api/portal/scheduling/rule-profiles/\{id(?::long)?\}/activate"'),
+    (Pattern 'POST /api/portal/scheduling/rule-profiles/{id}/retire' '(?i)MapPost\s*\(\s*"/api/portal/scheduling/rule-profiles/\{id(?::long)?\}/retire"'),
+    (Pattern 'POST /api/portal/scheduling/rules/evaluate' '(?i)MapPost\s*\(\s*"/api/portal/scheduling/rules/evaluate"'),
     (Pattern 'VIEW, CONFIGURE and GENERATE authorization' '(?is)SCHEDULING/VIEW.*SCHEDULING/CONFIGURE.*SCHEDULING/GENERATE')
 )
 
@@ -178,6 +179,25 @@ Assert-FileContains 'Rule HTTP response contracts' 'apps/sg-superapp-api/Contrac
 
 Assert-FileContains 'Backend endpoint registration' 'apps/sg-superapp-api/Program.cs' @(
     (Pattern 'scheduling rule endpoint mapping' '(?i)(MapSchedulingRule|SchedulingRuleEndpoints)')
+)
+
+Assert-FileContains 'Generation and manual-edit domain rule contracts' 'apps/sg-superapp-api/Domain/SchedulingModels.cs' @(
+    (Pattern 'versioned rule profile reference' '(?i)RuleProfile(Id|Version|Reference)'),
+    (Pattern 'common RuleEvaluation results in scheduling models' '(?i)RuleEvaluation'),
+    (Pattern 'scopeHash-bound scheduling snapshot' '(?i)ScopeHash'),
+    (Pattern 'simulated scheduling marker' '(?i)Simulated')
+)
+
+Assert-FileContains 'Generation, exception, approval and publication portal contracts' 'apps/sg-superapp-api/Contracts/Portal/SchedulingContracts.cs' @(
+    (Pattern 'generation/edit/transition response rule profile' '(?is)Schedule(Proposal|Version|Workflow)Response.*RuleProfile'),
+    (Pattern 'generation/edit/transition response rule result summary' '(?is)Schedule(Proposal|Version|Workflow)Response.*Rule(Evaluation|Summary|Result)'),
+    (Pattern 'generation/edit/transition response simulated marker' '(?is)Schedule(Proposal|Version|Workflow)Response.*Simulated'),
+    (Pattern 'manual-edit contract' '(?i)UpdateScheduleAssignmentRequest'),
+    (Pattern 'exception ruleCode snapshot' '(?is)CreateScheduleExceptionRequest.*RuleCode'),
+    (Pattern 'exception evaluationId snapshot' '(?is)CreateScheduleExceptionRequest.*EvaluationId'),
+    (Pattern 'exception scopeHash snapshot' '(?is)CreateScheduleExceptionRequest.*ScopeHash'),
+    (Pattern 'catalogued exception motive' '(?is)CreateScheduleExceptionRequest.*(MotiveCode|ReasonCode)'),
+    (Pattern 'approval/publication transition contract' '(?i)ScheduleTransitionRequest')
 )
 
 Assert-FileContains 'Generation eligibility integration' 'apps/sg-superapp-api/Services/SchedulingEligibilityService.cs' @(
@@ -195,6 +215,13 @@ Assert-FileContains 'Workflow snapshot and stale-exception integration' 'apps/sg
     (Pattern 'scopeHash revalidation' '(?i)scopeHash'),
     (Pattern 'simulated marker persistence' '(?i)simulated'),
     (Pattern 'approval or publication rule revalidation' '(?is)(approv|aproba|publish|publica).*(RuleEvaluation|BLOCKED|EXCEPTION_REQUIRED)')
+)
+
+Assert-FileContains 'Exception, approval and publication endpoint rule enforcement' 'apps/sg-superapp-api/Endpoints/PortalEndpoints.cs' @(
+    (Pattern 'exception endpoint rule snapshot handling' '(?is)/exceptions.*(RuleCode|EvaluationId).*ScopeHash'),
+    (Pattern 'approval endpoint rule revalidation' '(?is)/approve.*(SchedulingRuleEvaluator|RuleEvaluation|BLOCKED|EXCEPTION_REQUIRED)'),
+    (Pattern 'publication endpoint rule revalidation' '(?is)/publish.*(SchedulingRuleEvaluator|RuleEvaluation|BLOCKED|EXCEPTION_REQUIRED)'),
+    (Pattern 'stale scopeHash conflict response' '(?is)ScopeHash.*(Conflict|Results\.Conflict|409|stale|obsolet|desactual)')
 )
 
 Assert-FileContains 'Frontend rule profile and result types' 'apps/sg-superapp-web/src/types/portal.ts' @(
@@ -262,6 +289,13 @@ Assert-FileContains 'MVP frontend API verifier' 'scripts/dev/Verify-SgSuperAppI9
 Assert-FileContains 'MVP UI verifier' 'scripts/dev/Verify-SgSuperAppI9MvpUi.ps1' @(
     (Pattern 'simulated MVP label' '(?i)DATOS SIMULADOS\s*-\s*MVP'),
     (Pattern 'rule result states' '(?is)BLOCKED.*EXCEPTION_REQUIRED.*WARNING')
+)
+
+Assert-FileContains 'Existing I9 suite extended with MVP closure regression' 'scripts/dev/Verify-SgSuperAppI9Integration.ps1' @(
+    (Pattern 'MVP rules closure verifier invocation' '(?i)Verify-SgSuperAppI9MvpRules\.ps1'),
+    (Pattern 'MVP hermetic integration verifier invocation' '(?i)Verify-SgSuperAppI9MvpIntegration\.ps1'),
+    (Pattern 'generation and workflow regression coverage' '(?is)Verify-SgSuperAppI9(Eligibility|Recommendations)\.ps1.*Verify-SgSuperAppI9Workflow\.ps1'),
+    (Pattern 'security and export regression coverage' '(?is)Verify-SgSuperAppI9Security\.ps1.*Verify-SgSuperAppI9Exports\.ps1')
 )
 
 Assert-FileContains 'Hermetic MVP closure suite' 'scripts/dev/Verify-SgSuperAppI9MvpIntegration.ps1' @(
