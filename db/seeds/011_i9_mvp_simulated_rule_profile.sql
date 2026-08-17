@@ -36,7 +36,7 @@ UPDATE scheduling_rule_profiles p
 SET checksum=content.checksum,status='ACTIVE',activated_by='seed.i9.mvp',activated_at=NOW()
 FROM (
  SELECT e.rule_profile_id,
-        encode(public.digest(string_agg(e.rule_code||':'||i9_mvp_canonical_jsonb(e.parameters)||':'||i9_mvp_canonical_jsonb(e.catalog_snapshot), '|' ORDER BY e.rule_code),'sha256'),'hex') AS checksum
+        encode(public.digest(convert_to(string_agg(e.rule_code||':'||i9_mvp_canonical_jsonb(e.parameters)||':'||i9_mvp_canonical_jsonb(e.catalog_snapshot), '|' ORDER BY e.rule_code),'UTF8'),'sha256'),'hex') AS checksum
  FROM scheduling_rule_profile_entries e GROUP BY e.rule_profile_id
 ) content
 WHERE p.id=content.rule_profile_id AND p.profile_code='I9-MVP-SIMULATED'
@@ -53,7 +53,7 @@ BEGIN
     OR EXISTS(SELECT 1 FROM scheduling_rule_profile_entries WHERE rule_profile_id=p_id AND rule_code!~'^I9-R0[1-7]$') THEN
   RAISE EXCEPTION 'I9 simulated MVP profile must contain exactly R01-R07';
  END IF;
- IF actual_checksum<>(SELECT encode(public.digest(string_agg(rule_code||':'||i9_mvp_canonical_jsonb(parameters)||':'||i9_mvp_canonical_jsonb(catalog_snapshot),'|' ORDER BY rule_code),'sha256'),'hex')
+ IF actual_checksum<>(SELECT encode(public.digest(convert_to(string_agg(rule_code||':'||i9_mvp_canonical_jsonb(parameters)||':'||i9_mvp_canonical_jsonb(catalog_snapshot),'|' ORDER BY rule_code),'UTF8'),'sha256'),'hex')
                      FROM scheduling_rule_profile_entries WHERE rule_profile_id=p_id) THEN
   RAISE EXCEPTION 'I9 simulated MVP profile checksum does not match executable content';
  END IF;

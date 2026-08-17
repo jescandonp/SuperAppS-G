@@ -89,10 +89,14 @@ BEGIN
     EXCEPTION WHEN SQLSTATE '22023' THEN NULL; END;
 
     IF (SELECT checksum::TEXT FROM scheduling_rule_profiles WHERE id=profile_id)
-       <> (SELECT encode(public.digest(string_agg(rule_code||':'||i9_mvp_canonical_jsonb(parameters)||':'||
-                    i9_mvp_canonical_jsonb(catalog_snapshot),'|' ORDER BY rule_code),'sha256'),'hex')
+       <> (SELECT encode(public.digest(convert_to(string_agg(rule_code||':'||i9_mvp_canonical_jsonb(parameters)||':'||
+                    i9_mvp_canonical_jsonb(catalog_snapshot),'|' ORDER BY rule_code),'UTF8'),'sha256'),'hex')
              FROM scheduling_rule_profile_entries WHERE rule_profile_id=profile_id) THEN
         RAISE EXCEPTION 'Seed checksum does not match canonical executable composition';
+    END IF;
+    IF encode(public.digest(convert_to(i9_mvp_canonical_jsonb('"ñ"'::jsonb),'UTF8'),'sha256'),'hex')
+       <> '1141a26205a85d1449eebbea3abff7b04018691fd12fd0f2394feea4058afb8b' THEN
+        RAISE EXCEPTION 'I9 canonical checksum is not explicit UTF8 for non-ASCII content';
     END IF;
 
     BEGIN

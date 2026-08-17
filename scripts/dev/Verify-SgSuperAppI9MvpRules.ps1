@@ -122,6 +122,14 @@ function Test-StringAndDuplicateCanonicalizationLinkage {
         $ValidatorContent -notmatch 'JsonSerializer\.Serialize'
 }
 
+function Test-AllSha256DigestsUseExplicitUtf8 {
+    param([string]$SqlContent)
+    $allDigests = [regex]::Matches($SqlContent, '(?i)digest\s*\(').Count
+    $utf8Digests = [regex]::Matches($SqlContent,
+        "(?is)digest\s*\(\s*convert_to\s*\(.*?,\s*'UTF8'\s*\)\s*,\s*'sha256'\s*\)").Count
+    return $allDigests -gt 0 -and $allDigests -eq $utf8Digests
+}
+
 function ConvertTo-I9CanonicalStringSelfTest {
     param([string]$Value)
     $builder = New-Object System.Text.StringBuilder
@@ -248,6 +256,10 @@ if ((ConvertTo-I9CanonicalStringSelfTest ([string][char]11)) -cne $verticalTabEx
     (ConvertTo-I9CanonicalStringSelfTest 'Bogota ñ 😀') -cne '"Bogota ñ 😀"') {
     throw 'I9 MVP rules verifier UTF-8/control string self-test failed.'
 }
+if (-not (Test-AllSha256DigestsUseExplicitUtf8 "digest(convert_to('Bogota ñ','UTF8'),'sha256')") -or
+    (Test-AllSha256DigestsUseExplicitUtf8 "digest('Bogota ñ','sha256')")) {
+    throw 'I9 MVP rules verifier explicit UTF8 digest self-test failed.'
+}
 
 Assert-FileContains 'Versioned rule profile persistence' 'db/migrations/012_i9_mvp_rule_profiles.sql' @(
     (Pattern 'scheduling_rule_profiles' '(?i)\bscheduling_rule_profiles\b'),
@@ -267,7 +279,8 @@ Assert-FileContains 'Simulated MVP profile seed' 'db/seeds/011_i9_mvp_simulated_
     (Pattern 'I9-R04' 'I9-R04'), (Pattern 'I9-R05' 'I9-R05'), (Pattern 'I9-R06' 'I9-R06'),
     (Pattern 'I9-R07' 'I9-R07'),
     (Pattern 'canonical parameters checksum' '(?i)i9_mvp_canonical_jsonb\s*\(\s*e?\.?parameters\s*\)'),
-    (Pattern 'canonical catalog checksum' '(?i)i9_mvp_canonical_jsonb\s*\(\s*e?\.?catalog_snapshot\s*\)')
+    (Pattern 'canonical catalog checksum' '(?i)i9_mvp_canonical_jsonb\s*\(\s*e?\.?catalog_snapshot\s*\)'),
+    (Pattern 'explicit UTF8 checksum bytes' "(?is)digest\s*\(\s*convert_to\s*\(.*?,'UTF8'\s*\)\s*,'sha256'")
 )
 Assert-FileContains 'Versioned profile database contract' 'db/tests/008_i9_mvp_rule_profiles_contract.sql' @(
     (Pattern 'executable SQL' '(?i)\b(DO|BEGIN|SELECT)\b'), (Pattern 'active uniqueness' '(?i)(unique|overlap|superpuest|vigencia)'),
@@ -275,7 +288,8 @@ Assert-FileContains 'Versioned profile database contract' 'db/tests/008_i9_mvp_r
     (Pattern 'semantic number equivalence' "(?is)i9_mvp_canonical_jsonb\s*\(\s*'1e2'::jsonb\s*\).*?i9_mvp_canonical_jsonb\s*\(\s*'100'::jsonb\s*\)"),
     (Pattern 'canonical seed checksum' '(?i)Seed checksum.*canonical executable'),
     (Pattern 'U+000B lowercase escape' '(?is)to_jsonb\s*\(\s*chr\s*\(\s*11\s*\)\s*\).*?u000b'),
-    (Pattern 'nested duplicate last-wins' '(?is)"outer".*?"dup"\s*:\s*1.*?"dup"\s*:\s*2.*?"dup"\s*:\s*2')
+    (Pattern 'nested duplicate last-wins' '(?is)"outer".*?"dup"\s*:\s*1.*?"dup"\s*:\s*2.*?"dup"\s*:\s*2'),
+    (Pattern 'non-ASCII UTF8 digest vector' '(?is)convert_to\s*\(.*?ñ.*?,\s*''UTF8''\s*\).*?1141a262')
 )
 $migrationChecksumPath = Join-Path $repoRoot 'db/migrations/012_i9_mvp_rule_profiles.sql'
 $seedChecksumPath = Join-Path $repoRoot 'db/seeds/011_i9_mvp_simulated_rule_profile.sql'
@@ -287,6 +301,10 @@ if ((Test-Path $migrationChecksumPath) -and (Test-Path $seedChecksumPath) -and (
         -TestContent (Get-EffectiveContent $testChecksumPath)
     if (-not $sqlChecksumLinked) {
         $failures.Add('Cross-layer checksum contract: migration, seed and SQL test are not linked to canonical JSONB')
+    }
+    if (-not (Test-AllSha256DigestsUseExplicitUtf8 (Get-EffectiveContent $seedChecksumPath)) -or
+        -not (Test-AllSha256DigestsUseExplicitUtf8 (Get-EffectiveContent $testChecksumPath))) {
+        $failures.Add('Cross-layer checksum contract: canonical SHA256 digest is not explicitly UTF8')
     }
 }
 
