@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using Sg.SuperApp.Api.Domain;
 
@@ -8,6 +10,8 @@ public sealed class SchedulingRuleProfileValidator
 {
     private static readonly string[] RequiredRules =
         { "I9-R01", "I9-R02", "I9-R03", "I9-R04", "I9-R05", "I9-R06", "I9-R07" };
+    private static readonly JsonSerializerOptions JsonOptions = new()
+        { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     public void Validate(SchedulingRuleProfile profile, SchedulingEnvironmentScope requestedEnvironment,
         IEnumerable<SchedulingRuleProfile>? otherProfiles = null)
@@ -39,62 +43,57 @@ public sealed class SchedulingRuleProfileValidator
                 RangesOverlap(profile.EffectiveFrom, profile.EffectiveTo, other.EffectiveFrom, other.EffectiveTo)) == true)
             throw new InvalidOperationException("Active scheduling rule profile versions overlap.");
 
+        if (!string.Equals(profile.Checksum, ComputeChecksum(profile), StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("The scheduling rule profile checksum is invalid.");
     }
 
     public string ComputeChecksum(SchedulingRuleProfile profile)
     {
-        using var stream = new MemoryStream();
-        using (var writer = new Utf8JsonWriter(stream))
-        {
-            writer.WriteStartObject();
-            writer.WriteString("profileCode", profile.ProfileCode);
-            writer.WriteNumber("version", profile.Version);
-            writer.WriteString("origin", profile.Origin.ToString());
-            writer.WriteString("environmentScope", profile.EnvironmentScope.ToString());
-            writer.WriteString("scopeCode", profile.ScopeCode);
-            writer.WriteString("effectiveFrom", profile.EffectiveFrom.ToString("yyyy-MM-dd"));
-            if (profile.EffectiveTo is { } effectiveTo) writer.WriteString("effectiveTo", effectiveTo.ToString("yyyy-MM-dd"));
-            else writer.WriteNull("effectiveTo");
-            writer.WritePropertyName("entries");
-            writer.WriteStartArray();
-            foreach (var entry in profile.Entries.OrderBy(item => item.RuleCode, StringComparer.Ordinal))
-            {
-                writer.WriteStartObject();
-                writer.WriteString("ruleCode", entry.RuleCode);
-                writer.WriteBoolean("enabled", entry.Enabled);
-                writer.WritePropertyName("parameters");
-                WriteCanonicalJson(writer, entry.Parameters);
-                writer.WritePropertyName("catalogSnapshot");
-                WriteCanonicalJson(writer, entry.CatalogSnapshot);
-                writer.WriteEndObject();
-            }
-            writer.WriteEndArray();
-            writer.WriteEndObject();
-        }
-        return Convert.ToHexString(SHA256.HashData(stream.ToArray())).ToLowerInvariant();
+        var executableContent = string.Join("|", profile.Entries
+            .OrderBy(entry => entry.RuleCode, StringComparer.Ordinal)
+            .Select(entry => $"{entry.RuleCode}:{ToPostgresJsonbText(entry.Parameters)}:{ToPostgresJsonbText(entry.CatalogSnapshot)}"));
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(executableContent))).ToLowerInvariant();
     }
 
     private static bool RangesOverlap(DateOnly leftFrom, DateOnly? leftTo, DateOnly rightFrom, DateOnly? rightTo) =>
         leftFrom <= (rightTo ?? DateOnly.MaxValue) && rightFrom <= (leftTo ?? DateOnly.MaxValue);
 
-    private static void WriteCanonicalJson(Utf8JsonWriter writer, JsonElement element)
+    private static string ToPostgresJsonbText(JsonElement element)
     {
-        if (element.ValueKind == JsonValueKind.Object)
+        switch (element.ValueKind)
         {
-            writer.WriteStartObject();
-            foreach (var property in element.EnumerateObject().OrderBy(item => item.Name, StringComparer.Ordinal))
+            case JsonValueKind.Object:
+                return "{" + string.Join(", ", element.EnumerateObject()
+                    .OrderBy(property => property.Name, PostgresJsonbKeyComparer.Instance)
+                    .Select(property => $"{JsonSerializer.Serialize(property.Name, JsonOptions)}: {ToPostgresJsonbText(property.Value)}")) + "}";
+            case JsonValueKind.Array:
+                return "[" + string.Join(", ", element.EnumerateArray().Select(ToPostgresJsonbText)) + "]";
+            case JsonValueKind.String:
+                return JsonSerializer.Serialize(element.GetString(), JsonOptions);
+            case JsonValueKind.True: return "true";
+            case JsonValueKind.False: return "false";
+            case JsonValueKind.Null: return "null";
+            case JsonValueKind.Number: return element.GetRawText();
+            default: throw new InvalidOperationException("Unsupported JSON value in rule profile.");
+        }
+    }
+
+    private sealed class PostgresJsonbKeyComparer : IComparer<string>
+    {
+        public static PostgresJsonbKeyComparer Instance { get; } = new();
+
+        public int Compare(string? left, string? right)
+        {
+            var leftBytes = Encoding.UTF8.GetBytes(left ?? string.Empty);
+            var rightBytes = Encoding.UTF8.GetBytes(right ?? string.Empty);
+            var lengthComparison = leftBytes.Length.CompareTo(rightBytes.Length);
+            if (lengthComparison != 0) return lengthComparison;
+            for (var index = 0; index < leftBytes.Length; index++)
             {
-                writer.WritePropertyName(property.Name);
-                WriteCanonicalJson(writer, property.Value);
+                var byteComparison = leftBytes[index].CompareTo(rightBytes[index]);
+                if (byteComparison != 0) return byteComparison;
             }
-            writer.WriteEndObject();
+            return 0;
         }
-        else if (element.ValueKind == JsonValueKind.Array)
-        {
-            writer.WriteStartArray();
-            foreach (var item in element.EnumerateArray()) WriteCanonicalJson(writer, item);
-            writer.WriteEndArray();
-        }
-        else element.WriteTo(writer);
     }
 }

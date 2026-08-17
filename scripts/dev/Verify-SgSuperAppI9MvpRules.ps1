@@ -92,6 +92,13 @@ function Assert-FileContains {
     }
 }
 
+function Test-RuleProfileChecksumLinkage {
+    param([string]$RepositoryContent, [string]$ValidatorContent)
+    return $RepositoryContent -match '(?s)_validator\.Validate\s*\(\s*result\s*,\s*environment\s*\)' -and
+        $ValidatorContent -match '(?s)Validate\s*\(.*?ComputeChecksum\s*\(\s*profile\s*\)' -and
+        $ValidatorContent -match '(?s)string\.Equals\s*\(\s*profile\.Checksum\s*,\s*ComputeChecksum'
+}
+
 function Invoke-FocusedVerifier {
     param(
         [Parameter(Mandatory = $true)][string]$Requirement,
@@ -143,6 +150,10 @@ $immutabilitySelfTest = (Remove-FullLineComments -Lines @(
 if ($immutabilitySelfTest -match 'must not pass' -or $immutabilitySelfTest -notmatch $immutabilityPattern) {
     throw 'I9 MVP rules verifier immutability terminology self-test failed.'
 }
+if (-not (Test-RuleProfileChecksumLinkage '_validator.Validate(result, environment)' 'Validate(profile) { string.Equals(profile.Checksum, ComputeChecksum(profile)); }') -or
+    (Test-RuleProfileChecksumLinkage 'return result;' 'Validate(profile) { string.Equals(profile.Checksum, ComputeChecksum(profile)); }')) {
+    throw 'I9 MVP rules verifier checksum-linkage negative self-test failed.'
+}
 
 Assert-FileContains 'Versioned rule profile persistence' 'db/migrations/012_i9_mvp_rule_profiles.sql' @(
     (Pattern 'scheduling_rule_profiles' '(?i)\bscheduling_rule_profiles\b'),
@@ -179,17 +190,25 @@ Assert-FileContains 'Profile repository' 'apps/sg-superapp-api/Services/Scheduli
     (Pattern 'ACTIVE' '(?i)ACTIVE'), (Pattern 'project' '(?i)(project|proyecto)'),
     (Pattern 'period' '(?i)(period|periodo)'), (Pattern 'environment' '(?i)(environment|ambiente)'),
     (Pattern 'profile entries' '(?i)SchedulingRuleProfileEntr'),
-    (Pattern 'exactly one fail closed' '(?i)Count\s*!=\s*1')
+    (Pattern 'exactly one fail closed' '(?i)Count\s*!=\s*1'),
+    (Pattern 'shared profile validation' '(?i)_validator\.Validate\s*\(')
 )
 Assert-FileContains 'Profile validation and environment gate' 'apps/sg-superapp-api/Services/SchedulingRuleProfileValidator.cs' @(
     (Pattern 'SIMULATED' '(?i)SIMULATED'), (Pattern 'MVP_TEST' '(?i)MVP_TEST'),
     (Pattern 'PRODUCTION' '(?i)PRODUCTION'), (Pattern 'checksum' '(?i)checksum'),
     (Pattern 'canonical property order' '(?i)OrderBy\s*\('), (Pattern 'SHA-256 checksum' '(?i)SHA256'),
+    (Pattern 'PostgreSQL JSONB representation' '(?i)ToPostgresJsonbText'),
     (Pattern 'overlap validation' '(?i)RangesOverlap'),
     (Pattern 'I9-R01' 'I9-R01'), (Pattern 'I9-R02' 'I9-R02'), (Pattern 'I9-R03' 'I9-R03'),
     (Pattern 'I9-R04' 'I9-R04'), (Pattern 'I9-R05' 'I9-R05'), (Pattern 'I9-R06' 'I9-R06'),
     (Pattern 'I9-R07' 'I9-R07')
 )
+$repositoryPath = Join-Path $repoRoot 'apps/sg-superapp-api/Services/SchedulingRuleProfileRepository.cs'
+$validatorPath = Join-Path $repoRoot 'apps/sg-superapp-api/Services/SchedulingRuleProfileValidator.cs'
+if ((Test-Path -LiteralPath $repositoryPath -PathType Leaf) -and (Test-Path -LiteralPath $validatorPath -PathType Leaf) -and
+    -not (Test-RuleProfileChecksumLinkage (Get-EffectiveContent $repositoryPath) (Get-EffectiveContent $validatorPath))) {
+    $failures.Add('Rule profile checksum contract: repository is not linked to validator ComputeChecksum comparison')
+}
 Assert-FileContains 'Rule profile dependency registration' 'apps/sg-superapp-api/Program.cs' @(
     (Pattern 'profile validator DI' '(?i)AddSingleton<SchedulingRuleProfileValidator>'),
     (Pattern 'profile repository DI' '(?i)AddSingleton<SchedulingRuleProfileRepository>')

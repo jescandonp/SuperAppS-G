@@ -22,9 +22,6 @@ public sealed class SchedulingRuleProfileRepository
         const string sql = @"
 SELECT p.id, p.profile_code, p.version, p.origin, p.environment_scope,
  p.scope_code, p.effective_from, p.effective_to, p.status, p.checksum,
- (SELECT encode(public.digest(string_agg(x.rule_code || ':' || x.parameters::text || ':' ||
-          x.catalog_snapshot::text, '|' ORDER BY x.rule_code), 'sha256'), 'hex')
-    FROM scheduling_rule_profile_entries x WHERE x.rule_profile_id = p.id) AS executable_checksum,
  e.rule_code, e.parameters::text, e.catalog_snapshot::text, e.enabled
 FROM scheduling_rule_profiles p
 JOIN scheduling_rule_profile_entries e ON e.rule_profile_id = p.id
@@ -47,8 +44,6 @@ ORDER BY p.id, e.rule_code;";
             var id = reader.GetInt64(0);
             if (!profiles.TryGetValue(id, out var profile))
             {
-                if (!string.Equals(reader.GetString(9), reader.GetString(10), StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidOperationException("The ACTIVE scheduling rule profile checksum is invalid.");
                 profile = new ProfileBuilder(id, reader.GetString(1), reader.GetInt32(2),
                     Enum.Parse<SchedulingRuleOrigin>(reader.GetString(3), true),
                     Enum.Parse<SchedulingEnvironmentScope>(reader.GetString(4), true), reader.GetString(5),
@@ -57,8 +52,8 @@ ORDER BY p.id, e.rule_code;";
                     Enum.Parse<SchedulingRuleProfileStatus>(reader.GetString(8), true), reader.GetString(9));
                 profiles.Add(id, profile);
             }
-            profile.Entries.Add(new SchedulingRuleProfileEntry(reader.GetString(11),
-                ReadJson(reader.GetString(12)), ReadJson(reader.GetString(13)), reader.GetBoolean(14)));
+            profile.Entries.Add(new SchedulingRuleProfileEntry(reader.GetString(10),
+                ReadJson(reader.GetString(11)), ReadJson(reader.GetString(12)), reader.GetBoolean(13)));
         }
 
         if (profiles.Count != 1)
