@@ -115,14 +115,21 @@ void AssertRule(SchedulingRuleEvaluationBatch batch, string ruleCode, Scheduling
     AssertEqual(outcome, result.Outcome, $"{label} outcome");
     AssertEqual(severity, result.Severity, $"{label} severity");
     AssertEqual(exceptionAllowed, result.ExceptionAllowed, $"{label} exceptionAllowed");
+    if (!System.Text.RegularExpressions.Regex.IsMatch(result.ScopeHash, "^[a-f0-9]{64}$"))
+        throw new Exception($"{label} scopeHash is not a lowercase SHA-256 hex value.");
 }
 void AssertSummary(SchedulingRuleEvaluationBatch batch, int compliant, int blocked, int exceptionRequired,
-    bool canApproveOrPublish, string label) {
+    bool canApproveOrPublish, string label, int warning = 0, int notApplicable = 0) {
     AssertEqual(2, batch.Summary.Total, $"{label} total");
     AssertEqual(compliant, batch.Summary.Compliant, $"{label} compliant");
     AssertEqual(blocked, batch.Summary.Blocked, $"{label} blocked");
     AssertEqual(exceptionRequired, batch.Summary.ExceptionRequired, $"{label} exceptionRequired");
+    AssertEqual(warning, batch.Summary.Warning, $"{label} warning");
+    AssertEqual(notApplicable, batch.Summary.NotApplicable, $"{label} notApplicable");
     AssertEqual(canApproveOrPublish, batch.Summary.CanApproveOrPublish, $"{label} canApproveOrPublish");
+    foreach (var result in batch.Evaluations)
+        if (!System.Text.RegularExpressions.Regex.IsMatch(result.ScopeHash, "^[a-f0-9]{64}$"))
+            throw new Exception($"{label} {result.RuleCode} scopeHash is not a lowercase SHA-256 hex value.");
 }
 
 const string exactRest = "2026-08-18T10:00:00-05:00";
@@ -132,11 +139,21 @@ var ordinary = Evaluate(8m, 42m, false, exactRest);
 AssertRule(ordinary, "I9-R01", SchedulingRuleOutcome.COMPLIANT, SchedulingRuleSeverity.INFO, false, "R01 8/42");
 AssertRule(ordinary, "I9-R02", SchedulingRuleOutcome.COMPLIANT, SchedulingRuleSeverity.INFO, false, "R02 exact 12h");
 AssertSummary(ordinary, 2, 0, 0, true, "R01 8/42");
+var ordinaryRepeat = Evaluate(8m, 42m, false, exactRest);
+AssertEqual(Rule(ordinary, "I9-R01").ScopeHash, Rule(ordinaryRepeat, "I9-R01").ScopeHash, "R01 identical scope stability");
+AssertEqual(Rule(ordinary, "I9-R02").ScopeHash, Rule(ordinaryRepeat, "I9-R02").ScopeHash, "R02 identical scope stability");
 
 var missingAgreement = Evaluate(8.01m, 42m, false, exactRest);
 AssertRule(missingAgreement, "I9-R01", SchedulingRuleOutcome.BLOCKED, SchedulingRuleSeverity.BLOCKING, false,
     "R01 8.01 without agreement");
 AssertSummary(missingAgreement, 1, 1, 0, false, "R01 8.01 without agreement");
+
+var missingWeeklyAgreement = Evaluate(8m, 42.01m, false, exactRest);
+AssertRule(missingWeeklyAgreement, "I9-R01", SchedulingRuleOutcome.BLOCKED, SchedulingRuleSeverity.BLOCKING, false,
+    "R01 weekly 42.01 without agreement");
+AssertRule(missingWeeklyAgreement, "I9-R02", SchedulingRuleOutcome.COMPLIANT, SchedulingRuleSeverity.INFO, false,
+    "R02 alongside weekly 42.01 without agreement");
+AssertSummary(missingWeeklyAgreement, 1, 1, 0, false, "R01 weekly 42.01 without agreement");
 
 var tenHours = Evaluate(10m, 42m, true, exactRest);
 AssertRule(tenHours, "I9-R01", SchedulingRuleOutcome.COMPLIANT, SchedulingRuleSeverity.INFO, false, "R01 10 with agreement");
@@ -161,6 +178,8 @@ AssertSummary(dailyAbsolute, 1, 1, 0, false, "R01 12.01");
 var weeklyBoundary = Evaluate(8m, 60m, true, exactRest);
 AssertRule(weeklyBoundary, "I9-R01", SchedulingRuleOutcome.COMPLIANT, SchedulingRuleSeverity.INFO, false, "R01 weekly 60");
 AssertSummary(weeklyBoundary, 2, 0, 0, true, "R01 weekly 60");
+if (Rule(ordinary, "I9-R01").ScopeHash == Rule(weeklyBoundary, "I9-R01").ScopeHash)
+    throw new Exception("R01 weekly scopeHash did not change when weeklyHours changed.");
 
 var weeklyAbsolute = Evaluate(8m, 60.01m, true, exactRest);
 AssertRule(weeklyAbsolute, "I9-R01", SchedulingRuleOutcome.BLOCKED, SchedulingRuleSeverity.BLOCKING, false, "R01 weekly 60.01");
@@ -174,6 +193,8 @@ var r02WrongScope = Evaluate(8m, 42m, false, shortRest, new HashSet<string> { Ru
 AssertSummary(r02WrongScope, 1, 0, 1, false, "R02 11:59:59 wrong scope");
 var r02Approved = Evaluate(8m, 42m, false, shortRest, new HashSet<string> { Rule(shortRestInitial, "I9-R02").ScopeHash });
 AssertSummary(r02Approved, 1, 0, 1, true, "R02 11:59:59 approved scope");
+if (Rule(ordinary, "I9-R02").ScopeHash == Rule(shortRestInitial, "I9-R02").ScopeHash)
+    throw new Exception("R02 rest scopeHash did not change when the proposed start changed.");
 
 void VerifyAbsolutePrecedence(decimal daily, decimal weekly, string label) {
     var initial = Evaluate(daily, weekly, true, shortRest);

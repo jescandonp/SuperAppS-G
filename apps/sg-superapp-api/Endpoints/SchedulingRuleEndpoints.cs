@@ -201,11 +201,23 @@ public static class SchedulingRuleEndpoints
     }
 
     private static bool TryParseScope(string period, string environmentScope, out DateOnly parsedPeriod,
-        out SchedulingEnvironmentScope environment) =>
-        DateOnly.TryParseExact(period, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsedPeriod) &&
-        Enum.GetNames<SchedulingEnvironmentScope>().Contains(environmentScope?.Trim(), StringComparer.OrdinalIgnoreCase) &&
-        Enum.TryParse(environmentScope, true, out environment) &&
-        Enum.IsDefined(typeof(SchedulingEnvironmentScope), environment);
+        out SchedulingEnvironmentScope environment)
+    {
+        parsedPeriod = default;
+        environment = default;
+        if (!DateOnly.TryParseExact(period, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsedPeriod))
+            return false;
+        var normalizedEnvironment = environmentScope?.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedEnvironment) ||
+            !Enum.GetNames<SchedulingEnvironmentScope>().Contains(normalizedEnvironment, StringComparer.OrdinalIgnoreCase) ||
+            !Enum.TryParse(normalizedEnvironment, true, out environment) ||
+            !Enum.IsDefined(typeof(SchedulingEnvironmentScope), environment))
+        {
+            environment = default;
+            return false;
+        }
+        return true;
+    }
 
     private static bool TryParseCreateRequest(CreateSchedulingRuleProfileRequest request,
         out SchedulingRuleProfile? profile)

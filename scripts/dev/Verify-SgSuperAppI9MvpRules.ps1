@@ -155,6 +155,7 @@ function Test-RuleEndpointSecurityLinkage {
         $EndpointContent -match '(?s)MapGet\s*\(\s*"/api/portal/scheduling/rules/evaluations".*?RequireAsync\s*\(\s*"SCHEDULING"\s*,\s*"VIEW"' -and
         $EndpointContent -match '(?s)MapPost\s*\(\s*"/api/portal/scheduling/rule-profiles/\{id:long\}/activate".*?RequireAsync\s*\(\s*"SCHEDULING"\s*,\s*"CONFIGURE".*?PRODUCTION.*?Results\.Conflict.*?validator\.Validate\s*\(\s*profile\s*,\s*environment\s*\).*?ActivateProfileAsync.*?repository\.LoadActiveAsync' -and
         $EndpointContent -match '(?s)MapPost\s*\(\s*"/api/portal/scheduling/rules/evaluate".*?RequireAsync\s*\(\s*"SCHEDULING"\s*,\s*"GENERATE".*?validator\.Validate\s*\(\s*profile\s*,\s*environment\s*\).*?repository\.LoadActiveAsync.*?evaluator\.Evaluate' -and
+        $EndpointContent -match '(?s)TryParseScope\s*\(.*?out\s+DateOnly\s+parsedPeriod\s*,\s*out\s+SchedulingEnvironmentScope\s+environment\s*\)\s*\{\s*parsedPeriod\s*=\s*default\s*;\s*environment\s*=\s*default\s*;.*?DateOnly\.TryParseExact.*?normalizedEnvironment.*?Enum\.TryParse.*?return\s+true\s*;' -and
         $EndpointContent -notmatch '(?s)catch\s*\([^)]*Exception[^)]*\).*?exception\.Message'
 }
 
@@ -369,7 +370,7 @@ if (-not (Test-RuleEvaluatorDeterminismLinkage $evaluatorLinkagePositive) -or
     (Test-RuleEvaluatorDeterminismLinkage $evaluatorLinkageNegative)) {
     throw 'I9 MVP rules verifier evaluator linkage self-test failed.'
 }
-$endpointLinkagePositive = 'MapGet("/api/portal/scheduling/rule-profiles", RequireAsync("SCHEDULING", "VIEW")); MapGet("/api/portal/scheduling/rules/evaluations", RequireAsync("SCHEDULING", "VIEW")); MapPost("/api/portal/scheduling/rule-profiles/{id:long}/activate", RequireAsync("SCHEDULING", "CONFIGURE"); PRODUCTION; Results.Conflict(); validator.Validate(profile, environment); ActivateProfileAsync(); repository.LoadActiveAsync()); MapPost("/api/portal/scheduling/rules/evaluate", RequireAsync("SCHEDULING", "GENERATE"); validator.Validate(profile, environment); repository.LoadActiveAsync(); evaluator.Evaluate());'
+$endpointLinkagePositive = 'MapGet("/api/portal/scheduling/rule-profiles", RequireAsync("SCHEDULING", "VIEW")); MapGet("/api/portal/scheduling/rules/evaluations", RequireAsync("SCHEDULING", "VIEW")); MapPost("/api/portal/scheduling/rule-profiles/{id:long}/activate", RequireAsync("SCHEDULING", "CONFIGURE"); PRODUCTION; Results.Conflict(); validator.Validate(profile, environment); ActivateProfileAsync(); repository.LoadActiveAsync()); MapPost("/api/portal/scheduling/rules/evaluate", RequireAsync("SCHEDULING", "GENERATE"); validator.Validate(profile, environment); repository.LoadActiveAsync(); evaluator.Evaluate()); TryParseScope(string period, string environmentScope, out DateOnly parsedPeriod, out SchedulingEnvironmentScope environment) { parsedPeriod = default; environment = default; DateOnly.TryParseExact(period); normalizedEnvironment = environmentScope.Trim(); Enum.TryParse(normalizedEnvironment, true, out environment); return true; }'
 $endpointLinkageNegative = 'MapGet("/api/portal/scheduling/rule-profiles", RequireAsync("SCHEDULING", "VIEW")); MapPost("/api/portal/scheduling/rules/evaluate", evaluator.Evaluate());'
 if (-not (Test-RuleEndpointSecurityLinkage $endpointLinkagePositive) -or
     (Test-RuleEndpointSecurityLinkage $endpointLinkageNegative)) {
