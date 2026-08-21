@@ -37,26 +37,51 @@ public static class SchedulingOverlapTravelRules
             !TryReadExistingIntervals(facts, out var existingIntervals))
             return Blocked(R03Code("_INVALID_INPUT"), "La configuracion o los intervalos anonimos no son validos.");
 
+        var approvedOverlap = false;
+        var draftOverlap = false;
         foreach (var interval in existingIntervals)
         {
             if (!IsCurrent(interval.Status) || !string.Equals(employeeId, interval.EmployeeId, StringComparison.Ordinal))
                 continue;
             // Half-open intervals: adjacency is compliant because end == start is not an overlap.
             if (proposedStart < interval.End && interval.Start < proposedEnd)
-                return Blocked(R03Code("_OVERLAP_BLOCKED"),
-                    "El turno se solapa con otro intervalo vigente del mismo guarda y no admite excepcion.");
+            {
+                approvedOverlap |= interval.Status == "APPROVED";
+                draftOverlap |= interval.Status == "DRAFT";
+            }
         }
+        if (approvedOverlap)
+            return Blocked(R03Code("_OVERLAP_APPROVED_BLOCKED"),
+                "El turno se solapa con un turno aprobado vigente del mismo guarda y no admite excepcion.");
+        if (draftOverlap)
+            return Blocked(R03Code("_OVERLAP_DRAFT_BLOCKED"),
+                "El turno se solapa con un borrador vigente del mismo guarda y no admite excepcion.");
         return Compliant(R03Code("_COMPLIANT"), "No existe solapamiento vigente para el guarda anonimo evaluado.");
     }
 
     public static OverlapTravelRuleDecision EvaluateR05(JsonElement parameters, JsonElement catalogSnapshot, JsonElement facts)
     {
-        if (!HasR05Contract(parameters) || !TryReadCode(facts, "originPositionCode", out var origin) ||
+        if (!HasR05Contract(parameters) || !TryReadCode(facts, "employeeId", out _) ||
+            !TryReadCode(facts, "assignmentId", out _) || !TryReadCode(facts, "previousAssignmentId", out _) ||
+            !TryReadCode(facts, "originPositionCode", out var origin) ||
             !TryReadCode(facts, "destinationPositionCode", out var destination) ||
-            !TryReadNonNegativeInteger(facts, "availableMinutes", out var availableMinutes))
-            return Blocked(R05Code("_INVALID_INPUT"), "La configuracion o los minutos disponibles no son validos.");
+            !TryReadTimestamp(facts, "previousShiftStart", out var previousStart) ||
+            !TryReadTimestamp(facts, "previousShiftEnd", out var previousEnd) ||
+            !TryReadTimestamp(facts, "proposedShiftStart", out var proposedStart) ||
+            !TryReadTimestamp(facts, "proposedShiftEnd", out var proposedEnd) || previousStart >= previousEnd ||
+            proposedStart >= proposedEnd)
+            return Blocked(R05Code("_INVALID_INPUT"), "La configuracion o los turnos anonimos no son validos.");
 
-        if (!TryReadMatrix(catalogSnapshot, out var matrix))
+        var availableTicks = (proposedStart.ToUniversalTime() - previousEnd.ToUniversalTime()).Ticks;
+        if (availableTicks < 0 || availableTicks % TimeSpan.TicksPerMinute != 0)
+            return Blocked(R05Code("_INVALID_GAP"), "El intervalo exacto entre turnos no es un numero entero no negativo de minutos.");
+        var availableMinutes = availableTicks / TimeSpan.TicksPerMinute;
+
+        var matrixAvailability = ReadMatrix(catalogSnapshot, out var matrix);
+        if (matrixAvailability == MatrixAvailability.Missing)
+            return ExceptionRequired(R05Code("_MATRIX_UNAVAILABLE"),
+                "No existe una matriz versionada aplicable; nunca se presume desplazamiento cero.");
+        if (matrixAvailability == MatrixAvailability.Invalid)
             return Blocked(R05Code("_INVALID_MATRIX"), "La matriz de traslado versionada no es valida.");
 
         if (string.Equals(origin, destination, StringComparison.Ordinal))
@@ -105,29 +130,30 @@ public static class SchedulingOverlapTravelRules
         return true;
     }
 
-    private static bool TryReadMatrix(JsonElement catalogSnapshot, out IReadOnlyList<MatrixRelation> matrix)
+    private static MatrixAvailability ReadMatrix(JsonElement catalogSnapshot, out IReadOnlyList<MatrixRelation> matrix)
     {
         matrix = Array.Empty<MatrixRelation>();
-        if (catalogSnapshot.ValueKind != JsonValueKind.Object || !catalogSnapshot.TryGetProperty("matrixDemo", out var raw) ||
-            raw.ValueKind != JsonValueKind.Array) return false;
+        if (catalogSnapshot.ValueKind != JsonValueKind.Object || !catalogSnapshot.TryGetProperty("matrixDemo", out var raw))
+            return MatrixAvailability.Missing;
+        if (raw.ValueKind != JsonValueKind.Array) return MatrixAvailability.Invalid;
         var parsed = new List<MatrixRelation>();
         var keys = new HashSet<string>(StringComparer.Ordinal);
         foreach (var item in raw.EnumerateArray())
         {
             if (item.ValueKind != JsonValueKind.Object || !TryReadCode(item, "from", out var from) ||
-                !TryReadCode(item, "to", out var to) || !TryReadBoolean(item, "prohibited", out var prohibited)) return false;
+                !TryReadCode(item, "to", out var to) || !TryReadBoolean(item, "prohibited", out var prohibited)) return MatrixAvailability.Invalid;
             long? minutes = null;
             if (prohibited)
             {
-                if (!item.TryGetProperty("minutes", out var rawMinutes) || rawMinutes.ValueKind != JsonValueKind.Null) return false;
+                if (!item.TryGetProperty("minutes", out var rawMinutes) || rawMinutes.ValueKind != JsonValueKind.Null) return MatrixAvailability.Invalid;
             }
-            else if (!TryReadNonNegativeInteger(item, "minutes", out var value)) return false;
+            else if (!TryReadNonNegativeInteger(item, "minutes", out var value)) return MatrixAvailability.Invalid;
             else minutes = value;
-            if (!keys.Add(from + "\u001f" + to)) return false;
+            if (!keys.Add(from + "\u001f" + to)) return MatrixAvailability.Invalid;
             parsed.Add(new MatrixRelation(from, to, minutes, prohibited));
         }
         matrix = parsed;
-        return true;
+        return MatrixAvailability.Valid;
     }
 
     private static bool IsCurrent(string status) => status is "APPROVED" or "DRAFT";
@@ -186,4 +212,5 @@ public static class SchedulingOverlapTravelRules
 
     private sealed record ExistingInterval(string EmployeeId, string Status, DateTimeOffset Start, DateTimeOffset End);
     private sealed record MatrixRelation(string From, string To, long? Minutes, bool Prohibited);
+    private enum MatrixAvailability { Missing, Valid, Invalid }
 }

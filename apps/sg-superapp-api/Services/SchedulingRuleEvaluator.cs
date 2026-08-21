@@ -41,7 +41,7 @@ public sealed class SchedulingRuleEvaluator
         ["I9-R02"] = Fields("assignmentId", "scheduleVersionId", "previousShiftEnd", "proposedShiftStart"),
         ["I9-R03"] = Fields("assignmentId", "scheduleVersionId", "employeeId", "proposedShiftStart", "proposedShiftEnd", "existingIntervals"),
         ["I9-R04"] = Fields("assignmentId", "scheduleVersionId", "noveltyCodes"),
-        ["I9-R05"] = Fields("assignmentId", "scheduleVersionId", "employeeId", "originPositionCode", "destinationPositionCode", "availableMinutes"),
+        ["I9-R05"] = Fields("assignmentId", "previousAssignmentId", "scheduleVersionId", "employeeId", "originPositionCode", "destinationPositionCode", "previousShiftStart", "previousShiftEnd", "proposedShiftStart", "proposedShiftEnd"),
         ["I9-R06"] = Fields("assignmentId", "scheduleVersionId", "employeeId", "positionCode", "shiftStart", "shiftEnd", "requirementEvaluations"),
         ["I9-R07"] = Fields("assignmentId", "scheduleVersionId", "templateCode", "templateVersion", "anchorDate", "expectedCells", "proposedCells")
     };
