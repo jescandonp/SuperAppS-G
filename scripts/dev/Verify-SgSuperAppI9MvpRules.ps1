@@ -546,6 +546,12 @@ Assert-FileContains 'Common evaluator R01/R02 linkage' 'apps/sg-superapp-api/Ser
     (Pattern 'approved exception scope binding' 'approvedExceptionScopeHashes\?\.Contains\s*\(\s*result\.ScopeHash\s*\)'),
     (Pattern 'approval limited to exception outcome' 'result\.Outcome\s*==\s*SchedulingRuleOutcome\.EXCEPTION_REQUIRED')
 )
+Assert-FileContains 'Common evaluator R03/R05 linkage' 'apps/sg-superapp-api/Services/SchedulingRuleEvaluator.cs' @(
+    (Pattern 'R03 real evaluator call' 'SchedulingOverlapTravelRules\.EvaluateR03\s*\('),
+    (Pattern 'R05 real evaluator call' 'SchedulingOverlapTravelRules\.EvaluateR05\s*\('),
+    (Pattern 'R03 anonymous employee scope' '\["I9-R03"\]\s*=\s*Fields\([^\)]*"employeeId"'),
+    (Pattern 'R05 anonymous employee scope' '\["I9-R05"\]\s*=\s*Fields\([^\)]*"employeeId"')
+)
 
 Assert-FileContains 'Rule profile HTTP endpoints' 'apps/sg-superapp-api/Endpoints/SchedulingRuleEndpoints.cs' @(
     (Pattern 'GET mapping' '(?i)MapGet'), (Pattern 'POST mapping' '(?i)MapPost'),
