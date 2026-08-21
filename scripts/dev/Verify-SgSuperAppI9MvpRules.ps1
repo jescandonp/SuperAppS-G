@@ -174,6 +174,16 @@ function Test-AnonymousFactsAllowlistLinkage {
         $EvaluatorContent -notmatch '(?i)PiiFieldNames|blacklist|denylist'
 }
 
+function Test-NoveltyRequirementLinkage {
+    param([string]$EvaluatorContent, [string]$RulesContent)
+    return $EvaluatorContent -match '(?s)"I9-R04"\s*=>\s*EvaluateNoveltyRequirementRule\s*\(\s*"EvaluateR04"\s*,\s*entry\.Parameters\s*,\s*entry\.CatalogSnapshot\s*,\s*sanitizedFacts' -and
+        $EvaluatorContent -match '(?s)"I9-R06"\s*=>\s*EvaluateNoveltyRequirementRule\s*\(\s*"EvaluateR06"\s*,\s*entry\.Parameters\s*,\s*entry\.CatalogSnapshot\s*,\s*sanitizedFacts\s*,\s*projectCode' -and
+        $EvaluatorContent -match 'Canonicalize\s*\(\s*entry\.CatalogSnapshot\s*\)' -and
+        $RulesContent -match 'mappingDemo' -and $RulesContent -match 'AMBIGUOUS_MAPPING' -and
+        $RulesContent -match 'requirementsDemo' -and $RulesContent -match 'HasOverlappingRequirements' -and
+        $RulesContent -match 'validForEntireShift' -and $RulesContent -match 'informativeRequiresOwnerAndDueDate'
+}
+
 function Test-StoredEnumFailClosedLinkage {
     param([string]$RepositoryContent, [string]$HttpRepositoryContent, [string]$EndpointContent)
     return $RepositoryContent -match '(?s)ParseStoredEnum.*?Enum\.GetNames.*?Enum\.TryParse.*?SchedulingRuleContractException' -and
@@ -536,7 +546,7 @@ if ((Test-Path -LiteralPath $evaluatorPath -PathType Leaf) -and
 $implementations = @(
     @{ R='I9-R01/R02 rules'; P='apps/sg-superapp-api/Services/SchedulingWorkRestRules.cs'; X=@((Pattern 'R01 evaluator' 'EvaluateR01\s*\('),(Pattern 'R02 evaluator' 'EvaluateR02\s*\('),(Pattern 'ordinary daily limit' 'ordinaryDailyHours'),(Pattern 'approval daily threshold' 'approvalFromDailyHours'),(Pattern 'absolute daily limit' 'absoluteDailyHours'),(Pattern 'ordinary weekly limit' 'ordinaryWeeklyHours'),(Pattern 'absolute weekly limit' 'absoluteWeeklyHours'),(Pattern 'written agreement' 'writtenAgreement'),(Pattern 'minimum rest' 'minimumRestHours'),(Pattern 'BLOCKED' 'SchedulingRuleOutcome\.BLOCKED'),(Pattern 'EXCEPTION_REQUIRED' 'SchedulingRuleOutcome\.EXCEPTION_REQUIRED')) },
     @{ R='I9-R03/R05 rules'; P='apps/sg-superapp-api/Services/SchedulingOverlapTravelRules.cs'; X=@((Pattern 'I9-R03' 'I9-R03'),(Pattern 'I9-R05' 'I9-R05'),(Pattern 'overlap' '(?i)(overlap|solap)'),(Pattern 'directional' '(?i)(direction|direcc|travel|traslado)'),(Pattern 'prohibited' '(?i)(prohibit|prohibid)')) },
-    @{ R='I9-R04/R06 rules'; P='apps/sg-superapp-api/Services/SchedulingNoveltyRequirementRules.cs'; X=@((Pattern 'I9-R04' 'I9-R04'),(Pattern 'I9-R06' 'I9-R06'),(Pattern 'unknown' '(?i)(UNKNOWN|UNVERIFIED)'),(Pattern 'employeeId' '(?i)employeeId'),(Pattern 'position' '(?i)(position|puesto)'),(Pattern 'requirement' '(?i)(requirement|requisito)'),(Pattern 'evidence' '(?i)(evidence|evidencia)'),(Pattern 'validity' '(?i)(valid|vigencia|expiry|expires)')) },
+    @{ R='I9-R04/R06 rules'; P='apps/sg-superapp-api/Services/SchedulingNoveltyRequirementRules.cs'; X=@((Pattern 'R04 entry point' 'EvaluateR04\s*\('),(Pattern 'R06 entry point' 'EvaluateR06\s*\('),(Pattern 'unknown fail closed' '(?i)(UNKNOWN|UNVERIFIED)'),(Pattern 'anonymous employee key' '(?i)employeeId'),(Pattern 'position scope' '(?i)positionCode'),(Pattern 'canonical novelty mapping' '(?i)mappingDemo'),(Pattern 'versioned requirements catalog' '(?i)requirementsDemo'),(Pattern 'whole shift validity' '(?i)validForEntireShift'),(Pattern 'TH prerequisite' '(?i)hrValidated'),(Pattern 'informative traceability' '(?is)remediationOwnerRole.*remediationOwnerKey.*dueDate')) },
     @{ R='I9-R07 rule'; P='apps/sg-superapp-api/Services/SchedulingTemplateDeviationRule.cs'; X=@((Pattern 'I9-R07' 'I9-R07'),(Pattern 'template' '(?i)(template|plantilla)'),(Pattern 'version' '(?i)version'),(Pattern 'anchor' '(?i)(anchor|anclaje)'),(Pattern 'expected' '(?i)(expected|esperado)'),(Pattern 'proposed' '(?i)(proposed|propuesto)'),(Pattern 'cell' '(?i)(cell|celda)'),(Pattern 'scopeHash' '(?i)scopeHash')) }
 )
 foreach ($item in $implementations) { Assert-FileContains $item.R $item.P $item.X }
@@ -572,6 +582,11 @@ if ((Test-Path -LiteralPath $ruleEndpointPath) -and (Test-Path -LiteralPath $cre
 if ((Test-Path -LiteralPath $evaluatorPath) -and
     -not (Test-AnonymousFactsAllowlistLinkage (Get-EffectiveContent $evaluatorPath))) {
     $failures.Add('Common evaluator: anonymous facts allowlist, minimized snapshot and scopeHash are not linked')
+}
+$noveltyRequirementPath = Join-Path $repoRoot 'apps/sg-superapp-api/Services/SchedulingNoveltyRequirementRules.cs'
+if ((Test-Path -LiteralPath $evaluatorPath) -and (Test-Path -LiteralPath $noveltyRequirementPath) -and
+    -not (Test-NoveltyRequirementLinkage (Get-EffectiveContent $evaluatorPath) (Get-EffectiveContent $noveltyRequirementPath))) {
+    $failures.Add('R04/R06 linkage: canonical catalogs, exact snapshots and real evaluators are not linked')
 }
 if ((Test-Path -LiteralPath $createRepositoryPath) -and (Test-Path -LiteralPath $evaluatorPath) -and (Test-Path -LiteralPath $ruleEndpointPath) -and
     -not (Test-StoredEnumFailClosedLinkage (Get-EffectiveContent $createRepositoryPath) (Get-EffectiveContent $evaluatorPath) (Get-EffectiveContent $ruleEndpointPath))) {
@@ -649,7 +664,7 @@ Assert-FileContains 'Exception panel snapshot' 'apps/sg-superapp-web/src/feature
 $focused = @(
     @{ R='I9-R01/R02 verifier'; P='scripts/dev/Verify-SgSuperAppI9R01R02.ps1'; Pass='I9 R01 R02 PASS' },
     @{ R='I9-R03/R05 verifier'; P='scripts/dev/Verify-SgSuperAppI9R03R05.ps1'; Pass='I9 R03 R05 PASS' },
-    @{ R='I9-R04/R06 verifier'; P='scripts/dev/Verify-SgSuperAppI9R04R06.ps1'; Pass='I9 R04 R06 PASS' },
+    @{ R='I9-R04/R06 verifier'; P='scripts/dev/Verify-SgSuperAppI9R04R06.ps1'; Pass='I9 R04 R06 PASS 47' },
     @{ R='I9-R07 verifier'; P='scripts/dev/Verify-SgSuperAppI9R07.ps1'; Pass='I9 R07 PASS' }
 )
 foreach ($verifier in $focused) { Invoke-FocusedVerifier $verifier.R $verifier.P $verifier.Pass }

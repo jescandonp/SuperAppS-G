@@ -31,6 +31,8 @@ public sealed class SchedulingRuleEvaluator
     // Keeps the evaluator compatible with focused harnesses that exercise only R01/R02.
     private const string R03EvaluatorEntryPoint = "SchedulingOverlapTravelRules.EvaluateR03(";
     private const string R05EvaluatorEntryPoint = "SchedulingOverlapTravelRules.EvaluateR05(";
+    private const string R04EvaluatorEntryPoint = "SchedulingNoveltyRequirementRules.EvaluateR04(";
+    private const string R06EvaluatorEntryPoint = "SchedulingNoveltyRequirementRules.EvaluateR06(";
     private const int MaximumFactsUtf8Bytes = 256 * 1024;
     private const int MaximumFactsDepth = 32;
     private const int MaximumFactsNodes = 4096;
@@ -40,16 +42,19 @@ public sealed class SchedulingRuleEvaluator
         ["I9-R01"] = Fields("assignmentId", "scheduleVersionId", "dailyHours", "weeklyHours", "writtenAgreement"),
         ["I9-R02"] = Fields("assignmentId", "scheduleVersionId", "previousShiftEnd", "proposedShiftStart"),
         ["I9-R03"] = Fields("assignmentId", "scheduleVersionId", "employeeId", "proposedShiftStart", "proposedShiftEnd", "existingIntervals"),
-        ["I9-R04"] = Fields("assignmentId", "scheduleVersionId", "noveltyCodes"),
+        ["I9-R04"] = Fields("assignmentId", "scheduleVersionId", "employeeId", "shiftId", "shiftStart", "shiftEnd", "noveltyEvaluations"),
         ["I9-R05"] = Fields("assignmentId", "previousAssignmentId", "scheduleVersionId", "employeeId", "originPositionCode", "destinationPositionCode", "previousShiftStart", "previousShiftEnd", "proposedShiftStart", "proposedShiftEnd"),
-        ["I9-R06"] = Fields("assignmentId", "scheduleVersionId", "employeeId", "positionCode", "shiftStart", "shiftEnd", "requirementEvaluations"),
+        ["I9-R06"] = Fields("assignmentId", "scheduleVersionId", "employeeId", "positionCode", "shiftId", "shiftStart", "shiftEnd", "hrValidated", "requirementEvaluations"),
         ["I9-R07"] = Fields("assignmentId", "scheduleVersionId", "templateCode", "templateVersion", "anchorDate", "expectedCells", "proposedCells")
     };
     private static readonly HashSet<string> AllowedRootFacts = RootFactsByRule.Values
         .SelectMany(fields => fields).ToHashSet(StringComparer.Ordinal);
     private static readonly HashSet<string> AllowedNestedFacts = Fields(
         "start", "end", "positionCode", "shiftId", "code", "status", "validFrom", "validTo", "required",
-        "evidenceCode", "minutes", "prohibited", "cell", "expected", "proposed", "date", "shiftCode", "employeeId");
+        "evidenceCode", "minutes", "prohibited", "cell", "expected", "proposed", "date", "shiftCode", "employeeId",
+        "noveltyId", "sourceSystem", "sourceCode", "sourceStatus", "semanticCategory", "mappingVersion",
+        "requirementCode", "category", "catalogVersion", "evidenceState", "informativeRemediable",
+        "remediationOwnerRole", "remediationOwnerKey", "dueDate");
     private static readonly Regex AnonymousCode = new("^[A-Za-z0-9._:/-]{1,80}$", RegexOptions.CultureInvariant);
 
     public SchedulingRuleEvaluationBatch Evaluate(
@@ -176,7 +181,9 @@ public sealed class SchedulingRuleEvaluator
             "I9-R01" => ToRuleDecision(SchedulingWorkRestRules.EvaluateR01(entry.Parameters, sanitizedFacts)),
             "I9-R02" => ToRuleDecision(SchedulingWorkRestRules.EvaluateR02(entry.Parameters, sanitizedFacts)),
             "I9-R03" => EvaluateOverlapTravelRule("EvaluateR03", entry.Parameters, sanitizedFacts),
+            "I9-R04" => EvaluateNoveltyRequirementRule("EvaluateR04", entry.Parameters, entry.CatalogSnapshot, sanitizedFacts),
             "I9-R05" => EvaluateOverlapTravelRule("EvaluateR05", entry.Parameters, entry.CatalogSnapshot, sanitizedFacts),
+            "I9-R06" => EvaluateNoveltyRequirementRule("EvaluateR06", entry.Parameters, entry.CatalogSnapshot, sanitizedFacts, projectCode),
             _ => null
         };
         if (decision is not null)
@@ -238,6 +245,36 @@ public sealed class SchedulingRuleEvaluator
         "El evaluador de solapamiento o traslado no esta disponible; el MVP falla de forma cerrada.",
         ExceptionAllowed: false);
 
+    private static RuleDecision EvaluateNoveltyRequirementRule(string methodName, params object[] arguments)
+    {
+        try
+        {
+            var rulesType = typeof(SchedulingRuleEvaluator).Assembly
+                .GetType("Sg.SuperApp.Api.Services.SchedulingNoveltyRequirementRules", throwOnError: false);
+            var method = rulesType?.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static);
+            var decision = method?.Invoke(null, arguments);
+            if (decision is null ||
+                decision.GetType().GetProperty("Outcome")?.GetValue(decision) is not SchedulingRuleOutcome outcome ||
+                decision.GetType().GetProperty("Severity")?.GetValue(decision) is not SchedulingRuleSeverity severity ||
+                decision.GetType().GetProperty("MessageCode")?.GetValue(decision) is not string messageCode ||
+                decision.GetType().GetProperty("Explanation")?.GetValue(decision) is not string explanation ||
+                decision.GetType().GetProperty("ExceptionAllowed")?.GetValue(decision) is not bool exceptionAllowed)
+                return NoveltyRequirementEvaluatorUnavailable();
+            return new RuleDecision(outcome, severity, messageCode, explanation, exceptionAllowed);
+        }
+        catch (TargetInvocationException)
+        {
+            return NoveltyRequirementEvaluatorUnavailable();
+        }
+    }
+
+    private static RuleDecision NoveltyRequirementEvaluatorUnavailable() => new(
+        SchedulingRuleOutcome.WARNING,
+        SchedulingRuleSeverity.ERROR,
+        "I9_NOVELTY_REQUIREMENT_EVALUATOR_UNAVAILABLE",
+        "El evaluador R04/R06 no esta disponible; no se acredita cumplimiento.",
+        ExceptionAllowed: false);
+
     private sealed record RuleDecision(
         SchedulingRuleOutcome Outcome,
         SchedulingRuleSeverity Severity,
@@ -263,6 +300,7 @@ public sealed class SchedulingRuleEvaluator
             period.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             entry.RuleCode,
             Canonicalize(entry.Parameters),
+            Canonicalize(entry.CatalogSnapshot),
             Canonicalize(facts)
         });
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(scope))).ToLowerInvariant();
