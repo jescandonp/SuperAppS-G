@@ -3,13 +3,36 @@ param([string]$RepositoryRoot)
 $ErrorActionPreference='Stop'
 $repoRoot=if([string]::IsNullOrWhiteSpace($RepositoryRoot)){(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path}else{(Resolve-Path $RepositoryRoot).Path}
 $files=@('apps/sg-superapp-api/Domain/SchedulingRuleModels.cs','apps/sg-superapp-api/Services/SchedulingRuleProfileValidator.cs','apps/sg-superapp-api/Services/SchedulingWorkRestRules.cs','apps/sg-superapp-api/Services/SchedulingOverlapTravelRules.cs','apps/sg-superapp-api/Services/SchedulingRuleEvaluator.cs')|%{Join-Path $repoRoot $_}
+$authorizationService=Join-Path $repoRoot 'apps/sg-superapp-api/Services/PortalAuthorizationService.cs'
 $authorizationBoundary=Join-Path $repoRoot 'apps/sg-superapp-api/Endpoints/PortalEndpoints.cs'
-if(@(($files+$authorizationBoundary)|?{-not(Test-Path -LiteralPath $_ -PathType Leaf)}).Count){Write-Output 'I9 R03 R05 FAIL: required source missing';exit 1}
+if(@(($files+$authorizationService+$authorizationBoundary)|?{-not(Test-Path -LiteralPath $_ -PathType Leaf)}).Count){Write-Output 'I9 R03 R05 FAIL: required source missing';exit 1}
 $rules=Get-Content $files[3] -Raw;$evaluator=Get-Content $files[4] -Raw
 foreach($p in @('EvaluateR03\s*\(','EvaluateR05\s*\(','OVERLAP_APPROVED_BLOCKED.*OVERLAP_DRAFT_BLOCKED','proposedStart\.ToUniversalTime\(\).*previousEnd\.ToUniversalTime\(\)','MATRIX_UNAVAILABLE','INVALID_MATRIX')){if($rules-notmatch("(?s)"+$p)){Write-Output "I9 R03 R05 FAIL: contract $p";exit 1}}
 if($evaluator-notmatch 'previousAssignmentId' -or $evaluator-notmatch 'previousShiftEnd' -or $evaluator-notmatch 'proposedShiftEnd'){Write-Output 'I9 R03 R05 FAIL: travel scope incomplete';exit 1}
+function Remove-CSharpComments([string]$source){
+ $builder=[Text.StringBuilder]::new();$state='Code';$index=0
+ while($index-lt $source.Length){
+  $current=$source[$index];$next=if($index+1-lt $source.Length){$source[$index+1]}else{[char]0}
+  switch($state){
+   'Code' {
+    if($current-eq '/'-and $next-eq '/'){$state='LineComment';$index+=2;continue}
+    if($current-eq '/'-and $next-eq '*'){$state='BlockComment';$index+=2;continue}
+    if($current-eq '@'-and $next-eq '"'){[void]$builder.Append($current);[void]$builder.Append($next);$state='VerbatimString';$index+=2;continue}
+    [void]$builder.Append($current)
+    if($current-eq '"'){$state='String'}elseif($current-eq "'"){$state='Character'}
+    $index++;continue
+   }
+   'LineComment' {if($current-eq "`n"){[void]$builder.Append($current);$state='Code'};$index++;continue}
+   'BlockComment' {if($current-eq '*'-and $next-eq '/'){$state='Code';$index+=2;continue};if($current-eq "`n"){[void]$builder.Append($current)};$index++;continue}
+   'String' { [void]$builder.Append($current);if($current-eq '\'-and $index+1-lt $source.Length){$index++;[void]$builder.Append($source[$index])}elseif($current-eq '"'){$state='Code'};$index++;continue }
+   'Character' { [void]$builder.Append($current);if($current-eq '\'-and $index+1-lt $source.Length){$index++;[void]$builder.Append($source[$index])}elseif($current-eq "'"){$state='Code'};$index++;continue }
+   'VerbatimString' { [void]$builder.Append($current);if($current-eq '"'-and $next-eq '"'){[void]$builder.Append($next);$index+=2;continue};if($current-eq '"'){$state='Code'};$index++;continue }
+  }
+ }
+ return $builder.ToString()
+}
 function Test-ExceptionRouteContract([string]$section){
- $normalized=$section-replace '\s',''
+ $normalized=(Remove-CSharpComments $section)-replace '\s',''
  $authorization='authorization.RequireAsync("SCHEDULING","APPROVE_EXCEPTION",ct)'
  $deniedReturn='if(deniedisnotnull)returndenied;'
  $mutation='repository.CreateScheduleExceptionAsync('
@@ -26,25 +49,53 @@ $routeEnd=if($routeStart-ge 0){$portalSource.IndexOf($nextRouteMarker,$routeStar
 if($routeStart-lt 0-or $routeEnd-le $routeStart){Write-Output 'I9 R03 R05 BLOCKED: exact exception route unavailable';exit 2}
 $exceptionRoute=$portalSource.Substring($routeStart,$routeEnd-$routeStart)
 if(-not(Test-ExceptionRouteContract $exceptionRoute)){Write-Output 'I9 R03 R05 BLOCKED: authorization must precede denied return and repository mutation';exit 2}
-$normalizedRoute=$exceptionRoute-replace '\s',''
+$normalizedRoute=(Remove-CSharpComments $exceptionRoute)-replace '\s',''
 $authorizationMarker='authorization.RequireAsync("SCHEDULING","APPROVE_EXCEPTION",ct)'
 $deniedReturnMarker='if(deniedisnotnull)returndenied;'
 $mutationMarker='repository.CreateScheduleExceptionAsync('
 $withoutAuthorization=$normalizedRoute.Replace($authorizationMarker,'')
 $withoutDeniedReturn=$normalizedRoute.Replace($deniedReturnMarker,'')
 $reordered=$withoutDeniedReturn.Replace($mutationMarker,$mutationMarker+$deniedReturnMarker)
-if((Test-ExceptionRouteContract $withoutAuthorization)-or(Test-ExceptionRouteContract $reordered)){Write-Output 'I9 R03 R05 FAIL: authorization contract negative self-test';exit 1}
-Write-Output 'R05-T12 AUTHORIZATION CONTRACT PASS'
+$permissionOnlyInComment=$normalizedRoute.Replace($authorizationMarker,"/*$authorizationMarker*/")
+$returnOnlyInComment=$normalizedRoute.Replace($deniedReturnMarker,"//$deniedReturnMarker`n")
+$mutationBeforeAuthorization=$mutationMarker+$authorizationMarker+$deniedReturnMarker
+if((Test-ExceptionRouteContract $withoutAuthorization)-or(Test-ExceptionRouteContract $reordered)-or
+   (Test-ExceptionRouteContract $permissionOnlyInComment)-or(Test-ExceptionRouteContract $returnOnlyInComment)-or
+   (Test-ExceptionRouteContract $mutationBeforeAuthorization)){Write-Output 'I9 R03 R05 FAIL: authorization contract negative self-test';exit 1}
+Write-Output 'R05-T12 ROUTE LINKAGE PASS'
 Write-Output 'I9 R03 R05 STATIC PASS'
 $dotnet='C:\tmp\dotnet6\dotnet.exe';if(-not(Test-Path $dotnet -PathType Leaf)){Write-Output 'I9 R03 R05 BLOCKED: dotnet unavailable';exit 2}
 $tmp=Join-Path ([IO.Path]::GetTempPath()) ('sg-r0305-'+[guid]::NewGuid().ToString('N'));New-Item -ItemType Directory $tmp|Out-Null
 try{
  $links=@($files|%{[Security.SecurityElement]::Escape($_)})
+ $authorizationLink=[Security.SecurityElement]::Escape($authorizationService)
 @"
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework><LangVersion>latest</LangVersion><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup><ItemGroup><FrameworkReference Include="Microsoft.AspNetCore.App"/><PackageReference Include="Npgsql" Version="6.0.10"/><Using Include="Microsoft.Extensions.Configuration"/><Compile Include="$($links[0])" Link="Models.cs"/><Compile Include="$($links[1])" Link="Validator.cs"/><Compile Include="$($links[2])" Link="WorkRest.cs"/><Compile Include="$($links[3])" Link="Overlap.cs"/><Compile Include="$($links[4])" Link="Evaluator.cs"/></ItemGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework><LangVersion>latest</LangVersion><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup><ItemGroup><FrameworkReference Include="Microsoft.AspNetCore.App"/><PackageReference Include="Npgsql" Version="6.0.10"/><Using Include="Microsoft.Extensions.Configuration"/><Using Include="Microsoft.AspNetCore.Http"/><Compile Include="$($links[0])" Link="Models.cs"/><Compile Include="$($links[1])" Link="Validator.cs"/><Compile Include="$($links[2])" Link="WorkRest.cs"/><Compile Include="$($links[3])" Link="Overlap.cs"/><Compile Include="$($links[4])" Link="Evaluator.cs"/><Compile Include="$authorizationLink" Link="PortalAuthorizationService.cs"/></ItemGroup></Project>
 "@|Set-Content (Join-Path $tmp 'H.csproj') -Encoding utf8
 @'
-using System.Globalization; using System.Text.Json; using System.Text.RegularExpressions; using Sg.SuperApp.Api.Domain; using Sg.SuperApp.Api.Services;
+namespace Sg.SuperApp.Api.Services;
+public sealed record HarnessUser(long Id);
+public sealed class RequestUserContext { public HarnessUser? User { get; set; } }
+public sealed class PostgresPortalRepository
+{
+    private readonly bool _allowed;
+    public PostgresPortalRepository(bool allowed) { _allowed = allowed; }
+    public int PermissionCalls { get; private set; }
+    public long? LastUserId { get; private set; }
+    public string? LastModuleCode { get; private set; }
+    public string? LastActionCode { get; private set; }
+    public Task<bool> HasPermissionAsync(long userId, string moduleCode, string actionCode, CancellationToken cancellationToken = default)
+    {
+        PermissionCalls++;
+        LastUserId = userId;
+        LastModuleCode = moduleCode;
+        LastActionCode = actionCode;
+        return Task.FromResult(_allowed);
+    }
+}
+'@|Set-Content (Join-Path $tmp 'AuthStubs.cs') -Encoding utf8
+@'
+using System.Globalization; using System.Text.Json; using System.Text.RegularExpressions; using Microsoft.AspNetCore.Http; using Microsoft.Extensions.DependencyInjection; using Sg.SuperApp.Api.Domain; using Sg.SuperApp.Api.Services;
 static JsonElement J(string s){using var d=JsonDocument.Parse(s);return d.RootElement.Clone();}
 const string A="I9-R03",B="I9-R05"; var e=new SchedulingRuleEvaluator();
 var p3=J("{\"intervalSemantics\":\"HALF_OPEN\",\"adjacentIntervalsOverlap\":false}");var p5=J("{\"missingRelationOutcome\":\"EXCEPTION_REQUIRED\",\"neverAssumeZero\":true,\"directional\":true}");
@@ -52,6 +103,7 @@ var m=J("{\"matrixDemo\":[{\"from\":\"PROJECT-A/POSITION-1\",\"to\":\"PROJECT-B/
 SchedulingRuleProfile P(JsonElement? c=null,bool on3=true,bool on5=true,int v=1)=>new(19,"MVP",v,SchedulingRuleOrigin.SIMULATED,SchedulingEnvironmentScope.MVP_TEST,"PROJECT-A",new DateOnly(2026,1,1),null,SchedulingRuleProfileStatus.ACTIVE,new string((char)('a'+v),64),new[]{new SchedulingRuleProfileEntry(A,p3,J("{}"),on3),new SchedulingRuleProfileEntry(B,p5,c??m,on5)});
 SchedulingRuleEvaluationBatch E(string f,SchedulingRuleProfile? p=null,IReadOnlySet<string>? h=null)=>e.Evaluate(p??P(),"PROJECT-A",new DateOnly(2026,8,17),J(f),h);RuleEvaluation R(SchedulingRuleEvaluationBatch x,string c)=>x.Evaluations.Single(y=>y.RuleCode==c);
 void Q<T>(T x,T y,string n)where T:notnull{if(!EqualityComparer<T>.Default.Equals(x,y))throw new Exception($"{n}: {x}!={y}");} SchedulingRuleSeverity S(SchedulingRuleOutcome o)=>o==SchedulingRuleOutcome.COMPLIANT?SchedulingRuleSeverity.INFO:o==SchedulingRuleOutcome.EXCEPTION_REQUIRED?SchedulingRuleSeverity.WARNING:SchedulingRuleSeverity.BLOCKING;
+async Task<int> HttpStatus(IResult result){using var services=new ServiceCollection().AddLogging().BuildServiceProvider();var context=new DefaultHttpContext{RequestServices=services};await result.ExecuteAsync(context);return context.Response.StatusCode;}
 void C(RuleEvaluation x,SchedulingRuleOutcome o,string c,string n){Q(o,x.Outcome,n+" outcome");Q(S(o),x.Severity,n+" severity");Q(o==SchedulingRuleOutcome.EXCEPTION_REQUIRED,x.ExceptionAllowed,n+" exception");Q(c,x.MessageCode,n+" code");Q(false,string.IsNullOrWhiteSpace(x.Explanation),n+" explanation");if(!Regex.IsMatch(x.ScopeHash,"^[a-f0-9]{64}$"))throw new Exception(n+" hash");}
 void Sum(SchedulingRuleEvaluationBatch x,int t,int co,int bl,int ex,bool ok,string n){Q(t,x.Summary.Total,n+" total");Q(co,x.Summary.Compliant,n+" compliant");Q(bl,x.Summary.Blocked,n+" blocked");Q(ex,x.Summary.ExceptionRequired,n+" exception");Q(0,x.Summary.Warning,n+" warning");Q(0,x.Summary.NotApplicable,n+" not applicable");Q(ok,x.Summary.CanApproveOrPublish,n+" approve");}
 void SameEvaluation(RuleEvaluation x,RuleEvaluation y,string n){Q(x.RuleCode,y.RuleCode,n+" rule");Q(x.ProfileVersion,y.ProfileVersion,n+" version");Q(x.Outcome,y.Outcome,n+" outcome");Q(x.Severity,y.Severity,n+" severity");Q(x.MessageCode,y.MessageCode,n+" code");Q(x.Explanation,y.Explanation,n+" explanation");Q(x.ScopeHash,y.ScopeHash,n+" hash");Q(x.ParametersSnapshot.GetRawText(),y.ParametersSnapshot.GetRawText(),n+" parameters snapshot");Q(x.FactsSnapshot.GetRawText(),y.FactsSnapshot.GetRawText(),n+" facts snapshot");Q(x.ExceptionAllowed,y.ExceptionAllowed,n+" exception");}
@@ -82,7 +134,7 @@ var baselineFacts=F(ps:"2026-08-20T06:00:00-05:00",pe:"2026-08-20T07:15:00-05:00
 var r03Disabled=E(F(),P(on3:false));Q(false,r03Disabled.Evaluations.Any(x=>x.RuleCode==A),"R03-T15 no productive R03 decision");C(R(r03Disabled,B),SchedulingRuleOutcome.COMPLIANT,"I9_R05_SAME_POSITION","R03-T15 R05");Sum(r03Disabled,1,1,0,0,true,"R03-T15");Done("R03-T15");
 // R05-T01..T20: seed matrix, missing vs malformed, exact scope and temporal gap.
 var row30=Cat(Row("PROJECT-A/POSITION-1","PROJECT-B/POSITION-2","30"));
-T("R05-T01",G(0,from:"PROJECT-A/POSITION-1",to:"PROJECT-A/POSITION-1"),SchedulingRuleOutcome.COMPLIANT,"I9_R03_COMPLIANT",SchedulingRuleOutcome.COMPLIANT,"I9_R05_SAME_POSITION",true,P(Cat()));
+T("R05-T01",G(0,from:"PROJECT-A/POSITION-1",to:"PROJECT-A/POSITION-1"),SchedulingRuleOutcome.COMPLIANT,"I9_R03_COMPLIANT",SchedulingRuleOutcome.COMPLIANT,"I9_R05_SAME_POSITION",true,P(J("{}")));
 T("R05-T02",G(0,from:"SITE-A/POSITION-1",to:"SITE-A/POSITION-2"),SchedulingRuleOutcome.COMPLIANT,"I9_R03_COMPLIANT",SchedulingRuleOutcome.EXCEPTION_REQUIRED,"I9_R05_RELATION_MISSING",false,P(Cat()));
 T("R05-T03",G(30),SchedulingRuleOutcome.COMPLIANT,"I9_R03_COMPLIANT",SchedulingRuleOutcome.COMPLIANT,"I9_R05_COMPLIANT",true,P(row30));
 T("R05-T04",G(31),SchedulingRuleOutcome.COMPLIANT,"I9_R03_COMPLIANT",SchedulingRuleOutcome.COMPLIANT,"I9_R05_COMPLIANT",true,P(row30));
@@ -94,7 +146,7 @@ T("R05-T09",G(30),SchedulingRuleOutcome.COMPLIANT,"I9_R03_COMPLIANT",SchedulingR
 T("R05-T10",G(30,from:"POST-A",to:"POST-B"),SchedulingRuleOutcome.COMPLIANT,"I9_R03_COMPLIANT",SchedulingRuleOutcome.BLOCKED,"I9_R05_PROHIBITED",false,P(Cat(Row("POST-A","POST-B","0",true))));
 foreach(var corruptCatalog in new[]{"null","[]","\"invalid\"","42"}){var corrupt=E(G(30),P(J(corruptCatalog)));C(R(corrupt,A),SchedulingRuleOutcome.COMPLIANT,"I9_R03_COMPLIANT","malformed top-level R03 "+corruptCatalog);C(R(corrupt,B),SchedulingRuleOutcome.BLOCKED,"I9_R05_INVALID_MATRIX","malformed top-level R05 "+corruptCatalog);Sum(corrupt,2,1,1,0,false,"malformed top-level "+corruptCatalog);}Console.WriteLine("MALFORMED TOP-LEVEL PASS");
 var approvalProfile=P(row30);var approvalFacts=G(29);var approvalPending=E(approvalFacts,approvalProfile);C(R(approvalPending,A),SchedulingRuleOutcome.COMPLIANT,"I9_R03_COMPLIANT","R05-T11 pending R03");C(R(approvalPending,B),SchedulingRuleOutcome.EXCEPTION_REQUIRED,"I9_R05_EXCEPTION_REQUIRED","R05-T11 pending R05");Sum(approvalPending,2,1,0,1,false,"R05-T11 pending");var exactR05Approval=new HashSet<string>{R(approvalPending,B).ScopeHash};var approvalGranted=E(approvalFacts,approvalProfile,exactR05Approval);C(R(approvalGranted,A),SchedulingRuleOutcome.COMPLIANT,"I9_R03_COMPLIANT","R05-T11 approved R03");C(R(approvalGranted,B),SchedulingRuleOutcome.EXCEPTION_REQUIRED,"I9_R05_EXCEPTION_REQUIRED","R05-T11 approved R05");Q(R(approvalPending,B).ScopeHash,R(approvalGranted,B).ScopeHash,"R05-T11 exact approval hash");Sum(approvalGranted,2,1,0,1,true,"R05-T11 approved");Done("R05-T11");
-Done("R05-T12");
+var deniedRepository=new PostgresPortalRepository(false);var deniedAuthorization=new PortalAuthorizationService(new RequestUserContext{User=new HarnessUser(73)},deniedRepository);var forbidden=await deniedAuthorization.RequireAsync("SCHEDULING","APPROVE_EXCEPTION",CancellationToken.None);Q(false,forbidden is null,"R05-T12 authenticated denial result");Q(StatusCodes.Status403Forbidden,await HttpStatus(forbidden!),"R05-T12 authenticated denial status");Q(1,deniedRepository.PermissionCalls,"R05-T12 permission calls");Q(73L,deniedRepository.LastUserId!.Value,"R05-T12 permission user");Q("SCHEDULING",deniedRepository.LastModuleCode!,"R05-T12 permission module");Q("APPROVE_EXCEPTION",deniedRepository.LastActionCode!,"R05-T12 permission action");var anonymousRepository=new PostgresPortalRepository(true);var anonymousAuthorization=new PortalAuthorizationService(new RequestUserContext(),anonymousRepository);var unauthorized=await anonymousAuthorization.RequireAsync("SCHEDULING","APPROVE_EXCEPTION",CancellationToken.None);Q(false,unauthorized is null,"R05-T12 anonymous result");Q(StatusCodes.Status401Unauthorized,await HttpStatus(unauthorized!),"R05-T12 anonymous status");Q(0,anonymousRepository.PermissionCalls,"R05-T12 anonymous repository bypass");Done("R05-T12");
 var reusedFacts=G(29,g:"guard-b",asn:"assignment-b",pasn:"assignment-old-b");var reused=E(reusedFacts,approvalProfile,exactR05Approval);C(R(reused,A),SchedulingRuleOutcome.COMPLIANT,"I9_R03_COMPLIANT","R05-T13 reused R03");C(R(reused,B),SchedulingRuleOutcome.EXCEPTION_REQUIRED,"I9_R05_EXCEPTION_REQUIRED","R05-T13 reused R05");Q(false,R(approvalPending,B).ScopeHash==R(reused,B).ScopeHash,"R05-T13 new guard and turn hash");Sum(reused,2,1,0,1,false,"R05-T13 reused");Done("R05-T13");
 var editProfile=P(Cat(Row("PROJECT-A/POSITION-1","PROJECT-B/POSITION-2","30"),Row("PROJECT-A/POSITION-1","PROJECT-C/POSITION-3","30")));var beforeEditFacts=G(29,iv:I("guard-a","2026-08-20T06:00:00-05:00","2026-08-20T08:00:00-05:00","APPROVED"));var beforeEdit=E(beforeEditFacts,editProfile);C(R(beforeEdit,A),SchedulingRuleOutcome.COMPLIANT,"I9_R03_COMPLIANT","R05-T14 before R03");C(R(beforeEdit,B),SchedulingRuleOutcome.EXCEPTION_REQUIRED,"I9_R05_EXCEPTION_REQUIRED","R05-T14 before R05");Sum(beforeEdit,2,1,0,1,false,"R05-T14 before");var beforeEditApproval=new HashSet<string>{R(beforeEdit,B).ScopeHash};var beforeEditApproved=E(beforeEditFacts,editProfile,beforeEditApproval);C(R(beforeEditApproved,A),SchedulingRuleOutcome.COMPLIANT,"I9_R03_COMPLIANT","R05-T14 approved R03");C(R(beforeEditApproved,B),SchedulingRuleOutcome.EXCEPTION_REQUIRED,"I9_R05_EXCEPTION_REQUIRED","R05-T14 approved R05");Q(R(beforeEdit,B).ScopeHash,R(beforeEditApproved,B).ScopeHash,"R05-T14 exact approval hash");Sum(beforeEditApproved,2,1,0,1,true,"R05-T14 approved");var afterEditFacts=G(29,ns:"2026-08-20T07:59:00-05:00",iv:I("guard-a","2026-08-20T06:00:00-05:00","2026-08-20T08:00:00-05:00","APPROVED"),from:"PROJECT-A/POSITION-1",to:"PROJECT-C/POSITION-3");var afterEdit=E(afterEditFacts,editProfile,beforeEditApproval);C(R(afterEdit,A),SchedulingRuleOutcome.BLOCKED,"I9_R03_OVERLAP_APPROVED_BLOCKED","R05-T14 edited R03");C(R(afterEdit,B),SchedulingRuleOutcome.EXCEPTION_REQUIRED,"I9_R05_EXCEPTION_REQUIRED","R05-T14 edited R05");Q(false,R(beforeEdit,A).ScopeHash==R(afterEdit,A).ScopeHash,"R05-T14 new R03 hash");Q(false,R(beforeEdit,B).ScopeHash==R(afterEdit,B).ScopeHash,"R05-T14 new R05 hash");Sum(afterEdit,2,0,1,1,false,"R05-T14 edited");Done("R05-T14");
 var precedenceFacts=G(29,iv:I("guard-a","2026-08-20T08:00:00-05:00","2026-08-20T10:00:00-05:00","APPROVED"));var precedencePending=E(precedenceFacts,approvalProfile);var precedenceApproval=new HashSet<string>{R(precedencePending,B).ScopeHash};var precedenceApproved=E(precedenceFacts,approvalProfile,precedenceApproval);C(R(precedenceApproved,A),SchedulingRuleOutcome.BLOCKED,"I9_R03_OVERLAP_APPROVED_BLOCKED","R05-T15 R03");C(R(precedenceApproved,B),SchedulingRuleOutcome.EXCEPTION_REQUIRED,"I9_R05_EXCEPTION_REQUIRED","R05-T15 R05");Q(R(precedencePending,B).ScopeHash,R(precedenceApproved,B).ScopeHash,"R05-T15 exact R05 hash");Sum(precedenceApproved,2,0,1,1,false,"R05-T15");Done("R05-T15");

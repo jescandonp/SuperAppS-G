@@ -77,15 +77,15 @@ public static class SchedulingOverlapTravelRules
             return Blocked(R05Code("_INVALID_GAP"), "El intervalo exacto entre turnos no es un numero entero no negativo de minutos.");
         var availableMinutes = availableTicks / TimeSpan.TicksPerMinute;
 
+        if (string.Equals(origin, destination, StringComparison.Ordinal))
+            return Compliant(R05Code("_SAME_POSITION"), "El mismo puesto exacto no exige desplazamiento.");
+
         var matrixAvailability = ReadMatrix(catalogSnapshot, out var matrix);
         if (matrixAvailability == MatrixAvailability.Missing)
             return ExceptionRequired(R05Code("_MATRIX_UNAVAILABLE"),
                 "No existe una matriz versionada aplicable; nunca se presume desplazamiento cero.");
         if (matrixAvailability == MatrixAvailability.Invalid)
             return Blocked(R05Code("_INVALID_MATRIX"), "La matriz de traslado versionada no es valida.");
-
-        if (string.Equals(origin, destination, StringComparison.Ordinal))
-            return Compliant(R05Code("_SAME_POSITION"), "El mismo puesto exacto no exige desplazamiento.");
 
         var relation = matrix.SingleOrDefault(row => string.Equals(row.From, origin, StringComparison.Ordinal) &&
                                                    string.Equals(row.To, destination, StringComparison.Ordinal));
