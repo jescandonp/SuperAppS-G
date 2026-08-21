@@ -143,7 +143,7 @@ function Test-RuleProfilePayloadBoundsLinkage {
 
 function Test-RuleEvaluatorDeterminismLinkage {
     param([string]$EvaluatorContent)
-    return $EvaluatorContent -match '(?s)OrderBy\s*\(\s*entry\s*=>\s*entry\.RuleCode.*?CreateUnverifiedEvaluation' -and
+    return $EvaluatorContent -match '(?s)OrderBy\s*\(\s*entry\s*=>\s*entry\.RuleCode.*?CreateEvaluation' -and
         $EvaluatorContent -match '(?s)ComputeScopeHash\s*\(.*?profile\.Version.*?profile\.Checksum.*?projectCode.*?period.*?entry\.RuleCode.*?Canonicalize\s*\(\s*entry\.Parameters\s*\).*?Canonicalize\s*\(\s*facts\s*\)' -and
         $EvaluatorContent -match '(?s)SchedulingRuleOutcome\.WARNING.*?SchedulingRuleSeverity\.ERROR.*?I9_RULE_NOT_IMPLEMENTED.*?ExceptionAllowed:\s*false' -and
         $EvaluatorContent -match '(?s)CanApproveOrPublish:.*?results\.All.*?COMPLIANT.*?NOT_APPLICABLE'
@@ -363,7 +363,7 @@ $payloadBoundsNegative = Test-RuleProfilePayloadBoundsLinkage `
 if (-not $payloadBoundsPositive -or $payloadBoundsNegative) {
     throw 'I9 MVP rules verifier payload-bounds negative self-test failed.'
 }
-$evaluatorLinkagePositive = 'OrderBy(entry => entry.RuleCode).Select(entry => CreateUnverifiedEvaluation()); ComputeScopeHash(profile) { profile.Version; profile.Checksum; projectCode; period; entry.RuleCode; Canonicalize(entry.Parameters); Canonicalize(facts); } SchedulingRuleOutcome.WARNING; SchedulingRuleSeverity.ERROR; "I9_RULE_NOT_IMPLEMENTED"; ExceptionAllowed: false; CanApproveOrPublish: results.All(result => result.Outcome is SchedulingRuleOutcome.COMPLIANT or SchedulingRuleOutcome.NOT_APPLICABLE);'
+$evaluatorLinkagePositive = 'OrderBy(entry => entry.RuleCode).Select(entry => CreateEvaluation()); ComputeScopeHash(profile) { profile.Version; profile.Checksum; projectCode; period; entry.RuleCode; Canonicalize(entry.Parameters); Canonicalize(facts); } SchedulingRuleOutcome.WARNING; SchedulingRuleSeverity.ERROR; "I9_RULE_NOT_IMPLEMENTED"; ExceptionAllowed: false; CanApproveOrPublish: results.All(result => result.Outcome is SchedulingRuleOutcome.COMPLIANT or SchedulingRuleOutcome.NOT_APPLICABLE);'
 $evaluatorLinkageNegative = 'OrderBy(entry => entry.RuleCode); ComputeScopeHash(profile.Id); SchedulingRuleOutcome.COMPLIANT;'
 if (-not (Test-RuleEvaluatorDeterminismLinkage $evaluatorLinkagePositive) -or
     (Test-RuleEvaluatorDeterminismLinkage $evaluatorLinkageNegative)) {
