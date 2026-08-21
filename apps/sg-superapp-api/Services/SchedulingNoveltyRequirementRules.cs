@@ -19,8 +19,10 @@ public static class SchedulingNoveltyRequirementRules
     private static readonly Regex Code = new("^[A-Za-z0-9._:/-]{1,80}$", RegexOptions.CultureInvariant);
     private static readonly HashSet<string> NoveltyCategories = new(StringComparer.Ordinal)
     {
-        "INCAPACITY_ACTIVE", "VACATION_ACTIVE", "ABSENCE_CONFIRMED", "ABSENCE_PENDING",
-        "TEMPORARY_ASSIGNMENT", "AVAILABLE", "ADMINISTRATIVE_EVENT", "EXPIRED_OR_CANCELLED", "UNKNOWN"
+        "INCAPACITY_ACTIVE", "VACATION_APPROVED_ACTIVE", "LEAVE_OR_CALAMITY_ACTIVE",
+        "SUSPENSION_OR_TERMINATION_ACTIVE", "ABSENCE_CONFIRMED", "ABSENCE_PENDING_CONFIRMATION",
+        "TRAINING_OR_INDUCTION_OVERLAP", "AVAILABLE", "ADDITIONAL_SHIFT", "ADMINISTRATIVE_EVENT",
+        "EXPIRED_OR_CANCELLED", "UNKNOWN"
     };
     private static readonly HashSet<string> RequirementCategories = new(StringComparer.Ordinal)
     {
@@ -39,7 +41,7 @@ public static class SchedulingNoveltyRequirementRules
 
         var catalogState = ReadNoveltyCatalog(catalogSnapshot, out var catalog);
         if (catalogState == CatalogState.Invalid)
-            return R04Blocked("_INVALID_CATALOG", "El catalogo canonico R04 es ambiguo o invalido.");
+            throw new SchedulingRuleContractException();
         if (catalogState == CatalogState.Missing || evaluations.GetArrayLength() == 0)
             return R04Warning("_UNVERIFIED", "No existe catalogo o evaluacion de novedades suficiente para acreditar disponibilidad.");
 
@@ -68,10 +70,7 @@ public static class SchedulingNoveltyRequirementRules
                 string.Equals(row.SourceStatus, sourceStatus, StringComparison.Ordinal) &&
                 Covers(row.EffectiveFrom, row.EffectiveTo, shiftStart, shiftEnd)).ToArray();
             if (activeMappings.Length > 1)
-            {
-                decisions.Add(R04Blocked("_AMBIGUOUS_MAPPING", "Mas de un mapeo canonico vigente coincide con la novedad."));
-                continue;
-            }
+                throw new SchedulingRuleContractException();
             if (activeMappings.Length != 1 ||
                 !string.Equals(activeMappings[0].SemanticCategory, category, StringComparison.Ordinal) ||
                 !string.Equals(activeMappings[0].MappingVersion, mappingVersion, StringComparison.Ordinal))
@@ -90,10 +89,13 @@ public static class SchedulingNoveltyRequirementRules
             decisions.Add(category switch
             {
                 "INCAPACITY_ACTIVE" => R04Blocked("_INCAPACITY_ACTIVE", "Existe incapacidad vigente durante el turno."),
-                "VACATION_ACTIVE" => R04Blocked("_VACATION_ACTIVE", "Existe vacacion aprobada y vigente durante el turno."),
+                "VACATION_APPROVED_ACTIVE" => R04Blocked("_VACATION_APPROVED_ACTIVE", "Existe vacacion aprobada y vigente durante el turno."),
+                "LEAVE_OR_CALAMITY_ACTIVE" => R04Blocked("_LEAVE_OR_CALAMITY_ACTIVE", "Existe licencia o calamidad vigente durante el turno."),
+                "SUSPENSION_OR_TERMINATION_ACTIVE" => R04Blocked("_SUSPENSION_OR_TERMINATION_ACTIVE", "Existe suspension o retiro vigente durante el turno."),
                 "ABSENCE_CONFIRMED" => R04Blocked("_ABSENCE_CONFIRMED", "Existe ausencia confirmada durante el turno."),
-                "ABSENCE_PENDING" => R04Exception("_ABSENCE_PENDING", "La ausencia pendiente exige excepcion ligada al alcance."),
-                "TEMPORARY_ASSIGNMENT" => R04Exception("_TEMPORARY_ASSIGNMENT", "La asignacion temporal vigente exige excepcion sin reemplazar R01/R02."),
+                "ABSENCE_PENDING_CONFIRMATION" => R04Exception("_ABSENCE_PENDING_CONFIRMATION", "La ausencia pendiente exige excepcion ligada al alcance."),
+                "TRAINING_OR_INDUCTION_OVERLAP" => R04Exception("_TRAINING_OR_INDUCTION_OVERLAP", "La capacitacion o induccion coincidente exige excepcion."),
+                "ADDITIONAL_SHIFT" => R04Exception("_ADDITIONAL_SHIFT", "El turno adicional exige excepcion sin reemplazar R01/R02."),
                 "AVAILABLE" => new(SchedulingRuleOutcome.COMPLIANT, SchedulingRuleSeverity.INFO,
                     R04 + "_AVAILABLE", "El mapeo canonico exacto acredita disponibilidad para R04.", false),
                 "ADMINISTRATIVE_EVENT" => new(SchedulingRuleOutcome.COMPLIANT, SchedulingRuleSeverity.INFO,
@@ -117,7 +119,6 @@ public static class SchedulingNoveltyRequirementRules
             !facts.TryGetProperty("requirementEvaluations", out var evaluations) || evaluations.ValueKind != JsonValueKind.Array)
             return R06Exception("_UNVERIFIED", "La frontera anonima R06 esta incompleta.", false);
 
-        var hrValidated = TryReadBoolean(facts, "hrValidated", out var validated) && validated;
         var catalogState = ReadRequirementCatalog(catalogSnapshot, out var catalog);
         if (catalogState == CatalogState.Invalid || HasOverlappingRequirements(catalog))
             return R06Exception("_INVALID_CATALOG", "Las versiones del catalogo R06 son invalidas o se solapan.", false);
@@ -145,21 +146,35 @@ public static class SchedulingNoveltyRequirementRules
             }
             if (matching.Length == 0)
             {
-                decisions.Add(R06Exception("_MISSING", "Falta evidencia para un requisito obligatorio.", hrValidated));
+                decisions.Add(R06Exception("_MISSING", "Falta evidencia para un requisito obligatorio.", false));
                 continue;
             }
 
             var item = matching[0];
-            if (!TryReadCode(item, "category", out var category) ||
+            if (!TryReadCode(item, "evaluationId", out _) ||
+                !TryReadCode(item, "category", out var category) ||
                 !TryReadCode(item, "catalogVersion", out var catalogVersion) ||
+                !TryReadCode(item, "sourceSystem", out var sourceSystem) ||
+                !TryReadCode(item, "sourceRequirementCode", out var sourceRequirementCode) ||
+                !TryReadCode(item, "sourceStatus", out var sourceStatus) ||
+                !TryReadCode(item, "evidenceId", out var evidenceId) ||
+                !TryReadCode(item, "evidenceSource", out var evidenceSource) ||
+                !TryReadCode(item, "evidenceType", out var evidenceType) ||
                 !TryReadCode(item, "evidenceState", out var evidenceState) ||
                 !RequirementCategories.Contains(category) ||
                 !string.Equals(category, requirement.Category, StringComparison.Ordinal) ||
-                !string.Equals(catalogVersion, requirement.CatalogVersion, StringComparison.Ordinal))
+                !string.Equals(catalogVersion, requirement.CatalogVersion, StringComparison.Ordinal) ||
+                !string.Equals(sourceSystem, requirement.SourceSystem, StringComparison.Ordinal) ||
+                !string.Equals(sourceRequirementCode, requirement.SourceRequirementCode, StringComparison.Ordinal) ||
+                !string.Equals(sourceStatus, requirement.SourceStatus, StringComparison.Ordinal) ||
+                !string.Equals(evidenceSource, requirement.EvidenceSource, StringComparison.Ordinal) ||
+                !string.Equals(evidenceType, requirement.EvidenceType, StringComparison.Ordinal))
             {
                 decisions.Add(R06Exception("_UNVERIFIED", "La evidencia no coincide exactamente con categoria y version del catalogo.", false));
                 continue;
             }
+
+            var hrValidated = HasCoherentHrValidation(item, evidenceId);
 
             if (evidenceState == "VERIFIED")
             {
@@ -224,6 +239,8 @@ public static class SchedulingNoveltyRequirementRules
                 !TryReadCode(item, "sourceStatus", out var sourceStatus) ||
                 !TryReadCode(item, "semanticCategory", out var category) || !NoveltyCategories.Contains(category) ||
                 !TryReadCode(item, "mappingVersion", out var version) ||
+                !TryReadCode(item, "mappedBy", out _) ||
+                !TryReadCode(item, "approvedBy", out _) ||
                 !TryReadTimestamp(item, "effectiveFrom", out var effectiveFrom) ||
                 !TryReadOptionalTimestamp(item, "effectiveTo", out var effectiveTo) ||
                 effectiveTo is not null && effectiveFrom >= effectiveTo)
@@ -248,12 +265,18 @@ public static class SchedulingNoveltyRequirementRules
                 !TryReadCode(item, "requirementCode", out var requirementCode) ||
                 !TryReadCode(item, "category", out var category) || !RequirementCategories.Contains(category) ||
                 !TryReadCode(item, "catalogVersion", out var version) ||
+                !TryReadCode(item, "sourceSystem", out var sourceSystem) ||
+                !TryReadCode(item, "sourceRequirementCode", out var sourceRequirementCode) ||
+                !TryReadCode(item, "sourceStatus", out var sourceStatus) ||
+                !TryReadCode(item, "evidenceType", out var evidenceType) ||
+                !TryReadCode(item, "evidenceSource", out var evidenceSource) ||
                 !TryReadTimestamp(item, "effectiveFrom", out var effectiveFrom) ||
                 !TryReadOptionalTimestamp(item, "effectiveTo", out var effectiveTo) ||
                 effectiveTo is not null && effectiveFrom >= effectiveTo ||
                 !TryReadBoolean(item, "informativeRemediable", out var informativeRemediable))
                 return CatalogState.Invalid;
-            parsed.Add(new(projectCode, positionCode, requirementCode, category, version,
+            parsed.Add(new(projectCode, positionCode, requirementCode, category, version, sourceSystem,
+                sourceRequirementCode, sourceStatus, evidenceType, evidenceSource,
                 effectiveFrom, effectiveTo, informativeRemediable));
         }
         rows = parsed;
@@ -310,6 +333,16 @@ public static class SchedulingNoveltyRequirementRules
                DateOnly.TryParseExact(property.GetString(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out value);
     }
 
+    private static bool HasCoherentHrValidation(JsonElement evidence, string evidenceId)
+    {
+        if (!evidence.TryGetProperty("hrValidation", out var validation) || validation.ValueKind != JsonValueKind.Object ||
+            !TryReadCode(validation, "validationId", out _) ||
+            !TryReadCode(validation, "validatorRoleKey", out _) ||
+            !TryReadTimestamp(validation, "validatedAt", out _) ||
+            !TryReadCode(validation, "evidenceId", out var validatedEvidenceId)) return false;
+        return string.Equals(evidenceId, validatedEvidenceId, StringComparison.Ordinal);
+    }
+
     private static bool TryReadOptionalTimestamp(JsonElement source, string name, out DateTimeOffset? value)
     {
         value = null;
@@ -349,7 +382,8 @@ public static class SchedulingNoveltyRequirementRules
     private sealed record NoveltyMapping(string SourceSystem, string SourceCode, string SourceStatus,
         string SemanticCategory, string MappingVersion, DateTimeOffset EffectiveFrom, DateTimeOffset? EffectiveTo);
     private sealed record RequirementMapping(string ProjectCode, string PositionCode, string RequirementCode,
-        string Category, string CatalogVersion, DateTimeOffset EffectiveFrom, DateTimeOffset? EffectiveTo,
-        bool InformativeRemediable);
+        string Category, string CatalogVersion, string SourceSystem, string SourceRequirementCode,
+        string SourceStatus, string EvidenceType, string EvidenceSource, DateTimeOffset EffectiveFrom,
+        DateTimeOffset? EffectiveTo, bool InformativeRemediable);
     private enum CatalogState { Missing, Valid, Invalid }
 }

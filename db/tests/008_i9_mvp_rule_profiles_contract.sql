@@ -30,17 +30,31 @@ BEGIN
       INTO profile_id
       FROM scheduling_rule_profiles
      WHERE profile_code = 'I9-MVP-SIMULATED'
-       AND version = 1;
+       AND version = 2;
 
     IF profile_id IS NULL THEN
         RAISE EXCEPTION 'Missing simulated MVP rule profile seed';
     END IF;
 
     IF (SELECT count(*) FROM scheduling_rule_profiles
-        WHERE profile_code = 'I9-MVP-SIMULATED' AND version = 1
+        WHERE profile_code = 'I9-MVP-SIMULATED' AND version = 2
           AND origin = 'SIMULATED' AND environment_scope = 'MVP_TEST'
           AND status = 'ACTIVE') <> 1 THEN
         RAISE EXCEPTION 'Simulated seed profile is not uniquely ACTIVE in MVP_TEST';
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM scheduling_rule_profiles
+               WHERE profile_code='I9-MVP-SIMULATED' AND version=1 AND status='ACTIVE') THEN
+        RAISE EXCEPTION 'Superseded simulated v1 profile remained ACTIVE';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM scheduling_rule_profile_entries
+                   WHERE rule_profile_id=profile_id AND rule_code='I9-R04'
+                     AND jsonb_array_length(catalog_snapshot->'mappingDemo')>=5)
+       OR NOT EXISTS (SELECT 1 FROM scheduling_rule_profile_entries
+                      WHERE rule_profile_id=profile_id AND rule_code='I9-R06'
+                        AND jsonb_array_length(catalog_snapshot->'requirementsDemo')>=2) THEN
+        RAISE EXCEPTION 'Simulated v2 catalogs are not executable R04/R06 snapshots';
     END IF;
 
     IF (SELECT array_agg(rule_code ORDER BY rule_code)

@@ -44,7 +44,7 @@ public sealed class SchedulingRuleEvaluator
         ["I9-R03"] = Fields("assignmentId", "scheduleVersionId", "employeeId", "proposedShiftStart", "proposedShiftEnd", "existingIntervals"),
         ["I9-R04"] = Fields("assignmentId", "scheduleVersionId", "employeeId", "shiftId", "shiftStart", "shiftEnd", "noveltyEvaluations"),
         ["I9-R05"] = Fields("assignmentId", "previousAssignmentId", "scheduleVersionId", "employeeId", "originPositionCode", "destinationPositionCode", "previousShiftStart", "previousShiftEnd", "proposedShiftStart", "proposedShiftEnd"),
-        ["I9-R06"] = Fields("assignmentId", "scheduleVersionId", "employeeId", "positionCode", "shiftId", "shiftStart", "shiftEnd", "hrValidated", "requirementEvaluations"),
+        ["I9-R06"] = Fields("assignmentId", "scheduleVersionId", "employeeId", "positionCode", "shiftId", "shiftStart", "shiftEnd", "requirementEvaluations"),
         ["I9-R07"] = Fields("assignmentId", "scheduleVersionId", "templateCode", "templateVersion", "anchorDate", "expectedCells", "proposedCells")
     };
     private static readonly HashSet<string> AllowedRootFacts = RootFactsByRule.Values
@@ -53,7 +53,9 @@ public sealed class SchedulingRuleEvaluator
         "start", "end", "positionCode", "shiftId", "code", "status", "validFrom", "validTo", "required",
         "evidenceCode", "minutes", "prohibited", "cell", "expected", "proposed", "date", "shiftCode", "employeeId",
         "noveltyId", "sourceSystem", "sourceCode", "sourceStatus", "semanticCategory", "mappingVersion",
-        "requirementCode", "category", "catalogVersion", "evidenceState", "informativeRemediable",
+        "evaluationId", "requirementCode", "category", "catalogVersion", "sourceRequirementCode",
+        "evidenceId", "evidenceSource", "evidenceState", "evidenceType", "informativeRemediable",
+        "hrValidation", "validationId", "validatorRoleKey", "validatedAt",
         "remediationOwnerRole", "remediationOwnerKey", "dueDate");
     private static readonly Regex AnonymousCode = new("^[A-Za-z0-9._:/-]{1,80}$", RegexOptions.CultureInvariant);
 
@@ -69,7 +71,7 @@ public sealed class SchedulingRuleEvaluator
         ValidateFacts(facts);
 
         var results = profile.Entries
-            .Where(entry => entry.Enabled)
+            .Where(entry => entry.Enabled || entry.RuleCode is "I9-R04" or "I9-R06")
             .OrderBy(entry => entry.RuleCode, StringComparer.Ordinal)
             .Select(entry => CreateEvaluation(profile, entry, projectCode, period, facts))
             .ToArray();
@@ -135,7 +137,7 @@ public sealed class SchedulingRuleEvaluator
         if (value.ValueKind != JsonValueKind.String) return;
         var text = value.GetString() ?? string.Empty;
         if (propertyName.EndsWith("Start", StringComparison.Ordinal) || propertyName.EndsWith("End", StringComparison.Ordinal) ||
-            propertyName is "start" or "end" or "validFrom" or "validTo" or "date" or "anchorDate")
+            propertyName is "start" or "end" or "validFrom" or "validTo" or "date" or "anchorDate" or "validatedAt")
         {
             if (!DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out _) &&
                 !DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
@@ -176,6 +178,18 @@ public sealed class SchedulingRuleEvaluator
     {
         var sanitizedFacts = SanitizeFacts(entry.RuleCode, facts);
         var scopeHash = ComputeScopeHash(profile, entry, projectCode, period, sanitizedFacts);
+        if (!entry.Enabled && entry.RuleCode is ("I9-R04" or "I9-R06"))
+            return new RuleEvaluation(
+                entry.RuleCode,
+                profile.Version,
+                SchedulingRuleOutcome.WARNING,
+                SchedulingRuleSeverity.ERROR,
+                entry.RuleCode.Replace("-", "_", StringComparison.Ordinal) + "_DISABLED_UNVERIFIED",
+                "La regla esta desactivada y no produce una decision de cumplimiento.",
+                scopeHash,
+                entry.Parameters.Clone(),
+                sanitizedFacts,
+                ExceptionAllowed: false);
         var decision = entry.RuleCode switch
         {
             "I9-R01" => ToRuleDecision(SchedulingWorkRestRules.EvaluateR01(entry.Parameters, sanitizedFacts)),
@@ -261,6 +275,10 @@ public sealed class SchedulingRuleEvaluator
                 decision.GetType().GetProperty("ExceptionAllowed")?.GetValue(decision) is not bool exceptionAllowed)
                 return NoveltyRequirementEvaluatorUnavailable();
             return new RuleDecision(outcome, severity, messageCode, explanation, exceptionAllowed);
+        }
+        catch (TargetInvocationException exception) when (exception.InnerException is SchedulingRuleContractException)
+        {
+            throw new SchedulingRuleContractException();
         }
         catch (TargetInvocationException)
         {
