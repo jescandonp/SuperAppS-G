@@ -133,8 +133,8 @@ public static class SchedulingOverlapTravelRules
     private static MatrixAvailability ReadMatrix(JsonElement catalogSnapshot, out IReadOnlyList<MatrixRelation> matrix)
     {
         matrix = Array.Empty<MatrixRelation>();
-        if (catalogSnapshot.ValueKind != JsonValueKind.Object || !catalogSnapshot.TryGetProperty("matrixDemo", out var raw))
-            return MatrixAvailability.Missing;
+        if (catalogSnapshot.ValueKind != JsonValueKind.Object) return MatrixAvailability.Invalid;
+        if (!catalogSnapshot.TryGetProperty("matrixDemo", out var raw)) return MatrixAvailability.Missing;
         if (raw.ValueKind != JsonValueKind.Array) return MatrixAvailability.Invalid;
         var parsed = new List<MatrixRelation>();
         var keys = new HashSet<string>(StringComparer.Ordinal);
