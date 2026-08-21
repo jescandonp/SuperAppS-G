@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.Numerics;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Sg.SuperApp.Api.Domain;
 
 namespace Sg.SuperApp.Api.Services;
@@ -13,6 +15,21 @@ public sealed record WorkRestRuleDecision(
 
 public static class SchedulingWorkRestRules
 {
+    private static readonly BigInteger MaximumDecimalUnscaled = new(decimal.MaxValue);
+    private static readonly Regex CompleteIsoTimestamp = new(
+        "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,7})?(?:Z|[+-]\\d{2}:\\d{2})$",
+        RegexOptions.CultureInvariant);
+    private static readonly string[] OffsetTimestampFormats =
+    {
+        "yyyy-MM-dd'T'HH:mm:sszzz",
+        "yyyy-MM-dd'T'HH:mm:ss.FFFFFFFzzz"
+    };
+    private static readonly string[] UtcTimestampFormats =
+    {
+        "yyyy-MM-dd'T'HH:mm:ss'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss.FFFFFFF'Z'"
+    };
+
     public static WorkRestRuleDecision EvaluateR01(JsonElement parameters, JsonElement facts)
     {
         if (!TryReadDecimal(parameters, "ordinaryDailyHours", out var ordinaryDailyHours) ||
@@ -65,7 +82,53 @@ public static class SchedulingWorkRestRules
     {
         value = default;
         return source.ValueKind == JsonValueKind.Object && source.TryGetProperty(name, out var property) &&
-               property.ValueKind == JsonValueKind.Number && property.TryGetDecimal(out value);
+               property.ValueKind == JsonValueKind.Number && TryParseExactJsonDecimal(property.GetRawText(), out value);
+    }
+
+    private static bool TryParseExactJsonDecimal(string raw, out decimal value)
+    {
+        value = default;
+        var exponentIndex = raw.IndexOfAny(new[] { 'e', 'E' });
+        var mantissaEnd = exponentIndex < 0 ? raw.Length : exponentIndex;
+        var exponent = 0;
+        if (exponentIndex >= 0 && !int.TryParse(raw[(exponentIndex + 1)..], NumberStyles.AllowLeadingSign,
+                CultureInfo.InvariantCulture, out exponent))
+            return false;
+
+        var index = raw.StartsWith("-", StringComparison.Ordinal) ? 1 : 0;
+        var fractionalDigits = 0;
+        var afterDecimal = false;
+        var unscaled = BigInteger.Zero;
+        for (; index < mantissaEnd; index++)
+        {
+            var character = raw[index];
+            if (character == '.')
+            {
+                afterDecimal = true;
+                continue;
+            }
+            if (character is < '0' or > '9') return false;
+            unscaled = unscaled * 10 + character - '0';
+            if (afterDecimal) fractionalDigits++;
+        }
+        if (raw.StartsWith("-", StringComparison.Ordinal)) unscaled = -unscaled;
+        if (unscaled.IsZero) return true;
+
+        var scale = (long)fractionalDigits - exponent;
+        while (scale > 0 && unscaled % 10 == 0)
+        {
+            unscaled /= 10;
+            scale--;
+        }
+        if (scale < 0)
+        {
+            if (scale < -28) return false;
+            unscaled *= BigInteger.Pow(10, checked((int)-scale));
+            scale = 0;
+        }
+        if (scale > 28 || BigInteger.Abs(unscaled) > MaximumDecimalUnscaled) return false;
+        return decimal.TryParse(raw, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent,
+            CultureInfo.InvariantCulture, out value);
     }
 
     private static bool TryReadBoolean(JsonElement source, string name, out bool value)
@@ -83,10 +146,12 @@ public static class SchedulingWorkRestRules
         if (source.ValueKind != JsonValueKind.Object || !source.TryGetProperty(name, out var property) ||
             property.ValueKind != JsonValueKind.String) return false;
         var text = property.GetString() ?? string.Empty;
-        var hasExplicitOffset = text.EndsWith("Z", StringComparison.OrdinalIgnoreCase) ||
-                                text.Length >= 6 && text[^3] == ':' && (text[^6] is '+' or '-');
-        return hasExplicitOffset && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture,
-            DateTimeStyles.RoundtripKind, out value);
+        if (!CompleteIsoTimestamp.IsMatch(text)) return false;
+        return text.EndsWith("Z", StringComparison.Ordinal)
+            ? DateTimeOffset.TryParseExact(text, UtcTimestampFormats, CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out value)
+            : DateTimeOffset.TryParseExact(text, OffsetTimestampFormats, CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out value);
     }
 
     private static WorkRestRuleDecision Compliant(string code, string explanation) =>

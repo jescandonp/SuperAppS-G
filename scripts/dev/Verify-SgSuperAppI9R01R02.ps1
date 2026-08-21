@@ -99,10 +99,14 @@ var profile = new SchedulingRuleProfile(1, "MVP-RULES", 1, SchedulingRuleOrigin.
         new SchedulingRuleProfileEntry("I9-R02", r02p, J("{}"), true)
     });
 var evaluator = new SchedulingRuleEvaluator();
+SchedulingRuleEvaluationBatch EvaluateRaw(string daily, string weekly, bool writtenAgreement, string previousShiftEnd,
+    string proposedShiftStart, IReadOnlySet<string>? approvals = null) =>
+    evaluator.Evaluate(profile, "PROJECT-A", new DateOnly(2026, 8, 17),
+        J($"{{\"dailyHours\":{daily},\"weeklyHours\":{weekly},\"writtenAgreement\":{writtenAgreement.ToString().ToLowerInvariant()},\"previousShiftEnd\":\"{previousShiftEnd}\",\"proposedShiftStart\":\"{proposedShiftStart}\"}}"), approvals);
 SchedulingRuleEvaluationBatch Evaluate(decimal daily, decimal weekly, bool writtenAgreement, string start,
     IReadOnlySet<string>? approvals = null) =>
-    evaluator.Evaluate(profile, "PROJECT-A", new DateOnly(2026, 8, 17),
-        J($"{{\"dailyHours\":{daily.ToString(System.Globalization.CultureInfo.InvariantCulture)},\"weeklyHours\":{weekly.ToString(System.Globalization.CultureInfo.InvariantCulture)},\"writtenAgreement\":{writtenAgreement.ToString().ToLowerInvariant()},\"previousShiftEnd\":\"2026-08-17T22:00:00-05:00\",\"proposedShiftStart\":\"{start}\"}}"), approvals);
+    EvaluateRaw(daily.ToString(System.Globalization.CultureInfo.InvariantCulture), weekly.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        writtenAgreement, "2026-08-17T22:00:00-05:00", start, approvals);
 RuleEvaluation Rule(SchedulingRuleEvaluationBatch batch, string ruleCode) =>
     batch.Evaluations.Single(x => x.RuleCode == ruleCode);
 void AssertEqual<T>(T expected, T actual, string label) where T : notnull {
@@ -142,6 +146,19 @@ AssertSummary(ordinary, 2, 0, 0, true, "R01 8/42");
 var ordinaryRepeat = Evaluate(8m, 42m, false, exactRest);
 AssertEqual(Rule(ordinary, "I9-R01").ScopeHash, Rule(ordinaryRepeat, "I9-R01").ScopeHash, "R01 identical scope stability");
 AssertEqual(Rule(ordinary, "I9-R02").ScopeHash, Rule(ordinaryRepeat, "I9-R02").ScopeHash, "R02 identical scope stability");
+
+var equivalentNumberForms = EvaluateRaw("8.0", "42e0", false, "2026-08-17T22:00:00-05:00", exactRest);
+AssertRule(equivalentNumberForms, "I9-R01", SchedulingRuleOutcome.COMPLIANT, SchedulingRuleSeverity.INFO, false, "R01 exact equivalent JSON numbers");
+AssertSummary(equivalentNumberForms, 2, 0, 0, true, "R01 exact equivalent JSON numbers");
+void VerifyUnrepresentableR01(string daily, string weekly, string label) {
+    var batch = EvaluateRaw(daily, weekly, true, "2026-08-17T22:00:00-05:00", exactRest);
+    AssertRule(batch, "I9-R01", SchedulingRuleOutcome.BLOCKED, SchedulingRuleSeverity.BLOCKING, false, label);
+    AssertRule(batch, "I9-R02", SchedulingRuleOutcome.COMPLIANT, SchedulingRuleSeverity.INFO, false, $"{label} R02");
+    AssertSummary(batch, 1, 1, 0, false, label);
+}
+VerifyUnrepresentableR01("10.0000000000000000000000000001", "42", "R01 non-representable 10");
+VerifyUnrepresentableR01("12.0000000000000000000000000001", "42", "R01 non-representable 12");
+VerifyUnrepresentableR01("8", "60.0000000000000000000000000001", "R01 non-representable 60");
 
 var missingAgreement = Evaluate(8.01m, 42m, false, exactRest);
 AssertRule(missingAgreement, "I9-R01", SchedulingRuleOutcome.BLOCKED, SchedulingRuleSeverity.BLOCKING, false,
@@ -195,6 +212,18 @@ var r02Approved = Evaluate(8m, 42m, false, shortRest, new HashSet<string> { Rule
 AssertSummary(r02Approved, 1, 0, 1, true, "R02 11:59:59 approved scope");
 if (Rule(ordinary, "I9-R02").ScopeHash == Rule(shortRestInitial, "I9-R02").ScopeHash)
     throw new Exception("R02 rest scopeHash did not change when the proposed start changed.");
+
+var utcEquivalentRest = EvaluateRaw("8", "42", false, "2026-08-18T03:00:00Z", "2026-08-18T15:00:00Z");
+AssertRule(utcEquivalentRest, "I9-R02", SchedulingRuleOutcome.COMPLIANT, SchedulingRuleSeverity.INFO, false, "R02 exact UTC timestamps");
+AssertSummary(utcEquivalentRest, 2, 0, 0, true, "R02 exact UTC timestamps");
+foreach (var invalidTimestamp in new[] { "10:00:00-05:00", "2026-08-18", "2026-08-18 10:00:00-05:00", "18/08/2026T10:00:00-05:00" }) {
+    var decision = SchedulingWorkRestRules.EvaluateR02(r02p,
+        J($"{{\"previousShiftEnd\":\"2026-08-17T22:00:00-05:00\",\"proposedShiftStart\":\"{invalidTimestamp}\"}}"));
+    AssertEqual(SchedulingRuleOutcome.BLOCKED, decision.Outcome, $"R02 invalid timestamp {invalidTimestamp} outcome");
+    AssertEqual(SchedulingRuleSeverity.BLOCKING, decision.Severity, $"R02 invalid timestamp {invalidTimestamp} severity");
+    AssertEqual(false, decision.ExceptionAllowed, $"R02 invalid timestamp {invalidTimestamp} exceptionAllowed");
+    AssertEqual("I9_R02_INVALID_INPUT", decision.MessageCode, $"R02 invalid timestamp {invalidTimestamp} messageCode");
+}
 
 void VerifyAbsolutePrecedence(decimal daily, decimal weekly, string label) {
     var initial = Evaluate(daily, weekly, true, shortRest);
