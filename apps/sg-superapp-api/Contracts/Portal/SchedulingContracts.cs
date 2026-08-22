@@ -29,6 +29,7 @@ public sealed record CreateScheduleExceptionRequest(
     long? AssignmentId,
     long EvaluationId,
     string RuleCode,
+    string ScopeHash,
     string MotiveCode,
     string Reason,
     string Responsible,

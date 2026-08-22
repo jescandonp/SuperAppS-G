@@ -13,6 +13,11 @@ public sealed class SchedulingRuleContractException : Exception
     public SchedulingRuleContractException() : base("Stored scheduling rule data violates its contract.") { }
 }
 
+public sealed class SchedulingScopeHashMismatchException : InvalidOperationException
+{
+    public SchedulingScopeHashMismatchException() : base("El scopeHash declarado no corresponde al snapshot evaluado vigente.") { }
+}
+
 public sealed record SchedulingRuleProfileEntry(
     string RuleCode,
     JsonElement Parameters,

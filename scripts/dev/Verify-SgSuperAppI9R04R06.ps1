@@ -112,6 +112,37 @@ if ($routeStart -lt 0 -or $routeEnd -le $routeStart -or -not (Test-ExceptionRout
     exit 2
 }
 
+$contractsSource = Remove-CSharpComments (Get-Content -LiteralPath (Join-Path $repoRoot 'apps/sg-superapp-api/Contracts/Portal/SchedulingContracts.cs') -Raw)
+$exceptionRequestFields = [regex]::Match($contractsSource, '(?s)record\s+CreateScheduleExceptionRequest\s*\((?<fields>.*?)\)\s*;').Groups['fields'].Value
+if ([string]::IsNullOrWhiteSpace($exceptionRequestFields)) {
+    Write-Output 'I9 R04 R06 BLOCKED: exception request contract unavailable'; exit 2
+}
+foreach ($field in @('EvaluationId', 'RuleCode', 'ScopeHash', 'MotiveCode')) {
+    if ($exceptionRequestFields -notmatch ('\b' + $field + '\b')) {
+        Write-Output "I9 R04 R06 FAIL: exception request contract does not declare $field"; exit 1
+    }
+}
+$normalizedRoute = (Remove-CSharpComments $portalSource.Substring($routeStart, $routeEnd - $routeStart)) -replace '\s', ''
+foreach ($required in @('request.ScopeHash', '^[0-9a-f]{64}$', 'SchedulingScopeHashMismatchException')) {
+    if ($normalizedRoute.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+        Write-Output "I9 R04 R06 FAIL: exception route does not enforce the declared scope hash ($required)"; exit 1
+    }
+}
+$repositorySource = Get-Content -LiteralPath $portalRepository -Raw
+$persistenceStart = $repositorySource.IndexOf('CreateScheduleExceptionAsync(long versionId', [StringComparison]::Ordinal)
+$persistenceEnd = if ($persistenceStart -ge 0) { $repositorySource.IndexOf('AuditScheduleExceptionDenialAsync(long versionId', $persistenceStart, [StringComparison]::Ordinal) } else { -1 }
+if ($persistenceStart -lt 0 -or $persistenceEnd -le $persistenceStart) {
+    Write-Output 'I9 R04 R06 BLOCKED: exception persistence boundary unavailable'; exit 2
+}
+$normalizedPersistence = (Remove-CSharpComments $repositorySource.Substring($persistenceStart, $persistenceEnd - $persistenceStart)) -replace '\s', ''
+$declaredScopeIndex = $normalizedPersistence.IndexOf('request.ScopeHash', [StringComparison]::Ordinal)
+$scopeRejectIndex = $normalizedPersistence.IndexOf('SchedulingScopeHashMismatchException', [StringComparison]::Ordinal)
+$scopeInsertIndex = $normalizedPersistence.IndexOf('insertintoschedule_exceptions', [StringComparison]::Ordinal)
+$scopeAuditIndex = $normalizedPersistence.IndexOf('SCHEDULE_RULE_EXCEPTION_APPROVED', [StringComparison]::Ordinal)
+if ($declaredScopeIndex -lt 0 -or $scopeRejectIndex -lt $declaredScopeIndex -or $scopeInsertIndex -lt $scopeRejectIndex -or $scopeAuditIndex -lt $scopeInsertIndex) {
+    Write-Output 'I9 R04 R06 FAIL: persisted scope hash is derived instead of matched before mutation and audit'; exit 1
+}
+
 Write-Output 'I9 R04 R06 STATIC PASS'
 $dotnet = 'C:\tmp\dotnet6\dotnet.exe'
 if (-not (Test-Path -LiteralPath $dotnet -PathType Leaf)) {
@@ -335,6 +366,89 @@ Q(38,passed,"numbered rules scenario count"); Console.WriteLine($"I9 R04 R06 RUL
             & $psql -X -w -v ON_ERROR_STOP=1 -f (Join-Path $repoRoot 'db/tests/008_i9_mvp_rule_profiles_contract.sql') | Out-Null
             if ($LASTEXITCODE -ne 0) { throw 'database contract failed' }
         }
+        $contaminationFixture = @(
+            "INSERT INTO clients(code,name,status) VALUES('I9-MIG-CLIENT','I9 migration client','ACTIVO');",
+            "INSERT INTO service_projects(client_id,code,name,effective_from,status) SELECT id,'I9-MIG-PROJECT','I9 migration project',CURRENT_DATE,'ACTIVO' FROM clients WHERE code='I9-MIG-CLIENT';",
+            "INSERT INTO schedules(project_id,period_start,period_end,created_by) SELECT id,CURRENT_DATE,CURRENT_DATE,'i9.migration' FROM service_projects WHERE code='I9-MIG-PROJECT';",
+            "INSERT INTO schedule_versions(schedule_id,version_number,status,created_by) SELECT id,1,'BORRADOR','i9.migration' FROM schedules ORDER BY id DESC LIMIT 1;",
+            "INSERT INTO scheduling_rule_profiles(profile_code,version,origin,environment_scope,scope_code,effective_from,status,checksum,created_by,created_at,approval_evidence) VALUES('I9-MIG-PROFILE',1,'SIMULATED','MVP_TEST','I9-MIG-PROJECT',CURRENT_DATE,'DRAFT',repeat('a',64),'i9.migration',now(),'{}'::jsonb);",
+            "INSERT INTO scheduling_rule_evaluations(schedule_version_id,rule_profile_id,rule_code,outcome,severity,message_code,explanation,parameters_snapshot,facts_snapshot,scope_hash,exception_allowed,exception_status,correlation_id,evaluated_at,audit_actor) SELECT sv.id,p.id,'I9-R02','EXCEPTION_REQUIRED','WARNING','I9_R02_MIN_REST','Anonymous migration evaluation',jsonb_build_object('minimumRestHours',12),jsonb_build_object('restMinutes',660),repeat('b',64),TRUE,'PENDING','i9-migration-001',now(),'i9.migration' FROM schedule_versions sv CROSS JOIN scheduling_rule_profiles p WHERE p.profile_code='I9-MIG-PROFILE' ORDER BY sv.id DESC LIMIT 1;"
+        ) -join ' '
+        $contaminationCases = @(
+            @{
+                Name = 'partial'
+                Guards = @('schedule_exceptions_rule_audit_check')
+                Contamination = "INSERT INTO schedule_exceptions(schedule_version_id,exception_type,reason,responsible,rule_code) SELECT id,'RULE_EXCEPTION','Partial identity survivor','i9.migration','I9-R02' FROM schedule_versions ORDER BY id DESC LIMIT 1;"
+                Expected = 'I9_MVP_PARTIAL_SCHEMA_INCOMPATIBLE: schedule_exceptions contains a partial evaluation/rule/scope/motive identity'
+                Rows = 1
+            },
+            @{
+                Name = 'mismatch'
+                Guards = @('schedule_exceptions_evaluation_identity_fkey')
+                Contamination = "INSERT INTO schedule_exceptions(schedule_version_id,exception_type,reason,responsible,evaluation_id,rule_code,scope_hash,motive_code) SELECT e.schedule_version_id,'RULE_EXCEPTION','Mismatched identity survivor','i9.migration',e.id,'I9-R03',repeat('c',64),'MIG_TEST' FROM scheduling_rule_evaluations e ORDER BY e.id DESC LIMIT 1;"
+                Expected = 'I9_MVP_PARTIAL_SCHEMA_INCOMPATIBLE: schedule_exceptions rule_code/scope_hash does not match evaluation_id'
+                Rows = 1
+            },
+            @{
+                Name = 'duplicate'
+                Guards = @('uq_schedule_exceptions_evaluation_rule_scope_motive')
+                Contamination = "INSERT INTO schedule_exceptions(schedule_version_id,exception_type,reason,responsible,evaluation_id,rule_code,scope_hash,motive_code) SELECT e.schedule_version_id,'RULE_EXCEPTION','Duplicate survivor','i9.migration',e.id,e.rule_code,e.scope_hash,'MIG_TEST' FROM scheduling_rule_evaluations e CROSS JOIN generate_series(1,2) g;"
+                Expected = 'I9_MVP_PARTIAL_SCHEMA_INCOMPATIBLE: schedule_exceptions contains duplicate evaluation/rule/scope/motive identities'
+                Rows = 2
+            }
+        )
+        foreach ($case in $contaminationCases) {
+            $caseSchema = 'i9_r0406_mig' + $case.Name + '_' + [guid]::NewGuid().ToString('N').Substring(0, 10)
+            if ($caseSchema -notmatch '^i9_r0406_mig[a-z]+_[0-9a-f]{10}$') { throw 'unsafe contamination schema name' }
+            $savedOptions = $env:PGOPTIONS
+            try {
+                & $psql -X -w -v ON_ERROR_STOP=1 -c "CREATE SCHEMA $caseSchema" | Out-Null
+                if ($LASTEXITCODE -ne 0) { throw "$($case.Name): cannot create contamination schema" }
+                $env:PGOPTIONS = "--search_path=$caseSchema,public"
+                Get-ChildItem (Join-Path $repoRoot 'db/migrations') -Filter '*.sql' | Sort-Object Name | ForEach-Object {
+                    & $psql -X -w -v ON_ERROR_STOP=1 -f $_.FullName | Out-Null
+                    if ($LASTEXITCODE -ne 0) { throw "$($case.Name): clean migration failed at $($_.Name)" }
+                }
+                & $psql -X -w -v ON_ERROR_STOP=1 -c $contaminationFixture | Out-Null
+                if ($LASTEXITCODE -ne 0) { throw "$($case.Name): contamination fixture failed" }
+                foreach ($guard in $case.Guards) {
+                    & $psql -X -w -v ON_ERROR_STOP=1 -c "ALTER TABLE schedule_exceptions DROP CONSTRAINT $guard" | Out-Null
+                    if ($LASTEXITCODE -ne 0) { throw "$($case.Name): cannot relax guard $guard" }
+                }
+                & $psql -X -w -v ON_ERROR_STOP=1 -c $case.Contamination | Out-Null
+                if ($LASTEXITCODE -ne 0) { throw "$($case.Name): contaminated rows were rejected before the migration" }
+                $rowsBefore = & $psql -X -w -Atqc 'select count(*) from schedule_exceptions'
+                $evaluationsBefore = & $psql -X -w -Atqc 'select count(*) from scheduling_rule_evaluations'
+                $previousPreference = $ErrorActionPreference
+                $ErrorActionPreference = 'Continue'
+                $migrationOutput = & $psql -X -w -v ON_ERROR_STOP=1 -f $migration 2>&1
+                $migrationExit = $LASTEXITCODE
+                $ErrorActionPreference = $previousPreference
+                if ($migrationExit -eq 0) { throw "$($case.Name): contaminated schema was migrated instead of failing closed" }
+                if (($migrationOutput -join "`n") -notmatch [regex]::Escape($case.Expected)) {
+                    throw "$($case.Name): migration did not report the canonical preflight error"
+                }
+                $rowsAfter = & $psql -X -w -Atqc 'select count(*) from schedule_exceptions'
+                if ($rowsAfter -ne $rowsBefore -or [int]$rowsAfter -ne $case.Rows) {
+                    throw "$($case.Name): the failed migration altered the contaminated rows"
+                }
+                $evaluationsAfter = & $psql -X -w -Atqc 'select count(*) from scheduling_rule_evaluations'
+                if ($evaluationsAfter -ne $evaluationsBefore -or [int]$evaluationsAfter -ne 1) {
+                    throw "$($case.Name): the failed migration altered pre-existing evaluations"
+                }
+                foreach ($guard in $case.Guards) {
+                    $reapplied = & $psql -X -w -Atqc "select count(*) from pg_constraint where conrelid='schedule_exceptions'::regclass and conname='$guard'"
+                    if ([int]$reapplied -ne 0) { throw "$($case.Name): the failed migration partially applied $guard" }
+                }
+                Write-Output "I9 R04 R06 MIGRATION PREFLIGHT $($case.Name.ToUpperInvariant()) PASS"
+            }
+            finally {
+                $env:PGOPTIONS = $savedOptions
+                & $psql -X -w -v ON_ERROR_STOP=1 -c "DROP SCHEMA IF EXISTS $caseSchema CASCADE" | Out-Null
+                $caseClean = & $psql -X -w -Atqc "select to_regnamespace('$caseSchema') is null"
+                if ($caseClean -ne 't') { Write-Output 'I9 R04 R06 FAIL: contamination schema cleanup'; exit 1 }
+            }
+        }
         $apiAssembly = [Security.SecurityElement]::Escape((Join-Path $apiBuildRoot 'bin/Release/net6.0/sg-superapp-api.dll'))
 @"
 <Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework><LangVersion>preview</LangVersion><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup><ItemGroup><FrameworkReference Include="Microsoft.AspNetCore.App"/><PackageReference Include="Npgsql" Version="6.0.10"/><Compile Include="WorkflowProgram.cs"/><Reference Include="sg-superapp-api"><HintPath>$apiAssembly</HintPath></Reference></ItemGroup></Project>
@@ -358,6 +472,7 @@ static JsonElement J(string value){using var d=JsonDocument.Parse(value);return 
 static void Q(bool value,string label){if(!value)throw new Exception(label);Console.WriteLine(label+" PASS");}
 static async Task<long> ValidationCount(string connectionString,long evaluationId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select count(*) from scheduling_rule_hr_validations where evaluation_id=@id",c);q.Parameters.AddWithValue("id",evaluationId);return (long)(await q.ExecuteScalarAsync()??0L);}
 static async Task<long> ExceptionCount(string connectionString,long evaluationId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select count(*) from schedule_exceptions where evaluation_id=@id",c);q.Parameters.AddWithValue("id",evaluationId);return (long)(await q.ExecuteScalarAsync()??0L);}
+static async Task<long> ApprovedAuditCount(string connectionString,long evaluationId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select count(*) from audit_log where event_type='SCHEDULE_RULE_EXCEPTION_APPROVED' and (detail->>'evaluationId')::bigint=@id",c);q.Parameters.AddWithValue("id",evaluationId);return (long)(await q.ExecuteScalarAsync()??0L);}
 static async Task<long> DeniedAuditCount(string connectionString,long actorId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select count(*) from audit_log where actor_user_id=@actor and event_type='SCHEDULE_RULE_EXCEPTION_DENIED' and result='DENIED'",c);q.Parameters.AddWithValue("actor",actorId);return (long)(await q.ExecuteScalarAsync()??0L);}
 static async Task<int> HttpStatus(IResult result){using var services=new ServiceCollection().AddLogging().BuildServiceProvider();var context=new DefaultHttpContext{RequestServices=services};await result.ExecuteAsync(context);return context.Response.StatusCode;}
 static async Task<(int Version,string Outcome,string ScopeHash,string Parameters,string Facts,string Status)> PersistedSnapshot(string connectionString,long evaluationId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select p.version,e.outcome,e.scope_hash,e.parameters_snapshot::text,e.facts_snapshot::text,e.exception_status from scheduling_rule_evaluations e join scheduling_rule_profiles p on p.id=e.rule_profile_id where e.id=@id",c);q.Parameters.AddWithValue("id",evaluationId);await using var r=await q.ExecuteReaderAsync();if(!await r.ReadAsync())throw new Exception("persisted snapshot");return(r.GetInt32(0),r.GetString(1),r.GetString(2),r.GetString(3),r.GetString(4),r.GetString(5));}
@@ -375,18 +490,23 @@ var cleanFacts=J(facts.GetRawText().Replace(",\"hrValidation\":{\"validationId\"
 var batch=evaluator.Evaluate(profile,"PROJECT-A",new DateOnly(2026,8,21),cleanFacts);var saved=await httpRepository.PersistEvaluationsAsync(versionId,null,"PROJECT-A",batch,"i9.demo.actor",CancellationToken.None);
 var r04=saved.Single(x=>x.Evaluation.RuleCode=="I9-R04");var r06=saved.Single(x=>x.Evaluation.RuleCode=="I9-R06");
 Q(await portalRepository.AuditScheduleExceptionDenialAsync(versionId,actorId,"i9.demo.actor"),"R04-T19");
-await portalRepository.CreateScheduleExceptionAsync(versionId,new(null,r04.Id,"I9-R04","HR_VALIDATED_DEMO","demo","OPS","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");Q(true,"R04-T20");
-var duplicateBefore=await ExceptionCount(connectionString,r04.Id);var duplicateRejected=false;try{await portalRepository.CreateScheduleExceptionAsync(versionId,new(null,r04.Id,"I9-R04","HR_VALIDATED_DEMO","duplicate","OPS","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");}catch(InvalidOperationException ex) when(ex.Message.StartsWith("Ya existe una decision",StringComparison.Ordinal)){duplicateRejected=true;}if(!duplicateRejected||await ExceptionCount(connectionString,r04.Id)!=duplicateBefore)throw new Exception("duplicate exception identity was not rejected stably");
-try{await portalRepository.CreateScheduleExceptionAsync(versionId+999,new(null,r04.Id,"I9-R04","HR_VALIDATED_DEMO","demo","OPS","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");throw new Exception("reuse accepted");}catch(KeyNotFoundException){}Q(true,"R04-T21");
+await portalRepository.CreateScheduleExceptionAsync(versionId,new(null,r04.Id,"I9-R04",r04.Evaluation.ScopeHash,"HR_VALIDATED_DEMO","demo","OPS","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");Q(true,"R04-T20");
+var duplicateBefore=await ExceptionCount(connectionString,r04.Id);var duplicateRejected=false;try{await portalRepository.CreateScheduleExceptionAsync(versionId,new(null,r04.Id,"I9-R04",r04.Evaluation.ScopeHash,"HR_VALIDATED_DEMO","duplicate","OPS","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");}catch(InvalidOperationException ex) when(ex.Message.StartsWith("Ya existe una decision",StringComparison.Ordinal)){duplicateRejected=true;}if(!duplicateRejected||await ExceptionCount(connectionString,r04.Id)!=duplicateBefore)throw new Exception("duplicate exception identity was not rejected stably");
+try{await portalRepository.CreateScheduleExceptionAsync(versionId+999,new(null,r04.Id,"I9-R04",r04.Evaluation.ScopeHash,"HR_VALIDATED_DEMO","demo","OPS","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");throw new Exception("reuse accepted");}catch(KeyNotFoundException){}Q(true,"R04-T21");
+var scopeExceptionsBefore=await ExceptionCount(connectionString,r04.Id);var scopeAuditBefore=await ApprovedAuditCount(connectionString,r04.Id);
+foreach(var declaredScope in new[]{new string('a',64),string.Empty,"   ",r06.Evaluation.ScopeHash,r04.Evaluation.ScopeHash.ToUpperInvariant()}){var scopeRejected=false;try{await portalRepository.CreateScheduleExceptionAsync(versionId,new(null,r04.Id,"I9-R04",declaredScope,"HR_VALIDATED_DEMO","scope","OPS","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");}catch(SchedulingScopeHashMismatchException){scopeRejected=true;}if(!scopeRejected)throw new Exception("declared scope hash was not matched exactly");}
+Q(await ExceptionCount(connectionString,r04.Id)==scopeExceptionsBefore,"R04-T20 declared scope mismatch leaves no decision");
+Q(await ApprovedAuditCount(connectionString,r04.Id)==scopeAuditBefore,"R04-T20 declared scope mismatch leaves no approval audit");
 Q(!r06.Evaluation.ExceptionAllowed,"R06-T12");Q(await portalRepository.HasPermissionAsync(thActorId,"SCHEDULING","VALIDATE_REQUIREMENT"),"R06-T13 TH validate permission");await httpRepository.ValidateRequirementEvidenceAsync(r06.Id,"EVID-COURSE",thActorId,"i9.demo.th",CancellationToken.None);await httpRepository.ValidateRequirementEvidenceAsync(r06.Id,"EVID-ACC",thActorId,"i9.demo.th",CancellationToken.None);
 var exceptionCountBefore=await ExceptionCount(connectionString,r06.Id);var deniedAuditBefore=await DeniedAuditCount(connectionString,thActorId);var thAuthorization=new PortalAuthorizationService(new RequestUserContext{User=new UserProfileResponse(thActorId,"I9 TH Actor","i9.demo.th","TH",true,null)},portalRepository);var thDenied=await thAuthorization.RequireAsync("SCHEDULING","APPROVE_EXCEPTION",CancellationToken.None);Q(thDenied is not null&&await HttpStatus(thDenied)==403,"R06-T13 TH approve denied");Q(await portalRepository.AuditScheduleExceptionDenialAsync(versionId,thActorId,"i9.demo.th"),"R06-T13 TH denial audited");Q(exceptionCountBefore==await ExceptionCount(connectionString,r06.Id),"R06-T13 TH denial no mutation");Q(await DeniedAuditCount(connectionString,thActorId)==deniedAuditBefore+1,"R06-T13 TH denied audit persisted");
-var opsAuthorization=new PortalAuthorizationService(new RequestUserContext{User=new UserProfileResponse(actorId,"I9 Operations Actor","i9.demo.ops","OPERACIONES",true,null)},portalRepository);Q(await opsAuthorization.RequireAsync("SCHEDULING","APPROVE_EXCEPTION",CancellationToken.None) is null,"R06-T13 operations approve permission");await portalRepository.CreateScheduleExceptionAsync(versionId,new(null,r06.Id,"I9-R06","HR_VALIDATED_DEMO","demo","OPS","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.ops");Q(true,"R06-T13");
-var noHrBatch=evaluator.Evaluate(profile,"PROJECT-A",new DateOnly(2026,8,21),cleanFacts);var noHrSaved=await httpRepository.PersistEvaluationsAsync(versionId,null,"PROJECT-A",noHrBatch,"i9.demo.actor",CancellationToken.None);var noHrR06=noHrSaved.Single(x=>x.Evaluation.RuleCode=="I9-R06");try{await portalRepository.CreateScheduleExceptionAsync(versionId,new(null,noHrR06.Id,"I9-R06","HR_VALIDATED_DEMO","demo","TH","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");throw new Exception("no HR accepted");}catch(InvalidOperationException){}Q(true,"R06-T14");
-var validationCountBefore=await ValidationCount(connectionString,noHrR06.Id);Q(await httpRepository.AuditRequirementValidationDenialAsync(noHrR06.Id,actorId,"i9.demo.actor",CancellationToken.None),"R06-T15 audit");Q(validationCountBefore==await ValidationCount(connectionString,noHrR06.Id),"R06-T15 no mutation");try{await portalRepository.CreateScheduleExceptionAsync(versionId+999,new(null,r06.Id,"I9-R06","HR_VALIDATED_DEMO","demo","TH","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");throw new Exception("wrong version accepted");}catch(KeyNotFoundException){}Q(true,"R06-T16");
+var opsAuthorization=new PortalAuthorizationService(new RequestUserContext{User=new UserProfileResponse(actorId,"I9 Operations Actor","i9.demo.ops","OPERACIONES",true,null)},portalRepository);Q(await opsAuthorization.RequireAsync("SCHEDULING","APPROVE_EXCEPTION",CancellationToken.None) is null,"R06-T13 operations approve permission");await portalRepository.CreateScheduleExceptionAsync(versionId,new(null,r06.Id,"I9-R06",r06.Evaluation.ScopeHash,"HR_VALIDATED_DEMO","demo","OPS","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.ops");Q(true,"R06-T13");
+var noHrBatch=evaluator.Evaluate(profile,"PROJECT-A",new DateOnly(2026,8,21),cleanFacts);var noHrSaved=await httpRepository.PersistEvaluationsAsync(versionId,null,"PROJECT-A",noHrBatch,"i9.demo.actor",CancellationToken.None);var noHrR06=noHrSaved.Single(x=>x.Evaluation.RuleCode=="I9-R06");try{await portalRepository.CreateScheduleExceptionAsync(versionId,new(null,noHrR06.Id,"I9-R06",noHrR06.Evaluation.ScopeHash,"HR_VALIDATED_DEMO","demo","TH","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");throw new Exception("no HR accepted");}catch(InvalidOperationException){}Q(true,"R06-T14");
+var validationCountBefore=await ValidationCount(connectionString,noHrR06.Id);Q(await httpRepository.AuditRequirementValidationDenialAsync(noHrR06.Id,actorId,"i9.demo.actor",CancellationToken.None),"R06-T15 audit");Q(validationCountBefore==await ValidationCount(connectionString,noHrR06.Id),"R06-T15 no mutation");try{await portalRepository.CreateScheduleExceptionAsync(versionId+999,new(null,r06.Id,"I9-R06",r06.Evaluation.ScopeHash,"HR_VALIDATED_DEMO","demo","TH","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");throw new Exception("wrong version accepted");}catch(KeyNotFoundException){}Q(true,"R06-T16");
 var changed=J(cleanFacts.GetRawText().Replace("SHIFT-1","SHIFT-2"));var changedBatch=evaluator.Evaluate(profile,"PROJECT-A",new DateOnly(2026,8,21),changed);var changedSaved=await httpRepository.PersistEvaluationsAsync(versionId,null,"PROJECT-A",changedBatch,"i9.demo.actor",CancellationToken.None);Q(changedSaved.Single(x=>x.Evaluation.RuleCode=="I9-R06").Evaluation.ScopeHash!=r06.Evaluation.ScopeHash,"R06-T17");
+var supersededScope=changedSaved.Single(x=>x.Evaluation.RuleCode=="I9-R06").Evaluation.ScopeHash;var supersededRejected=false;try{await portalRepository.CreateScheduleExceptionAsync(versionId,new(null,r06.Id,"I9-R06",supersededScope,"HR_VALIDATED_DEMO","superseded","OPS","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");}catch(SchedulingScopeHashMismatchException){supersededRejected=true;}if(!supersededRejected)throw new Exception("superseded scope hash was accepted");Q(supersededScope!=r06.Evaluation.ScopeHash,"R06-T17 superseded scope hash fails closed");
 var oldStored=await PersistedSnapshot(connectionString,r06.Id);long replacementProfileId;
 await using(var cn=new NpgsqlConnection(connectionString)){await cn.OpenAsync();await using(var retire=new NpgsqlCommand("update scheduling_rule_profiles set status='RETIRED',effective_to=date '2026-08-21' where id=@id",cn)){retire.Parameters.AddWithValue("id",profile.Id);await retire.ExecuteNonQueryAsync();}var retiredMutationRejected=false;try{await using var tamper=new NpgsqlCommand("update scheduling_rule_profile_entries set catalog_snapshot=jsonb_set(catalog_snapshot,'{approvedMotiveCodes}',(catalog_snapshot->'approvedMotiveCodes')||'\"TAMPERED_MOTIVE\"'::jsonb) where rule_profile_id=@id and rule_code='I9-R04'",cn);tamper.Parameters.AddWithValue("id",profile.Id);await tamper.ExecuteNonQueryAsync();}catch(PostgresException ex) when(ex.SqlState=="55000"){retiredMutationRejected=true;}if(!retiredMutationRejected)throw new Exception("retired catalog mutation accepted");await using(var insert=new NpgsqlCommand(@"insert into scheduling_rule_profiles(profile_code,version,origin,environment_scope,scope_code,effective_from,status,checksum,created_by,approval_evidence) select profile_code,version+1,origin,environment_scope,scope_code,date '2026-08-22','DRAFT',repeat('3',64),'i9.traceability',jsonb_build_object('mode','SIMULATED','purpose','MVP_TEST','catalogVersion','REQ-V3') from scheduling_rule_profiles where id=@old returning id",cn)){insert.Parameters.AddWithValue("old",profile.Id);replacementProfileId=(long)(await insert.ExecuteScalarAsync()??throw new Exception("replacement profile"));}await using(var entries=new NpgsqlCommand(@"insert into scheduling_rule_profile_entries(rule_profile_id,rule_code,parameters,catalog_snapshot,enabled) select @new,rule_code,parameters,case when rule_code='I9-R06' then replace(catalog_snapshot::text,'REQ-V2','REQ-V3')::jsonb else catalog_snapshot end,enabled from scheduling_rule_profile_entries where rule_profile_id=@old",cn)){entries.Parameters.AddWithValue("new",replacementProfileId);entries.Parameters.AddWithValue("old",profile.Id);await entries.ExecuteNonQueryAsync();}await using(var activate=new NpgsqlCommand("update scheduling_rule_profiles set status='ACTIVE',activated_by='i9.traceability',activated_at=now() where id=@id",cn)){activate.Parameters.AddWithValue("id",replacementProfileId);await activate.ExecuteNonQueryAsync();}}
-var historicalMotiveRejected=false;try{await portalRepository.CreateScheduleExceptionAsync(versionId,new(null,r04.Id,"I9-R04","TAMPERED_MOTIVE","tamper","OPS","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");}catch(InvalidOperationException ex) when(ex.Message.Contains("catalogo versionado",StringComparison.Ordinal)){historicalMotiveRejected=true;}if(!historicalMotiveRejected)throw new Exception("historical motive did not fail closed");
+var historicalMotiveRejected=false;try{await portalRepository.CreateScheduleExceptionAsync(versionId,new(null,r04.Id,"I9-R04",r04.Evaluation.ScopeHash,"TAMPERED_MOTIVE","tamper","OPS","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");}catch(InvalidOperationException ex) when(ex.Message.Contains("catalogo versionado",StringComparison.Ordinal)){historicalMotiveRejected=true;}if(!historicalMotiveRejected)throw new Exception("historical motive did not fail closed");
 long replacementVersionId;await using(var cn=new NpgsqlConnection(connectionString)){await cn.OpenAsync();await using var replacementVersion=new NpgsqlCommand(@"with s as (insert into schedules(project_id,period_start,period_end,created_by) select s.project_id,date '2026-08-22',date '2026-08-22','i9.traceability' from schedule_versions sv join schedules s on s.id=sv.schedule_id where sv.id=@old returning id) insert into schedule_versions(schedule_id,version_number,status,created_by) select id,1,'PROPUESTA','i9.traceability' from s returning id",cn);replacementVersion.Parameters.AddWithValue("old",versionId);replacementVersionId=(long)(await replacementVersion.ExecuteScalarAsync()??throw new Exception("replacement schedule version"));}
 var replacementEntries=profile.Entries.Select(x=>x.RuleCode=="I9-R06"?new SchedulingRuleProfileEntry(x.RuleCode,x.Parameters,J(x.CatalogSnapshot.GetRawText().Replace("REQ-V2","REQ-V3")),x.Enabled):x).ToArray();var replacementProfile=new SchedulingRuleProfile(replacementProfileId,profile.ProfileCode,profile.Version+1,profile.Origin,profile.EnvironmentScope,profile.ScopeCode,new DateOnly(2026,8,22),null,SchedulingRuleProfileStatus.ACTIVE,new string('3',64),replacementEntries);var replacementFacts=J(cleanFacts.GetRawText().Replace("REQ-V2","REQ-V3"));var replacementBatch=evaluator.Evaluate(replacementProfile,"PROJECT-A",new DateOnly(2026,8,22),replacementFacts);await httpRepository.PersistEvaluationsAsync(replacementVersionId,null,"PROJECT-A",replacementBatch,"i9.traceability",CancellationToken.None);var reloaded=await httpRepository.LoadEvaluationsAsync(replacementVersionId,CancellationToken.None);var oldReloaded=await PersistedSnapshot(connectionString,r06.Id);var newReloaded=reloaded.Single(x=>x.RuleCode=="I9-R06"&&x.ProfileVersion==profile.Version+1);Q(oldStored.ScopeHash==oldReloaded.ScopeHash&&oldStored.Parameters==oldReloaded.Parameters&&oldStored.Facts==oldReloaded.Facts&&oldStored.Outcome==oldReloaded.Outcome&&oldStored.Version==oldReloaded.Version&&oldStored.Status==oldReloaded.Status,"R06-T22 old persisted snapshot immutable");Q(newReloaded.ProfileVersion==profile.Version+1&&newReloaded.ScopeHash!=oldReloaded.ScopeHash,"R06-T22 replacement persisted");
 Console.WriteLine("I9 R04 R06 PASS 47");

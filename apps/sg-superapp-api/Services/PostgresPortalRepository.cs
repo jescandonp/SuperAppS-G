@@ -3125,6 +3125,8 @@ where e.id=@evaluation and e.schedule_version_id=@version for share of e";
             ruleCode=rd.GetString(0);scopeHash=rd.GetString(1);outcome=rd.GetString(2);exceptionAllowed=rd.GetBoolean(3);
             evaluatedAssignment=rd.IsDBNull(4)?null:rd.GetInt64(4);factsJson=rd.GetString(5);catalogJson=rd.GetString(6);
         }
+        if(!string.Equals(scopeHash,(request.ScopeHash??string.Empty).Trim(),StringComparison.Ordinal))
+            throw new SchedulingScopeHashMismatchException();
         if(!string.Equals(ruleCode,request.RuleCode.Trim(),StringComparison.Ordinal) || outcome!="EXCEPTION_REQUIRED" ||
            (ruleCode!="I9-R06" && !exceptionAllowed))
             throw new InvalidOperationException("La evaluacion no admite la excepcion solicitada.");
