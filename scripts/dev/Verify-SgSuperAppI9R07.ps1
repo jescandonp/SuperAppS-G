@@ -11,8 +11,13 @@ $rule=Get-Content $files[5] -Raw;$evaluator=Get-Content $files[6] -Raw
 foreach($p in @('EvaluateR07\s*\(','I9_R07_COMPLIANT','I9_R07_DEVIATION','I9_R07_MIXED_GUARDS','I9_R07_TEMPLATE_UNAVAILABLE','I9_R07_INVALID_INPUT','templateCode','templateVersion','anchorDate','expectedCells','proposedCells','shiftCode')){
   if($rule-notmatch ("(?s)"+$p)){Write-Output "I9 R07 FAIL: rule contract $p";exit 1}
 }
-foreach($p in @('"I9-R07"\s*=>','SchedulingTemplateDeviationRule','"I9-R06"\s*or\s*"I9-R07"')){
+foreach($p in @('"I9-R07"\s*=>','SchedulingTemplateDeviationRule','if\s*\(!entry\.Enabled\)')){
   if($evaluator-notmatch ("(?s)"+$p)){Write-Output "I9 R07 FAIL: evaluator does not dispatch R07 ($p)";exit 1}
+}
+# No rule may be dropped for being disabled: a missing evaluation would let the summary approve
+# by omission. This is the shared fail-closed contract for all seven rules, not just R07.
+if($evaluator-match '(?s)\.Where\s*\(\s*entry\s*=>\s*entry\.Enabled'){
+  Write-Output 'I9 R07 FAIL: evaluator still drops disabled rules from the batch';exit 1
 }
 # Contract point 7 (deterministic comparison that never infers a different template) cannot be
 # asserted at this layer: the rule receives expectedCells already derived. It is deferred to

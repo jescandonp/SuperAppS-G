@@ -70,7 +70,9 @@ public sealed class SchedulingRuleEvaluator
         ValidateFacts(facts);
 
         var results = profile.Entries
-            .Where(entry => entry.Enabled || entry.RuleCode is "I9-R04" or "I9-R06" or "I9-R07")
+            // No rule is ever dropped for being disabled. A missing evaluation would let the summary
+            // approve by omission, which is the opposite of what every rule contract requires in
+            // development mode: "no decide cumplimiento productivo".
             .OrderBy(entry => entry.RuleCode, StringComparer.Ordinal)
             .Select(entry => CreateEvaluation(profile, entry, projectCode, period, facts))
             .ToArray();
@@ -177,7 +179,7 @@ public sealed class SchedulingRuleEvaluator
     {
         var sanitizedFacts = SanitizeFacts(entry.RuleCode, facts);
         var scopeHash = ComputeScopeHash(profile, entry, projectCode, period, sanitizedFacts);
-        if (!entry.Enabled && entry.RuleCode is ("I9-R04" or "I9-R06" or "I9-R07"))
+        if (!entry.Enabled)
             return new RuleEvaluation(
                 entry.RuleCode,
                 profile.Version,
