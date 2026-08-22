@@ -123,9 +123,26 @@ foreach ($field in @('EvaluationId', 'RuleCode', 'ScopeHash', 'MotiveCode')) {
     }
 }
 $normalizedRoute = (Remove-CSharpComments $portalSource.Substring($routeStart, $routeEnd - $routeStart)) -replace '\s', ''
-foreach ($required in @('request.ScopeHash', '^[0-9a-f]{64}$', 'SchedulingScopeHashMismatchException')) {
+foreach ($required in @('request.ScopeHash', '^[0-9a-f]{64}$', 'SchedulingScopeHashMismatchException',
+        'InvalidScopeHashProblem()', 'StaleScopeHashProblem()')) {
     if ($normalizedRoute.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
         Write-Output "I9 R04 R06 FAIL: exception route does not enforce the declared scope hash ($required)"; exit 1
+    }
+}
+$scopeMismatchCatch = $normalizedRoute.IndexOf('catch(SchedulingScopeHashMismatchException)', [StringComparison]::Ordinal)
+$invalidOperationCatch = $normalizedRoute.IndexOf('catch(Exceptionex)when(exisInvalidOperationException', [StringComparison]::Ordinal)
+if ($scopeMismatchCatch -lt 0 -or $invalidOperationCatch -lt 0 -or $scopeMismatchCatch -gt $invalidOperationCatch) {
+    Write-Output 'I9 R04 R06 FAIL: the stale scope hash catch does not precede the InvalidOperationException filter'; exit 1
+}
+$normalizedPortal = (Remove-CSharpComments $portalSource) -replace '\s', ''
+foreach ($problemContract in @(
+    'InvalidScopeHashProblem()=>ScopeHashProblem(',
+    'StaleScopeHashProblem()=>ScopeHashProblem(',
+    'StatusCodes.Status400BadRequest',
+    'StatusCodes.Status409Conflict'
+)) {
+    if ($normalizedPortal.IndexOf($problemContract, [StringComparison]::Ordinal) -lt 0) {
+        Write-Output "I9 R04 R06 FAIL: stable scope hash ProblemDetails contract missing ($problemContract)"; exit 1
     }
 }
 $repositorySource = Get-Content -LiteralPath $portalRepository -Raw
@@ -480,7 +497,7 @@ static JsonElement J(string value){using var d=JsonDocument.Parse(value);return 
 static void Q(bool value,string label){if(!value)throw new Exception(label);Console.WriteLine(label+" PASS");}
 static async Task<long> ValidationCount(string connectionString,long evaluationId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select count(*) from scheduling_rule_hr_validations where evaluation_id=@id",c);q.Parameters.AddWithValue("id",evaluationId);return (long)(await q.ExecuteScalarAsync()??0L);}
 static async Task<long> ExceptionCount(string connectionString,long evaluationId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select count(*) from schedule_exceptions where evaluation_id=@id",c);q.Parameters.AddWithValue("id",evaluationId);return (long)(await q.ExecuteScalarAsync()??0L);}
-static async Task<long> ApprovedAuditCount(string connectionString,long evaluationId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select count(*) from audit_log where event_type='SCHEDULE_RULE_EXCEPTION_APPROVED' and (detail->>'evaluationId')::bigint=@id",c);q.Parameters.AddWithValue("id",evaluationId);return (long)(await q.ExecuteScalarAsync()??0L);}
+static async Task<long> ApprovedAuditCount(string connectionString,long evaluationId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select count(*) from audit_log where event_type='SCHEDULE_RULE_EXCEPTION_APPROVED' and (detail->>'evaluationId') ~ '^[0-9]+$' and (detail->>'evaluationId')::bigint=@id",c);q.Parameters.AddWithValue("id",evaluationId);return (long)(await q.ExecuteScalarAsync()??0L);}
 static async Task<long> DeniedAuditCount(string connectionString,long actorId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select count(*) from audit_log where actor_user_id=@actor and event_type='SCHEDULE_RULE_EXCEPTION_DENIED' and result='DENIED'",c);q.Parameters.AddWithValue("actor",actorId);return (long)(await q.ExecuteScalarAsync()??0L);}
 static async Task<int> HttpStatus(IResult result){using var services=new ServiceCollection().AddLogging().BuildServiceProvider();var context=new DefaultHttpContext{RequestServices=services};await result.ExecuteAsync(context);return context.Response.StatusCode;}
 static async Task<(int Version,string Outcome,string ScopeHash,string Parameters,string Facts,string Status)> PersistedSnapshot(string connectionString,long evaluationId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select p.version,e.outcome,e.scope_hash,e.parameters_snapshot::text,e.facts_snapshot::text,e.exception_status from scheduling_rule_evaluations e join scheduling_rule_profiles p on p.id=e.rule_profile_id where e.id=@id",c);q.Parameters.AddWithValue("id",evaluationId);await using var r=await q.ExecuteReaderAsync();if(!await r.ReadAsync())throw new Exception("persisted snapshot");return(r.GetInt32(0),r.GetString(1),r.GetString(2),r.GetString(3),r.GetString(4),r.GetString(5));}
