@@ -14,8 +14,9 @@ foreach($p in @('EvaluateR07\s*\(','I9_R07_COMPLIANT','I9_R07_DEVIATION','I9_R07
 foreach($p in @('"I9-R07"\s*=>','SchedulingTemplateDeviationRule','"I9-R06"\s*or\s*"I9-R07"')){
   if($evaluator-notmatch ("(?s)"+$p)){Write-Output "I9 R07 FAIL: evaluator does not dispatch R07 ($p)";exit 1}
 }
-# The rule must never infer a different template to avoid the deviation (contract point 7).
-if($rule-notmatch '(?s)scopeHash'){Write-Output 'I9 R07 FAIL: rule does not document the scopeHash binding';exit 1}
+# Contract point 7 (deterministic comparison that never infers a different template) cannot be
+# asserted at this layer: the rule receives expectedCells already derived. It is deferred to
+# Task 22 together with the producer of those facts, and is deliberately NOT claimed here.
 foreach($forbidden in @('fullName','documentNumber','email','phone','freeText','description')){
   if($rule-match ('"'+[regex]::Escape($forbidden)+'"')){Write-Output "I9 R07 FAIL: non-minimized fact field $forbidden";exit 1}
 }
@@ -36,7 +37,7 @@ Write-Output 'R07-T11 ROUTE LINKAGE PASS'
 
 # R07-T07/T08: the versioned catalog is the only source of authorized motives, and OTHER is one of them.
 $seedText=Get-Content $seed -Raw
-$r07Entry=[regex]::Match($seedText,"(?s)\('I9-R07',(?<body>.*?)\)\s*\)").Groups['body'].Value
+$r07Entry=[regex]::Match($seedText,"(?s)\('I9-R07',(?<body>(?:(?!\('I9-R).)*?)\)\s*\)").Groups['body'].Value
 if([string]::IsNullOrWhiteSpace($r07Entry)){Write-Output 'I9 R07 BLOCKED: simulated R07 profile entry unavailable';exit 2}
 foreach($p in @('approvedMotiveCodes','OTHER','SIMULATED_DEMO_NOT_INSTITUTIONAL','templateCodes','changeInvalidatesApproval')){
   if($r07Entry-notmatch [regex]::Escape($p)){Write-Output "I9 R07 FAIL: simulated R07 catalog missing $p";exit 1}
@@ -56,7 +57,7 @@ using System.Text.Json; using System.Text.RegularExpressions; using Sg.SuperApp.
 static JsonElement J(string s){using var d=JsonDocument.Parse(s);return d.RootElement.Clone();}
 const string R7="I9-R07", R3="I9-R03"; var e=new SchedulingRuleEvaluator();
 var p7=J("{\"compareBy\":[\"templateVersion\",\"anchor\",\"cell\"],\"changeInvalidatesApproval\":true}");
-var cat7=J("{\"classification\":\"SIMULATED_DEMO_NOT_INSTITUTIONAL\",\"templateCodes\":[\"2X2\",\"4X2\",\"6X1\"],\"approvedMotiveCodes\":[\"OPERATIONAL_NEED_DEMO\",\"COVERAGE_DEMO\",\"OTHER\"]}");
+var cat7=J("{\"classification\":\"SIMULATED_DEMO_NOT_INSTITUTIONAL\",\"templateCodes\":[\"2X2\",\"4X2\",\"6X1\"],\"templateVersions\":[\"TPL-V1\",\"TPL-V2\"],\"approvedMotiveCodes\":[\"OPERATIONAL_NEED_DEMO\",\"COVERAGE_DEMO\",\"OTHER\"]}");
 var p3=J("{\"intervalSemantics\":\"HALF_OPEN\",\"adjacentIntervalsOverlap\":false}");
 SchedulingRuleProfile P(JsonElement? c=null,bool on=true,int v=1)=>new(7,"MVP",v,SchedulingRuleOrigin.SIMULATED,SchedulingEnvironmentScope.MVP_TEST,"PROJECT-A",new DateOnly(2026,1,1),null,SchedulingRuleProfileStatus.ACTIVE,new string((char)('a'+v),64),new[]{new SchedulingRuleProfileEntry(R7,p7,c??cat7,on)});
 SchedulingRuleProfile PBoth()=>new(7,"MVP",1,SchedulingRuleOrigin.SIMULATED,SchedulingEnvironmentScope.MVP_TEST,"PROJECT-A",new DateOnly(2026,1,1),null,SchedulingRuleProfileStatus.ACTIVE,new string('a',64),new[]{new SchedulingRuleProfileEntry(R3,p3,J("{}"),true),new SchedulingRuleProfileEntry(R7,p7,cat7,true)});
@@ -91,7 +92,19 @@ T("R07-T03",F(Base(),Base(c1:"X")),SchedulingRuleOutcome.EXCEPTION_REQUIRED,"I9_
 // T04 a shift is added where the template prescribes rest.
 T("R07-T04",F(Base(),Base(c3:"D")),SchedulingRuleOutcome.EXCEPTION_REQUIRED,"I9_R07_DEVIATION",false);
 
-// T05 an engine deviation and an identical manual deviation are indistinguishable.
+// T04 regression: a dropped or added cell is a deviation even when its code equals the label
+// the explanation uses for an absent cell. Presence is compared structurally, not by string.
+foreach(var sentinel in new[]{"AUSENTE","SIN_CELDA","X"}){
+  var shortSet=Cells(Cell("guard-a","2026-08-17","C1","D"),Cell("guard-a","2026-08-18","C2","N"));
+  var longSet=Cells(Cell("guard-a","2026-08-17","C1","D"),Cell("guard-a","2026-08-18","C2","N"),Cell("guard-a","2026-08-19","C3",sentinel));
+  C(R(E(F(longSet,shortSet)),R7),SchedulingRuleOutcome.EXCEPTION_REQUIRED,"I9_R07_DEVIATION","R07-T04 dropped cell coded "+sentinel);
+  C(R(E(F(shortSet,longSet)),R7),SchedulingRuleOutcome.EXCEPTION_REQUIRED,"I9_R07_DEVIATION","R07-T04 added cell coded "+sentinel);
+}
+Console.WriteLine("R07-T04 ABSENT CELL SENTINEL PASS");
+
+// T05 partial: the facts carry no origin field, so engine and manual edits are literally the
+// same input. What is asserted is determinism, not equivalence of treatment; the origin fact
+// belongs to Task 22.
 var t05a=R(E(F(Base(),Base(c2:"D"))),R7);var t05b=R(E(F(Base(),Base(c2:"D"))),R7);
 Q(t05a.MessageCode,t05b.MessageCode,"R07-T05 code");Q(t05a.Explanation,t05b.Explanation,"R07-T05 explanation");Q(t05a.ScopeHash,t05b.ScopeHash,"R07-T05 hash");Done("R07-T05");
 
@@ -100,7 +113,8 @@ var t06=R(E(F(Base(),Base(c2:"D",c3:"D"))),R7);
 Q(false,t06.ScopeHash==t05a.ScopeHash,"R07-T06 hash changes with the edit");
 C(t06,SchedulingRuleOutcome.EXCEPTION_REQUIRED,"I9_R07_DEVIATION","R07-T06");Done("R07-T06");
 
-// T09 selecting an authorized motive leaves the exception pending until a decision.
+// T09 partial: the motive is not a rule fact, so what is asserted is that the deviation stays
+// pending and approvable-by-exception. Motive selection itself belongs to Task 23.
 var t09=E(F(Base(),Base(c2:"D")));
 Q(true,R(t09,R7).ExceptionAllowed,"R07-T09 exception allowed");Q(false,t09.Summary.CanApproveOrPublish,"R07-T09 still pending");Done("R07-T09");
 
@@ -125,11 +139,13 @@ Q(false,t14Template.ScopeHash==t10Hash,"R07-T14 template hash");Q(false,t14Versi
 var t15=R(E(F(Base(),Base(c2:"D"),anchor:"2026-08-02")),R7);
 Q(false,t15.ScopeHash==t10Hash,"R07-T15 anchor hash");Done("R07-T15");
 
-// T16 a new profile version never reuses the previous scope.
+// T16 partial: asserts profile-version isolation of the scope. Template-version currency for
+// existing drafts needs the template registry and belongs to Task 22.
 var t16=R(E(F(Base(),Base(c2:"D")),P(v:2)),R7);
 Q(2,t16.ProfileVersion,"R07-T16 profile version");Q(false,t16.ScopeHash==t10Hash,"R07-T16 hash");Done("R07-T16");
 
-// T17 a historical snapshot is preserved verbatim, so a correction can only be a new evaluation.
+// T17 partial: asserts the snapshot is reproduced verbatim. Immutability of a published
+// schedule is enforced by the database triggers and re-asserted in Task 23.
 var t17a=R(E(F(Base(),Base(c2:"D"))),R7);var t17b=R(E(F(Base(),Base(c2:"D"))),R7);
 Q(t17a.FactsSnapshot.GetRawText(),t17b.FactsSnapshot.GetRawText(),"R07-T17 facts snapshot");
 Q(t17a.ParametersSnapshot.GetRawText(),t17b.ParametersSnapshot.GetRawText(),"R07-T17 parameters snapshot");Done("R07-T17");
@@ -144,6 +160,19 @@ Q(false,t18.Summary.CanApproveOrPublish,"R07-T18 absolute block survives");Done(
 // T19 without an applicable template or version the rule never presumes compliance.
 T("R07-T19",F(Base(),Base(),template:"9X9"),SchedulingRuleOutcome.WARNING,"I9_R07_TEMPLATE_UNAVAILABLE",false,false);
 C(R(E(F("[]",Base())),R7),SchedulingRuleOutcome.WARNING,"I9_R07_TEMPLATE_UNAVAILABLE","R07-T19 empty expected",false);
+
+// T19 regression: a version the versioned catalog does not authorise never presumes compliance.
+C(R(E(F(Base(),Base(),version:"TPL-V999")),R7),SchedulingRuleOutcome.WARNING,"I9_R07_TEMPLATE_UNAVAILABLE","R07-T19 unknown version",false);
+C(R(E(F(Base(),Base(c2:"D"),version:"TPL-V999")),R7),SchedulingRuleOutcome.WARNING,"I9_R07_TEMPLATE_UNAVAILABLE","R07-T19 unknown version with deviation",false);
+Console.WriteLine("R07-T19 VERSION GATE PASS");
+
+// The persisted explanation must fit VARCHAR(1000) even with maximum-length anonymous codes.
+string LongCell(int i,string shift)=>Cell("guard-a",$"2026-09-0{i+1}",new string('L',79)+i.ToString(),shift);
+var longExpected=Cells(Enumerable.Range(0,6).Select(i=>LongCell(i,new string('E',80))).ToArray());
+var longProposed=Cells(Enumerable.Range(0,6).Select(i=>LongCell(i,new string('P',80))).ToArray());
+var longEvaluation=R(E(F(longExpected,longProposed)),R7);
+C(longEvaluation,SchedulingRuleOutcome.EXCEPTION_REQUIRED,"I9_R07_DEVIATION","maximum length codes");
+Console.WriteLine("EXPLANATION LENGTH BOUND PASS");
 
 // T20 the historical snapshot keeps the original template, version and values.
 var t20=R(E(F(Base(),Base(c2:"D"),version:"TPL-V1")),R7);

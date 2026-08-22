@@ -23,7 +23,10 @@ public static class SchedulingTemplateDeviationRule
     private const string TemplateUnavailableCode = "I9_R07_TEMPLATE_UNAVAILABLE";
     private const string InvalidInputCode = "I9_R07_INVALID_INPUT";
     private const int MaximumEnumeratedCells = 5;
-    private const string MissingShift = "AUSENTE";
+    private const int MaximumExplanationLength = 1000;
+    // Only ever rendered in the explanation. Presence is compared structurally, never by
+    // string, because any label would also be a valid shiftCode and would silently collide.
+    private const string MissingShiftLabel = "SIN_CELDA";
     // Changing any of these keys changes the scopeHash the evaluator derives, which is what
     // forces an earlier approval to be revalidated instead of reused.
     private static readonly string[] ScopeHashComparisonKeys = { "templateVersion", "anchor", "cell" };
@@ -54,9 +57,11 @@ public static class SchedulingTemplateDeviationRule
             return Blocked(MixedGuardsCode,
                 "Un mismo alcance no puede agrupar celdas de guardas distintos; cada guarda exige su propia decision.");
 
-        if (!CatalogAllowsTemplate(catalogSnapshot, templateCode) || expected.Count == 0)
+        if (!CatalogDeclares(catalogSnapshot, "templateCodes", templateCode) ||
+            !CatalogDeclares(catalogSnapshot, "templateVersions", templateVersion) ||
+            expected.Count == 0)
             return Unavailable(TemplateUnavailableCode,
-                "No existe una plantilla vigente y aprobada para comparar; no se presume cumplimiento.");
+                "No existe una plantilla y version vigentes y aprobadas para comparar; no se presume cumplimiento.");
 
         var deviations = BuildDeviations(expected, proposed);
         if (deviations.Count == 0)
@@ -77,14 +82,18 @@ public static class SchedulingTemplateDeviationRule
             .Where(item => item.ValueKind == JsonValueKind.String)
             .Select(item => item.GetString() ?? string.Empty)
             .ToArray();
-        return ScopeHashComparisonKeys.All(key => declared.Contains(key, StringComparer.Ordinal));
+        // Exact set: the engine compares by these keys and only these, so a profile that declares
+        // extra dimensions would promise a comparison it never performs.
+        return new HashSet<string>(declared, StringComparer.Ordinal).SetEquals(ScopeHashComparisonKeys);
     }
 
-    private static bool CatalogAllowsTemplate(JsonElement catalogSnapshot, string templateCode) =>
+    // A catalog that does not declare the list at all is treated as unavailable: an absent
+    // catalog never authorises a template or a version by omission.
+    private static bool CatalogDeclares(JsonElement catalogSnapshot, string listName, string value) =>
         catalogSnapshot.ValueKind == JsonValueKind.Object &&
-        catalogSnapshot.TryGetProperty("templateCodes", out var codes) && codes.ValueKind == JsonValueKind.Array &&
-        codes.EnumerateArray().Any(item => item.ValueKind == JsonValueKind.String &&
-                                           string.Equals(item.GetString(), templateCode, StringComparison.Ordinal));
+        catalogSnapshot.TryGetProperty(listName, out var declared) && declared.ValueKind == JsonValueKind.Array &&
+        declared.EnumerateArray().Any(item => item.ValueKind == JsonValueKind.String &&
+                                              string.Equals(item.GetString(), value, StringComparison.Ordinal));
 
     private static IReadOnlyList<TemplateDeviation> BuildDeviations(
         IReadOnlyList<TemplateCell> expected, IReadOnlyList<TemplateCell> proposed)
@@ -94,11 +103,16 @@ public static class SchedulingTemplateDeviationRule
         var deviations = new List<TemplateDeviation>();
         foreach (var key in expectedByKey.Keys.Concat(proposedByKey.Keys).Distinct(StringComparer.Ordinal))
         {
-            var expectedShift = expectedByKey.TryGetValue(key, out var expectedCell) ? expectedCell.ShiftCode : MissingShift;
-            var proposedShift = proposedByKey.TryGetValue(key, out var proposedCell) ? proposedCell.ShiftCode : MissingShift;
-            if (string.Equals(expectedShift, proposedShift, StringComparison.Ordinal)) continue;
-            var reference = expectedByKey.TryGetValue(key, out var anchor) ? anchor : proposedByKey[key];
-            deviations.Add(new TemplateDeviation(reference.Date, reference.Cell, expectedShift, proposedShift));
+            var expectedPresent = expectedByKey.TryGetValue(key, out var expectedCell);
+            var proposedPresent = proposedByKey.TryGetValue(key, out var proposedCell);
+            if (expectedPresent && proposedPresent &&
+                string.Equals(expectedCell!.ShiftCode, proposedCell!.ShiftCode, StringComparison.Ordinal)) continue;
+            var reference = expectedPresent ? expectedCell! : proposedCell!;
+            deviations.Add(new TemplateDeviation(
+                reference.Date,
+                reference.Cell,
+                expectedPresent ? expectedCell!.ShiftCode : MissingShiftLabel,
+                proposedPresent ? proposedCell!.ShiftCode : MissingShiftLabel));
         }
         return deviations
             .OrderBy(deviation => deviation.Date, StringComparer.Ordinal)
@@ -114,8 +128,14 @@ public static class SchedulingTemplateDeviationRule
         var tail = remaining > 0
             ? $"; y {remaining.ToString(CultureInfo.InvariantCulture)} celdas mas requieren la misma decision."
             : ".";
-        return $"La asignacion se aparta de la plantilla obligatoria {templateCode} version {templateVersion}: " +
-               string.Join("; ", enumerated) + tail;
+        var explanation = $"La asignacion se aparta de la plantilla obligatoria {templateCode} version {templateVersion}: " +
+                          string.Join("; ", enumerated) + tail;
+        // scheduling_rule_evaluations.explanation is VARCHAR(1000); cell and shift codes are
+        // caller supplied and can each reach 80 characters, so the text is bounded here rather
+        // than failing the whole batch on insert.
+        return explanation.Length <= MaximumExplanationLength
+            ? explanation
+            : explanation[..(MaximumExplanationLength - 1)] + "\u2026";
     }
 
     private static bool TryReadCells(JsonElement facts, string name, out IReadOnlyList<TemplateCell> cells)
