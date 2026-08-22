@@ -1288,15 +1288,22 @@ public static class PortalEndpoints
         return true;
     }
 
-    private static IResult InvalidScopeHashProblem() => Results.Problem(
-        title: "Alcance de evaluacion invalido",
-        detail: "La decision debe declarar el scopeHash exacto de la evaluacion persistida.",
-        statusCode: StatusCodes.Status400BadRequest);
+    private static IResult ScopeHashProblem(string title, string detail, int statusCode)
+    {
+        var problem = new Microsoft.AspNetCore.Mvc.ProblemDetails { Title = title, Detail = detail, Status = statusCode };
+        problem.Extensions["message"] = detail;
+        return Results.Problem(problem);
+    }
 
-    private static IResult StaleScopeHashProblem() => Results.Problem(
-        title: "Alcance de evaluacion obsoleto",
-        detail: "El scopeHash declarado no corresponde al snapshot evaluado vigente.",
-        statusCode: StatusCodes.Status409Conflict);
+    private static IResult InvalidScopeHashProblem() => ScopeHashProblem(
+        "Alcance de evaluacion invalido",
+        "La decision debe declarar el scopeHash exacto de la evaluacion persistida.",
+        StatusCodes.Status400BadRequest);
+
+    private static IResult StaleScopeHashProblem() => ScopeHashProblem(
+        "Alcance de evaluacion obsoleto",
+        "El scopeHash declarado no corresponde al snapshot evaluado vigente.",
+        StatusCodes.Status409Conflict);
 
     private static IResult? MapCertificatePreviewError(CertificatePreviewResponse? result)
     {

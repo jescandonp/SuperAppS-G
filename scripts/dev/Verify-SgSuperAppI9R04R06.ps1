@@ -399,7 +399,7 @@ Q(38,passed,"numbered rules scenario count"); Console.WriteLine($"I9 R04 R06 RUL
         )
         foreach ($case in $contaminationCases) {
             $caseSchema = 'i9_r0406_mig' + $case.Name + '_' + [guid]::NewGuid().ToString('N').Substring(0, 10)
-            if ($caseSchema -notmatch '^i9_r0406_mig[a-z]+_[0-9a-f]{10}$') { throw 'unsafe contamination schema name' }
+            if ($caseSchema -cnotmatch '^i9_r0406_mig[a-z]+_[0-9a-f]{10}$') { throw 'unsafe contamination schema name' }
             $savedOptions = $env:PGOPTIONS
             try {
                 & $psql -X -w -v ON_ERROR_STOP=1 -c "CREATE SCHEMA $caseSchema" | Out-Null
@@ -417,23 +417,31 @@ Q(38,passed,"numbered rules scenario count"); Console.WriteLine($"I9 R04 R06 RUL
                 }
                 & $psql -X -w -v ON_ERROR_STOP=1 -c $case.Contamination | Out-Null
                 if ($LASTEXITCODE -ne 0) { throw "$($case.Name): contaminated rows were rejected before the migration" }
+                $exceptionFingerprintSql = 'select coalesce(md5(string_agg(t,'','' order by t)),''empty'') from (select concat_ws(''|'',id,schedule_version_id,exception_type,reason,responsible,status,evaluation_id,rule_code,scope_hash,motive_code,decision,decided_by,decision_detail::text) as t from schedule_exceptions) s'
                 $rowsBefore = & $psql -X -w -Atqc 'select count(*) from schedule_exceptions'
+                $fingerprintBefore = & $psql -X -w -Atqc $exceptionFingerprintSql
                 $evaluationsBefore = & $psql -X -w -Atqc 'select count(*) from scheduling_rule_evaluations'
                 $previousPreference = $ErrorActionPreference
-                $ErrorActionPreference = 'Continue'
-                $migrationOutput = & $psql -X -w -v ON_ERROR_STOP=1 -f $migration 2>&1
-                $migrationExit = $LASTEXITCODE
-                $ErrorActionPreference = $previousPreference
+                try {
+                    $ErrorActionPreference = 'Continue'
+                    $migrationOutput = & $psql -X -w -v ON_ERROR_STOP=1 -f $migration 2>&1
+                    $migrationExit = $LASTEXITCODE
+                }
+                finally { $ErrorActionPreference = $previousPreference }
                 if ($migrationExit -eq 0) { throw "$($case.Name): contaminated schema was migrated instead of failing closed" }
                 if (($migrationOutput -join "`n") -notmatch [regex]::Escape($case.Expected)) {
                     throw "$($case.Name): migration did not report the canonical preflight error"
                 }
                 $rowsAfter = & $psql -X -w -Atqc 'select count(*) from schedule_exceptions'
-                if ($rowsAfter -ne $rowsBefore -or [int]$rowsAfter -ne $case.Rows) {
-                    throw "$($case.Name): the failed migration altered the contaminated rows"
+                if ([int]$rowsAfter -ne [int]$rowsBefore -or [int]$rowsAfter -ne [int]$case.Rows) {
+                    throw "$($case.Name): the failed migration altered the contaminated row count"
+                }
+                $fingerprintAfter = & $psql -X -w -Atqc $exceptionFingerprintSql
+                if ([string]$fingerprintAfter -cne [string]$fingerprintBefore -or [string]$fingerprintAfter -ceq 'empty') {
+                    throw "$($case.Name): the failed migration mutated the contaminated rows"
                 }
                 $evaluationsAfter = & $psql -X -w -Atqc 'select count(*) from scheduling_rule_evaluations'
-                if ($evaluationsAfter -ne $evaluationsBefore -or [int]$evaluationsAfter -ne 1) {
+                if ([int]$evaluationsAfter -ne [int]$evaluationsBefore -or [int]$evaluationsAfter -ne 1) {
                     throw "$($case.Name): the failed migration altered pre-existing evaluations"
                 }
                 foreach ($guard in $case.Guards) {
