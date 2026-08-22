@@ -681,8 +681,11 @@ Assert-FileContains 'Exception panel snapshot' 'apps/sg-superapp-web/src/feature
 $focused = @(
     @{ R='I9-R01/R02 verifier'; P='scripts/dev/Verify-SgSuperAppI9R01R02.ps1'; Pass='I9 R01 R02 PASS' },
     @{ R='I9-R03/R05 verifier'; P='scripts/dev/Verify-SgSuperAppI9R03R05.ps1'; Pass='I9 R03 R05 PASS' },
-    @{ R='I9-R04/R06 verifier'; P='scripts/dev/Verify-SgSuperAppI9R04R06.ps1'; Pass='I9 R04 R06 PASS 51' },
-    @{ R='I9-R07 verifier'; P='scripts/dev/Verify-SgSuperAppI9R07.ps1'; Pass='I9 R07 PASS' }
+    @{ R='I9-R04/R06 verifier'; P='scripts/dev/Verify-SgSuperAppI9R04R06.ps1'; Pass='I9 R04 R06 PASS 55' },
+    @{ R='I9-R07 verifier'; P='scripts/dev/Verify-SgSuperAppI9R07.ps1'; Pass='I9 R07 PASS' },
+    # Run, not merely inspected: the generation verifier was only content-matched further down,
+    # and a content match cannot tell a passing gate from a deleted one.
+    @{ R='MVP generation verifier'; P='scripts/dev/Verify-SgSuperAppI9MvpGeneration.ps1'; Pass='I9 MVP GENERATION PASS 13' }
 )
 foreach ($verifier in $focused) { Invoke-FocusedVerifier $verifier.R $verifier.P $verifier.Pass }
 

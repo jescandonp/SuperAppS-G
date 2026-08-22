@@ -145,7 +145,30 @@ Q(false,afterEdit.Summary.CanApproveOrPublish,"GEN-T10 stale approval does not s
 var recomputed=evaluator.Evaluate(profile,"PROJECT-A",new DateOnly(2026,8,17),J(Facts("[]")),approvedBefore);
 Q(true,recomputed.Summary.CanApproveOrPublish,"GEN-T10 summary recomputed for the current scope");Done("GEN-T10");
 
-Q(10,passed,"numbered generation scenario count");
+// GEN-T15 a caller declaring itself eligible without any versioned evaluation is never assigned.
+// The request body is the caller's word; ranking projects the verdicts instead of trusting it.
+var noEvidence=new ScheduleRecommendationRequest(null,"gen-t15",weights,new[]{new RequiredShiftRecommendationInput(1,10,"2026-08-17","08:00",new[]{Cand(400,okResult,Array.Empty<RuleEvaluationReference>())})});
+var t11=engine.Generate(noEvidence);
+Q("VACANTE",t11.Assignments[0].Status,"GEN-T15 declared eligibility without evidence stays vacant");
+Q(true,t11.Assignments[0].EmployeeId is null,"GEN-T15 unassigned");
+Q(true,t11.Assignments[0].RankingReasons.Any(x=>x.Contains("RULE_EVALUATION_MISSING",StringComparison.Ordinal)),"GEN-T15 missing evaluation reason visible");Done("GEN-T15");
+
+// GEN-T16 a caller declaring itself eligible while its own evidence blocks is never assigned.
+// This is the contradiction the isolated booleans used to permit, now stated over the verdicts.
+var contradiction=new ScheduleRecommendationRequest(null,"gen-t16",weights,new[]{new RequiredShiftRecommendationInput(1,10,"2026-08-17","08:00",new[]{Cand(500,okResult,blocked)})});
+var t12=engine.Generate(contradiction);
+Q("VACANTE",t12.Assignments[0].Status,"GEN-T16 declared eligibility cannot override a blocked rule");
+Q(true,t12.Assignments[0].RankingReasons.Any(x=>x.Contains("I9_R03_OVERLAP_APPROVED_BLOCKED",StringComparison.Ordinal)),"GEN-T16 blocking rule still decides");Done("GEN-T16");
+
+// GEN-T17 verdicts from two different profile versions accredit nothing: there is no single
+// snapshot they all belong to, so none of them can be read as describing this decision.
+var mixedVersions=new[]{compliant[0],new RuleEvaluationReference(compliant[0].RuleCode=="I9-R01"?"I9-R02":"I9-R01",compliant[0].RuleProfileVersion+1,"COMPLIANT","INFO","I9_MIXED","otra version",new string('d',64),false)};
+var mixedRequest=new ScheduleRecommendationRequest(null,"gen-t17",weights,new[]{new RequiredShiftRecommendationInput(1,10,"2026-08-17","08:00",new[]{Cand(600,okResult,mixedVersions)})});
+var t13=engine.Generate(mixedRequest);
+Q("VACANTE",t13.Assignments[0].Status,"GEN-T17 verdicts from mixed profile versions stay vacant");
+Q(true,t13.Assignments[0].RankingReasons.Any(x=>x.Contains("RULE_EVALUATION_UNTRUSTED",StringComparison.Ordinal)),"GEN-T17 untrusted reason visible");Done("GEN-T17");
+
+Q(13,passed,"numbered generation scenario count");
 Console.WriteLine($"I9 MVP GENERATION PASS {passed}");
 Console.WriteLine("I9 MVP GENERATION PASS");
 '@|Set-Content (Join-Path $tmp 'Program.cs') -Encoding utf8

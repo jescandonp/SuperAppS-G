@@ -58,6 +58,10 @@ app.MapPost("/api/portal/scheduling/recommendations/generate", async (
     {
         return Results.BadRequest(new { message = exception.Message });
     }
+    catch (InvalidOperationException exception)
+    {
+        return Results.Conflict(new { message = exception.Message });
+    }
 });
 
 app.MapHealthEndpoints();

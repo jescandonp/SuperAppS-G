@@ -29,12 +29,20 @@ public sealed class SchedulingRecommendationEngine
                      .ThenBy(x => x.RequiredShiftId))
         {
             var candidates = shift.Candidates ?? Array.Empty<EligibleCandidate>();
-            var ranked = candidates
-                .Where(x => x.Eligibility is not null && x.Eligibility.Eligible)
+            var judged = candidates
                 .Select(candidate => new
                 {
                     Candidate = candidate,
-                    Score = Score(candidate, request.Weights, assignedCounts.GetValueOrDefault(candidate.EmployeeId))
+                    Verdict = SchedulingEligibilityService.ProjectCandidate(candidate)
+                })
+                .ToArray();
+            var ranked = judged
+                .Where(x => x.Verdict.Eligible)
+                .Select(x => new
+                {
+                    x.Candidate,
+                    x.Verdict,
+                    Score = Score(x.Candidate, request.Weights, assignedCounts.GetValueOrDefault(x.Candidate.EmployeeId))
                 })
                 .OrderByDescending(x => x.Score)
                 .ThenBy(x => x.Candidate.EmployeeId)
@@ -43,8 +51,8 @@ public sealed class SchedulingRecommendationEngine
             var selected = ranked.FirstOrDefault();
             if (selected is null)
             {
-                var reasons = candidates
-                    .SelectMany(x => x.Eligibility?.Reasons ?? Array.Empty<EligibilityReason>())
+                var reasons = judged
+                    .SelectMany(x => x.Verdict.Reasons)
                     .OrderBy(x => x.Code, StringComparer.Ordinal)
                     .Select(x => $"{x.Code}: {x.Message}")
                     .Distinct(StringComparer.Ordinal)
@@ -69,7 +77,7 @@ public sealed class SchedulingRecommendationEngine
                          .Where(evaluation => evaluation.Outcome == "EXCEPTION_REQUIRED")
                          .OrderBy(evaluation => evaluation.RuleCode, StringComparer.Ordinal))
                 explanation.Add($"EXCEPTION_REQUIRED: {pending.RuleCode} {pending.ScopeHash}");
-            explanation.AddRange(selected.Candidate.Eligibility.Reasons.Select(x => $"{x.Code}: {x.Message}"));
+            explanation.AddRange(selected.Verdict.Reasons.Select(x => $"{x.Code}: {x.Message}"));
             assignments.Add(new(shift.RequiredShiftId, shift.PositionId, shift.Date, shift.StartsAt,
                 selected.Candidate.EmployeeId, "ASIGNADA", selected.Score, explanation));
         }

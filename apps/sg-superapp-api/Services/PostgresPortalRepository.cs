@@ -2916,6 +2916,50 @@ public sealed class PostgresPortalRepository
             ? new SchedulingClientResponse(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)) : null;
     }
 
+    // An assignment is only written when every rule verdict the caller declared for the chosen
+    // candidate is one this schedule version actually persisted, with the same outcome, the same
+    // scope and the same profile version. Without this the caller could declare its own compliance
+    // and have it written: the ranking projection alone only reads what the caller sent.
+    private static string VerdictKey(string ruleCode, string scopeHash, string outcome, int profileVersion) =>
+        (ruleCode ?? string.Empty).Trim() + "\u001f" + (scopeHash ?? string.Empty).Trim() + "\u001f" +
+        (outcome ?? string.Empty).Trim() + "\u001f" +
+        profileVersion.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private static async Task<HashSet<string>> LoadPersistedVerdictsAsync(
+        NpgsqlConnection cn, NpgsqlTransaction tx, long versionId, CancellationToken ct)
+    {
+        var verdicts = new HashSet<string>(StringComparer.Ordinal);
+        await using var cmd = new NpgsqlCommand(@"select e.rule_code,e.scope_hash,e.outcome,rp.version
+from scheduling_rule_evaluations e
+join scheduling_rule_profiles rp on rp.id=e.rule_profile_id and rp.origin='SIMULATED' and rp.environment_scope='MVP_TEST'
+where e.schedule_version_id=@version", cn, tx);
+        cmd.Parameters.AddWithValue("version", versionId);
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+            verdicts.Add(VerdictKey(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetInt32(3)));
+        return verdicts;
+    }
+
+    private static void RequireDeclaredVerdictsArePersisted(
+        ScheduleRecommendationRequest request, ScheduleAssignmentRecommendation assignment, HashSet<string> persisted)
+    {
+        if (assignment.EmployeeId is null) return;
+        var candidate = request.Shifts
+            .FirstOrDefault(shift => shift.RequiredShiftId == assignment.RequiredShiftId)?.Candidates
+            ?.FirstOrDefault(item => item.EmployeeId == assignment.EmployeeId.Value);
+        var declared = candidate?.RuleEvaluations ?? Array.Empty<RuleEvaluationReference>();
+        if (declared.Count == 0)
+            throw new InvalidOperationException(
+                "No se puede asignar un guarda sin evaluacion versionada persistida para esta version.");
+        foreach (var evaluation in declared)
+        {
+            if (!persisted.Contains(VerdictKey(
+                    evaluation.RuleCode, evaluation.ScopeHash, evaluation.Outcome, evaluation.RuleProfileVersion)))
+                throw new InvalidOperationException(
+                    "La evaluacion declarada no corresponde a un veredicto persistido de esta version.");
+        }
+    }
+
     public async Task<long> PersistScheduleRecommendationAsync(
         ScheduleRecommendationRequest request,
         ScheduleRecommendationResult result,
@@ -2973,8 +3017,12 @@ public sealed class PostgresPortalRepository
                 throw new InvalidOperationException("La version no existe o ya fue publicada.");
         }
 
+        var persistedVerdicts = await LoadPersistedVerdictsAsync(
+            connection, transaction, request.ScheduleVersionId.Value, cancellationToken);
+
         foreach (var assignment in result.Assignments)
         {
+            RequireDeclaredVerdictsArePersisted(request, assignment, persistedVerdicts);
             await using var insertAssignment = new NpgsqlCommand(@"
                 insert into schedule_assignments(
                     schedule_version_id,required_shift_id,employee_id,status,score,reasons)

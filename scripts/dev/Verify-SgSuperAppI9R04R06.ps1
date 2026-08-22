@@ -499,6 +499,7 @@ static async Task<long> ValidationCount(string connectionString,long evaluationI
 static async Task<long> ExceptionCount(string connectionString,long evaluationId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select count(*) from schedule_exceptions where evaluation_id=@id",c);q.Parameters.AddWithValue("id",evaluationId);return (long)(await q.ExecuteScalarAsync()??0L);}
 static async Task<(string Decision,string DecidedBy,bool Superseded)> DecisionState(string connectionString,long evaluationId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand(@"select coalesce(x.decision,'NONE'),coalesce(x.decided_by,''),coalesce(a.updated_at>e.evaluated_at,false) from schedule_exceptions x join scheduling_rule_evaluations e on e.id=x.evaluation_id left join schedule_assignments a on a.id=e.assignment_id where x.evaluation_id=@id",c);q.Parameters.AddWithValue("id",evaluationId);await using var r=await q.ExecuteReaderAsync();if(!await r.ReadAsync())throw new Exception("decision state missing");return(r.GetString(0),r.GetString(1),r.GetBoolean(2));}
 static async Task<long> SupersededAuditCount(string connectionString,long versionId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select count(*) from audit_log where event_type='SCHEDULE_ASSIGNMENT_REVALIDATED' and entity_id=@v and (detail->>'supersededDecisions') ~ '^[0-9]+$' and (detail->>'supersededDecisions')::int>0",c);q.Parameters.AddWithValue("v",versionId.ToString(System.Globalization.CultureInfo.InvariantCulture));return (long)(await q.ExecuteScalarAsync()??0L);}
+static async Task<long> AssignmentCount(string connectionString,long shiftId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select count(*) from schedule_assignments where required_shift_id=@id",c);q.Parameters.AddWithValue("id",shiftId);return (long)(await q.ExecuteScalarAsync()??0L);}
 static async Task<long> ApprovedAuditCount(string connectionString,long evaluationId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select count(*) from audit_log where event_type='SCHEDULE_RULE_EXCEPTION_APPROVED' and (detail->>'evaluationId') ~ '^[0-9]+$' and (detail->>'evaluationId')::bigint=@id",c);q.Parameters.AddWithValue("id",evaluationId);return (long)(await q.ExecuteScalarAsync()??0L);}
 static async Task<long> DeniedAuditCount(string connectionString,long actorId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select count(*) from audit_log where actor_user_id=@actor and event_type='SCHEDULE_RULE_EXCEPTION_DENIED' and result='DENIED'",c);q.Parameters.AddWithValue("actor",actorId);return (long)(await q.ExecuteScalarAsync()??0L);}
 static async Task<int> HttpStatus(IResult result){using var services=new ServiceCollection().AddLogging().BuildServiceProvider();var context=new DefaultHttpContext{RequestServices=services};await result.ExecuteAsync(context);return context.Response.StatusCode;}
@@ -569,7 +570,36 @@ catch(InvalidOperationException ex) when(ex.Message.IndexOf("obsoleta",StringCom
 Q(staleRejected,"GEN-T14 a superseded evaluation admits no new decision");
 Q(await ExceptionCount(connectionString,editR04.Id)==staleExceptionsBefore,"GEN-T14 superseded evaluation leaves no extra decision");
 Q(await ApprovedAuditCount(connectionString,editR04.Id)==staleAuditBefore,"GEN-T14 superseded evaluation leaves no approval audit");
-Console.WriteLine("I9 R04 R06 PASS 51");
+// GEN-T18 the generation write path settles the caller's declared verdicts against the database.
+// Ranking only ever reads what the caller sent, so an assignment is written only when every verdict
+// the caller declared for the chosen guard is one this schedule version really persisted.
+long t18ShiftId,t18EmployeeId;
+await using(var cn=new NpgsqlConnection(connectionString)){await cn.OpenAsync();
+ await using var seed=new NpgsqlCommand(@"with e as (insert into employees(identification_type,identification_number,full_name,employment_status,job_title,hire_date) values('CC','I9-GEN-T18','I9 Generation Guard','ACTIVO','GUARDA',date '2026-01-01') returning id),
+r as (insert into required_shifts(schedule_version_id,position_id,shift_date,starts_at,ends_at) select @version,p.id,date '2026-08-21',time '20:00',time '23:00' from service_positions p where p.code='I9-EDIT-POSITION' returning id)
+select (select id from r),(select id from e)",cn);
+ seed.Parameters.AddWithValue("version",versionId);
+ await using var rd18=await seed.ExecuteReaderAsync();await rd18.ReadAsync();t18ShiftId=rd18.GetInt64(0);t18EmployeeId=rd18.GetInt64(1);}
+var t18Weights=new SchedulingWeights(1m,1m,0.1m,0.1m,5m,0.1m);
+var t18Result=new ScheduleRecommendationResult(null,"gen-t18-forged","COMPLETADO",new[]{new ScheduleAssignmentRecommendation(t18ShiftId,1,"2026-08-21","20:00",t18EmployeeId,"ASIGNADA",1m,new[]{"forged"})});
+var forgedVerdict=new[]{new RuleEvaluationReference("I9-R04",profile.Version,"COMPLIANT","INFO","I9_R04_AVAILABLE","inventado",new string('e',64),false)};
+var forgedRequest=new ScheduleRecommendationRequest(versionId,"gen-t18-forged",t18Weights,new[]{new RequiredShiftRecommendationInput(t18ShiftId,1,"2026-08-21","20:00",new[]{new EligibleCandidate(t18EmployeeId,new EligibilityResult(true,false,Array.Empty<EligibilityReason>()),1m,1m,0m,0m,0m,forgedVerdict)})});
+var forgedRejected=false;
+try{await portalRepository.PersistScheduleRecommendationAsync(forgedRequest,t18Result,CancellationToken.None);}
+catch(InvalidOperationException ex) when(ex.Message.IndexOf("veredicto persistido",StringComparison.Ordinal)>=0){forgedRejected=true;}
+Q(forgedRejected,"GEN-T18 a forged verdict cannot be written");
+Q(await AssignmentCount(connectionString,t18ShiftId)==0,"GEN-T18 a forged verdict leaves no assignment");
+var barelessRequest=new ScheduleRecommendationRequest(versionId,"gen-t18-bare",t18Weights,new[]{new RequiredShiftRecommendationInput(t18ShiftId,1,"2026-08-21","20:00",new[]{new EligibleCandidate(t18EmployeeId,new EligibilityResult(true,false,Array.Empty<EligibilityReason>()),1m,1m,0m,0m,0m,null)})});
+var bareRejected=false;
+try{await portalRepository.PersistScheduleRecommendationAsync(barelessRequest,t18Result with{IdempotencyKey="gen-t18-bare"},CancellationToken.None);}
+catch(InvalidOperationException ex) when(ex.Message.IndexOf("sin evaluacion versionada",StringComparison.Ordinal)>=0){bareRejected=true;}
+Q(bareRejected,"GEN-T18 an assignment without any declared verdict is refused");
+Q(await AssignmentCount(connectionString,t18ShiftId)==0,"GEN-T18 refusal leaves no assignment");
+var honestVerdict=new[]{new RuleEvaluationReference(editR04.Evaluation.RuleCode,profile.Version,editR04.Evaluation.Outcome.ToString(),editR04.Evaluation.Severity.ToString(),editR04.Evaluation.MessageCode,editR04.Evaluation.Explanation,editR04.Evaluation.ScopeHash,editR04.Evaluation.ExceptionAllowed)};
+var honestRequest=new ScheduleRecommendationRequest(versionId,"gen-t18-honest",t18Weights,new[]{new RequiredShiftRecommendationInput(t18ShiftId,1,"2026-08-21","20:00",new[]{new EligibleCandidate(t18EmployeeId,new EligibilityResult(true,false,Array.Empty<EligibilityReason>()),1m,1m,0m,0m,0m,honestVerdict)})});
+await portalRepository.PersistScheduleRecommendationAsync(honestRequest,t18Result with{IdempotencyKey="gen-t18-honest"},CancellationToken.None);
+Q(await AssignmentCount(connectionString,t18ShiftId)==1,"GEN-T18 a verdict this version really persisted is written");
+Console.WriteLine("I9 R04 R06 PASS 55");
 '@ | Set-Content -LiteralPath (Join-Path $tempRoot 'WorkflowProgram.cs') -Encoding utf8
         Move-Item -LiteralPath (Join-Path $tempRoot 'Program.cs') -Destination (Join-Path $tempRoot 'RulesProgram.cs')
         & $dotnet run --project (Join-Path $tempRoot 'Workflow.csproj') --configuration Release

@@ -74,6 +74,40 @@ public sealed class SchedulingEligibilityService
         return new EligibilityResult(!blocked, requiresException, reasons);
     }
 
+    // Ranking must not take the caller's word for a candidate being eligible. The versioned
+    // verdicts it declares are projected here as well, so a candidate that carries no evaluation,
+    // or one that is blocked, unverified or inconsistent about the profile version it came from,
+    // can never be selected. A caller's own eligibility can still add reasons; it can never remove
+    // one. Whether those declared verdicts are real is settled against the database at persistence.
+    public static EligibilityResult ProjectCandidate(EligibleCandidate candidate)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+        var evaluations = candidate.RuleEvaluations ?? Array.Empty<RuleEvaluationReference>();
+        var reasons = new List<EligibilityReason>();
+
+        if (evaluations.Count == 0)
+            reasons.Add(new("RULE_EVALUATION_MISSING", "BLOCKING",
+                "No hay evaluacion versionada vigente; no se presume cumplimiento."));
+
+        var versions = evaluations.Select(evaluation => evaluation.RuleProfileVersion).Distinct().ToArray();
+        if (versions.Length > 1)
+            reasons.Add(new("RULE_EVALUATION_UNTRUSTED", "BLOCKING",
+                "Las evaluaciones declaradas no provienen de una misma version de perfil."));
+
+        // With no single declared version there is nothing to agree with, so every evaluation below
+        // is projected as untrusted rather than being read against a version of its own choosing.
+        var expectedVersion = versions.Length == 1 ? versions[0] : 0;
+        foreach (var evaluation in evaluations.OrderBy(evaluation => evaluation.RuleCode, StringComparer.Ordinal))
+            reasons.AddRange(Project(evaluation, expectedVersion));
+
+        reasons.AddRange(candidate.Eligibility?.Reasons ?? Array.Empty<EligibilityReason>());
+
+        var blocked = candidate.Eligibility is null || !candidate.Eligibility.Eligible ||
+                      reasons.Any(reason => reason.Severity == "BLOCKING");
+        var requiresException = reasons.Any(reason => reason.Severity == "SUBSANABLE");
+        return new EligibilityResult(!blocked, requiresException, reasons);
+    }
+
     private static IEnumerable<EligibilityReason> Project(RuleEvaluationReference evaluation, int profileVersion)
     {
         if (evaluation is null || string.IsNullOrWhiteSpace(evaluation.RuleCode) ||
