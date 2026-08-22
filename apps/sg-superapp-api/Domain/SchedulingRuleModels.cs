@@ -13,6 +13,15 @@ public sealed class SchedulingRuleContractException : Exception
     public SchedulingRuleContractException() : base("Stored scheduling rule data violates its contract.") { }
 }
 
+// Why a transition was refused, in the rule vocabulary rather than as prose. Derives from
+// InvalidOperationException so the existing conflict handling still applies if nothing maps it.
+public sealed class SchedulingRuleGateException : InvalidOperationException
+{
+    public SchedulingRuleGateException(string code, string message) : base(message) => Code = code;
+
+    public string Code { get; }
+}
+
 public sealed class SchedulingScopeHashMismatchException : InvalidOperationException
 {
     public SchedulingScopeHashMismatchException() : base("El scopeHash declarado no corresponde al snapshot evaluado vigente.") { }

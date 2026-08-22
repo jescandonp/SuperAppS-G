@@ -105,9 +105,9 @@ public static class PortalEndpoints
         app.MapPost("/api/portal/scheduling/proposals/{versionId:long}/exceptions",async(long versionId,CreateScheduleExceptionRequest request,PortalAuthorizationService authorization,PostgresPortalRepository repository,RequestUserContext userContext,CancellationToken ct)=>
         {var denied=await authorization.RequireAsync("SCHEDULING","APPROVE_EXCEPTION",ct);if(denied is not null&&userContext.User is not null)await repository.AuditScheduleExceptionDenialAsync(versionId,userContext.User.Id,userContext.User.Username,ct);if(denied is not null)return denied;if(request.ScopeHash is null||!System.Text.RegularExpressions.Regex.IsMatch(request.ScopeHash.Trim(),"^[0-9a-f]{64}$"))return InvalidScopeHashProblem();if(request.EvaluationId<=0||request.RuleCode is null||!System.Text.RegularExpressions.Regex.IsMatch(request.RuleCode,"^I9-R0[1-7]$")||string.IsNullOrWhiteSpace(request.MotiveCode)||request.MotiveCode.Length>50||!System.Text.RegularExpressions.Regex.IsMatch(request.MotiveCode,"^[A-Z0-9_]+$")||string.IsNullOrWhiteSpace(request.Reason)||string.IsNullOrWhiteSpace(request.Responsible)||!DateOnly.TryParse(request.ResolutionDate,out var date))return Results.BadRequest(new{message="Evaluacion, regla, motivo, responsable y fecha son obligatorios."});try{return Results.Ok(await repository.CreateScheduleExceptionAsync(versionId,request,date,userContext.User!.Id,userContext.User.Username,ct));}catch(SchedulingScopeHashMismatchException){return StaleScopeHashProblem();}catch(Exception ex)when(ex is InvalidOperationException or System.Data.DBConcurrencyException){return Results.Conflict(new{message=ex.Message});}catch(KeyNotFoundException){return Results.NotFound();}});
         app.MapPost("/api/portal/scheduling/proposals/{versionId:long}/approve",async(long versionId,ScheduleTransitionRequest request,PortalAuthorizationService authorization,PostgresPortalRepository repository,RequestUserContext userContext,CancellationToken ct)=>
-        {var denied=await authorization.RequireAsync("SCHEDULING","APPROVE",ct);if(denied is not null)return denied;try{return Results.Ok(await repository.ApproveScheduleAsync(versionId,request.ExpectedVersion,userContext.User!.Id,userContext.User.Username,ct));}catch(Exception ex)when(ex is InvalidOperationException or System.Data.DBConcurrencyException){return Results.Conflict(new{message=ex.Message});}catch(KeyNotFoundException){return Results.NotFound();}});
+        {var denied=await authorization.RequireAsync("SCHEDULING","APPROVE",ct);if(denied is not null)return denied;try{return Results.Ok(await repository.ApproveScheduleAsync(versionId,request.ExpectedVersion,userContext.User!.Id,userContext.User.Username,ct));}catch(SchedulingRuleGateException ex){return RuleGateProblem(ex);}catch(Exception ex)when(ex is InvalidOperationException or System.Data.DBConcurrencyException){return Results.Conflict(new{message=ex.Message});}catch(KeyNotFoundException){return Results.NotFound();}});
         app.MapPost("/api/portal/scheduling/proposals/{versionId:long}/publish",async(long versionId,ScheduleTransitionRequest request,PortalAuthorizationService authorization,PostgresPortalRepository repository,RequestUserContext userContext,CancellationToken ct)=>
-        {var denied=await authorization.RequireAsync("SCHEDULING","PUBLISH",ct);if(denied is not null)return denied;try{return Results.Ok(await repository.PublishScheduleAsync(versionId,request.ExpectedVersion,userContext.User!.Id,userContext.User.Username,ct));}catch(Exception ex)when(ex is InvalidOperationException or System.Data.DBConcurrencyException){return Results.Conflict(new{message=ex.Message});}catch(KeyNotFoundException){return Results.NotFound();}});
+        {var denied=await authorization.RequireAsync("SCHEDULING","PUBLISH",ct);if(denied is not null)return denied;try{return Results.Ok(await repository.PublishScheduleAsync(versionId,request.ExpectedVersion,userContext.User!.Id,userContext.User.Username,ct));}catch(SchedulingRuleGateException ex){return RuleGateProblem(ex);}catch(Exception ex)when(ex is InvalidOperationException or System.Data.DBConcurrencyException){return Results.Conflict(new{message=ex.Message});}catch(KeyNotFoundException){return Results.NotFound();}});
         app.MapGet("/api/portal/scheduling/versions/{versionId:long}/audit",async(long versionId,PortalAuthorizationService authorization,PostgresPortalRepository repository,CancellationToken ct)=>
         {var denied=await authorization.RequireAsync("SCHEDULING","AUDIT",ct);if(denied is not null)return denied;return Results.Ok(await repository.GetScheduleAuditAsync(versionId,ct));});
         app.MapPost("/api/portal/scheduling/versions/{versionId:long}/replan",async(long versionId,ScheduleReplanningRequest request,PortalAuthorizationService authorization,PostgresPortalRepository repository,SchedulingRecommendationEngine engine,RequestUserContext userContext,CancellationToken ct)=>
@@ -1286,6 +1286,26 @@ public static class PortalEndpoints
         }
 
         return true;
+    }
+
+    // The states a transition can be refused on, in the rule vocabulary. This is the HTTP contract
+    // a client renders against: RULE_BLOCKED and RULE_EVALUATION_MISSING mean nothing can be done
+    // until the schedule is evaluated again, while RULE_EXCEPTION_REQUIRED means a decision is
+    // pending on an EXCEPTION_REQUIRED rule and RULE_EVALUATION_SUPERSEDED that an edit outran it.
+    private static readonly string[] RuleGateCodes =
+        { "RULE_BLOCKED", "RULE_EXCEPTION_REQUIRED", "RULE_EVALUATION_MISSING", "RULE_EVALUATION_SUPERSEDED" };
+
+    private static IResult RuleGateProblem(SchedulingRuleGateException exception)
+    {
+        var problem = new Microsoft.AspNetCore.Mvc.ProblemDetails
+        {
+            Title = "La programacion tiene reglas sin decidir",
+            Detail = exception.Message,
+            Status = StatusCodes.Status409Conflict
+        };
+        problem.Extensions["message"] = exception.Message;
+        problem.Extensions["code"] = Array.IndexOf(RuleGateCodes, exception.Code) >= 0 ? exception.Code : "RULE_BLOCKED";
+        return Results.Problem(problem);
     }
 
     private static IResult ScopeHashProblem(string title, string detail, int statusCode)

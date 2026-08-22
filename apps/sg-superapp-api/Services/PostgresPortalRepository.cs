@@ -3228,6 +3228,58 @@ where exists(select 1 from schedule_versions sv join scheduling_rule_profiles rp
         await using var command=new NpgsqlCommand("SELECT count(DISTINCT evidence_id) FROM scheduling_rule_hr_validations WHERE evaluation_id=@evaluation AND rule_code='I9-R06' AND status='VALIDATED' AND evidence_id=ANY(@evidence)",connection,transaction);command.Parameters.AddWithValue("evaluation",evaluationId);command.Parameters.AddWithValue("evidence",evidenceIds!);return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken),System.Globalization.CultureInfo.InvariantCulture)==evidenceIds.Length;
     }
 
+    // What the transition gate actually verified, carried into the audit trail so a reader can tell
+    // which versioned profile backed the decision and that it was a simulated MVP_TEST run.
+    private sealed record SchedulingTransitionEvidence(
+        bool Simulated,long RuleProfileId,long RuleProfileVersion,long Evaluations,long DecidedExceptions);
+
+    // Approving or publishing is the moment a proposal stops being a proposal, so by then every
+    // rule must have been decided. This mirrors SchedulingRuleEvaluationSummary.CanApproveOrPublish
+    // over what is actually persisted: only COMPLIANT and NOT_APPLICABLE pass on their own, an
+    // EXCEPTION_REQUIRED needs an approved decision bound to its exact evaluation, rule and scope,
+    // and BLOCKED or WARNING never pass - an unverified rule accredits nothing. An assignment edited
+    // after its evaluation has no verdict describing it any more and must be evaluated again.
+    // A version with no evaluation at all is not clean, it is unverified.
+    private static async Task<SchedulingTransitionEvidence> RequireEveryRuleDecidedAsync(
+        NpgsqlConnection cn,NpgsqlTransaction tx,long versionId,CancellationToken ct)
+    {
+        const string sql=@"select sv.simulated,coalesce(sv.rule_profile_id,0),coalesce(sv.rule_profile_version,0),
+count(e.id),
+count(e.id) filter(where a.updated_at>e.evaluated_at),
+count(e.id) filter(where coalesce(a.updated_at<=e.evaluated_at,true) and e.outcome in('BLOCKED','WARNING')),
+count(e.id) filter(where coalesce(a.updated_at<=e.evaluated_at,true) and e.outcome='EXCEPTION_REQUIRED'
+  and not(e.exception_allowed and exists(select 1 from schedule_exceptions x
+    where x.evaluation_id=e.id and x.rule_code=e.rule_code and x.scope_hash=e.scope_hash and x.decision='APPROVED'))),
+count(e.id) filter(where e.outcome='EXCEPTION_REQUIRED' and exists(select 1 from schedule_exceptions x
+    where x.evaluation_id=e.id and x.rule_code=e.rule_code and x.scope_hash=e.scope_hash and x.decision='APPROVED'))
+from schedule_versions sv
+left join scheduling_rule_evaluations e on e.schedule_version_id=sv.id
+left join schedule_assignments a on a.id=e.assignment_id
+where sv.id=@version group by sv.simulated,sv.rule_profile_id,sv.rule_profile_version";
+        bool simulated; long profileId,profileVersion,total,superseded,blocked,pending,decided;
+        await using(var cmd=new NpgsqlCommand(sql,cn,tx))
+        {
+            cmd.Parameters.AddWithValue("version",versionId);
+            await using var rd=await cmd.ExecuteReaderAsync(ct);
+            if(!await rd.ReadAsync(ct))throw new KeyNotFoundException("La version de programacion no existe.");
+            simulated=rd.GetBoolean(0);profileId=rd.GetInt64(1);profileVersion=rd.GetInt32(2);
+            total=rd.GetInt64(3);superseded=rd.GetInt64(4);blocked=rd.GetInt64(5);pending=rd.GetInt64(6);decided=rd.GetInt64(7);
+        }
+        // A version that never entered the versioned-rule regime is left to the workflow it was
+        // built under; this gate governs the MVP profiles, and silently passing one of those would
+        // be the fail-open case it exists to prevent.
+        if(!simulated&&total==0)return new SchedulingTransitionEvidence(false,0,0,0,0);
+        if(total==0)
+            throw new SchedulingRuleGateException("RULE_EVALUATION_MISSING","La version simulada no tiene evaluacion de reglas persistida; no se presume cumplimiento.");
+        if(superseded>0)
+            throw new SchedulingRuleGateException("RULE_EVALUATION_SUPERSEDED","Hay asignaciones editadas despues de su evaluacion; se deben reevaluar antes de aprobar o publicar.");
+        if(blocked>0)
+            throw new SchedulingRuleGateException("RULE_BLOCKED","Hay reglas bloqueadas o sin verificar; no se puede aprobar ni publicar.");
+        if(pending>0)
+            throw new SchedulingRuleGateException("RULE_EXCEPTION_REQUIRED","Hay excepciones requeridas sin decision aprobada; no se puede aprobar ni publicar.");
+        return new SchedulingTransitionEvidence(simulated,profileId,profileVersion,total,decided);
+    }
+
     public Task<ScheduleWorkflowResponse> ApproveScheduleAsync(long id,int expected,long actorId,string actor,CancellationToken ct=default)=>TransitionScheduleAsync(id,expected,"PROPUESTA","APROBADA","SCHEDULE_APPROVED",actorId,actor,ct);
     public Task<ScheduleWorkflowResponse> PublishScheduleAsync(long id,int expected,long actorId,string actor,CancellationToken ct=default)=>TransitionScheduleAsync(id,expected,"APROBADA","PUBLICADA","SCHEDULE_PUBLISHED",actorId,actor,ct);
 
@@ -3249,7 +3301,7 @@ where exists(select 1 from schedule_versions sv join scheduling_rule_profiles rp
     }
 
     private async Task<ScheduleWorkflowResponse> TransitionScheduleAsync(long id,int expected,string from,string to,string eventType,long actorId,string actor,CancellationToken ct)
-    { await using var cn=new NpgsqlConnection(_connectionString);await cn.OpenAsync(ct);await using var tx=await cn.BeginTransactionAsync(ct);var current=await RequireScheduleStateAsync(cn,tx,id,expected,from,ct);if(to=="PUBLICADA"){await using var replace=new NpgsqlCommand("update schedule_versions set status='REEMPLAZADA' where schedule_id=@s and status='PUBLICADA'",cn,tx);replace.Parameters.AddWithValue("s",current.ScheduleId);await replace.ExecuteNonQueryAsync(ct);}var sql=to=="APROBADA"?"update schedule_versions set status='APROBADA',approved_by=@a,approved_at=now() where id=@id":"update schedule_versions set status='PUBLICADA',published_by=@a,published_at=now() where id=@id";await using(var cmd=new NpgsqlCommand(sql,cn,tx)){cmd.Parameters.AddWithValue("a",actor);cmd.Parameters.AddWithValue("id",id);await cmd.ExecuteNonQueryAsync(ct);}var self=to=="PUBLICADA"&&current.CreatedBy==actor&&current.ApprovedBy==actor;await InsertAuditLogAsync(cn,tx,actorId,actor,eventType,"SCHEDULE_VERSION",id.ToString(),"jsonb_build_object('from',@from,'to',@to,'selfManaged',@self)",c=>{c.Parameters.AddWithValue("from",from);c.Parameters.AddWithValue("to",to);c.Parameters.AddWithValue("self",self);},ct);await tx.CommitAsync(ct);return(await GetScheduleVersionAsync(id,ct))!; }
+    { await using var cn=new NpgsqlConnection(_connectionString);await cn.OpenAsync(ct);await using var tx=await cn.BeginTransactionAsync(ct);var current=await RequireScheduleStateAsync(cn,tx,id,expected,from,ct);var evidence=await RequireEveryRuleDecidedAsync(cn,tx,id,ct);if(to=="PUBLICADA"){await using var replace=new NpgsqlCommand("update schedule_versions set status='REEMPLAZADA' where schedule_id=@s and status='PUBLICADA'",cn,tx);replace.Parameters.AddWithValue("s",current.ScheduleId);await replace.ExecuteNonQueryAsync(ct);}var sql=to=="APROBADA"?"update schedule_versions set status='APROBADA',approved_by=@a,approved_at=now() where id=@id":"update schedule_versions set status='PUBLICADA',published_by=@a,published_at=now() where id=@id";await using(var cmd=new NpgsqlCommand(sql,cn,tx)){cmd.Parameters.AddWithValue("a",actor);cmd.Parameters.AddWithValue("id",id);await cmd.ExecuteNonQueryAsync(ct);}var self=to=="PUBLICADA"&&current.CreatedBy==actor&&current.ApprovedBy==actor;await InsertAuditLogAsync(cn,tx,actorId,actor,eventType,"SCHEDULE_VERSION",id.ToString(),"jsonb_build_object('from',@from,'to',@to,'selfManaged',@self,'simulated',@simulated,'ruleProfileId',@profile,'ruleProfileVersion',@profileVersion,'evaluations',@evaluations,'decidedExceptions',@decided)",c=>{c.Parameters.AddWithValue("from",from);c.Parameters.AddWithValue("to",to);c.Parameters.AddWithValue("self",self);c.Parameters.AddWithValue("simulated",evidence.Simulated);c.Parameters.AddWithValue("profile",evidence.RuleProfileId);c.Parameters.AddWithValue("profileVersion",evidence.RuleProfileVersion);c.Parameters.AddWithValue("evaluations",evidence.Evaluations);c.Parameters.AddWithValue("decided",evidence.DecidedExceptions);},ct);await tx.CommitAsync(ct);return(await GetScheduleVersionAsync(id,ct))!; }
 
     private async Task<ScheduleWorkflowResponse> RequireScheduleStateAsync(NpgsqlConnection cn,NpgsqlTransaction tx,long id,int expected,string status,CancellationToken ct)
     { await using var cmd=new NpgsqlCommand("select sv.id,sv.schedule_id,s.project_id,sv.version_number,sv.status,s.period_start,s.period_end,sv.coverage_percent,sv.vacancy_count,sv.exception_count,coalesce((sv.source_snapshot->>'acceptedVacancy')::boolean,false),sv.created_by,sv.approved_by,sv.published_by from schedule_versions sv join schedules s on s.id=sv.schedule_id where sv.id=@id for update of sv",cn,tx);cmd.Parameters.AddWithValue("id",id);await using var rd=await cmd.ExecuteReaderAsync(ct);if(!await rd.ReadAsync(ct))throw new KeyNotFoundException("La propuesta no existe.");var item=ReadScheduleWorkflow(rd);if(item.VersionNumber!=expected)throw new DBConcurrencyException("La version esperada no coincide.");if(item.Status!=status)throw new InvalidOperationException($"La transicion requiere estado {status}.");return item; }

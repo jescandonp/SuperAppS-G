@@ -22,10 +22,16 @@ if(-not[string]::IsNullOrWhiteSpace($VerificationSchema)){
   $adjusted=Call Put "$ApiBaseUrl/portal/scheduling/proposals/$($p1.Body.versionId)/assignments/$($assignment.Trim())" $h @{employeeId=$null;status="VACANTE";reasons=@("Vacante aceptada y revalidada");expectedVersion=$p1.Body.versionNumber}
   if($adjusted.Status-ne 200-or$adjusted.Body.vacancyCount-ne 1){throw "Manual adjustment did not revalidate metrics."}
 }
-$bad=Call Post "$ApiBaseUrl/portal/scheduling/proposals/$($p1.Body.versionId)/exceptions" $h @{assignmentId=$null;exceptionType="SUBSANABLE";reason="";responsible="";resolutionDate="";expectedVersion=$p1.Body.versionNumber}
-if($bad.Status-ne 400){throw "Subsanable exception accepted without reason/responsible/date."}
-$ex=Call Post "$ApiBaseUrl/portal/scheduling/proposals/$($p1.Body.versionId)/exceptions" $h @{assignmentId=$null;exceptionType="SUBSANABLE";reason="Compromiso documentado";responsible="operaciones.sg";resolutionDate="2026-09-10";expectedVersion=$p1.Body.versionNumber}
-if($ex.Status-ne 200-or$ex.Body.exceptionCount-ne 1){throw "Valid exception was not persisted."}
+# Exceptions are no longer free-standing notes: every one binds to an evaluation, a rule, a scope and
+# a catalogued motive. The old shape is refused whether or not it carries a reason, because it names
+# no snapshot at all. Rule-bound exceptions are covered by Verify-SgSuperAppI9MvpWorkflow.ps1, which
+# stands the API up against its own schema and can persist a versioned evaluation to decide on.
+foreach($legacy in @(
+  @{assignmentId=$null;exceptionType="SUBSANABLE";reason="";responsible="";resolutionDate="";expectedVersion=$p1.Body.versionNumber},
+  @{assignmentId=$null;exceptionType="SUBSANABLE";reason="Compromiso documentado";responsible="operaciones.sg";resolutionDate="2026-09-10";expectedVersion=$p1.Body.versionNumber})){
+  $refused=Call Post "$ApiBaseUrl/portal/scheduling/proposals/$($p1.Body.versionId)/exceptions" $h $legacy
+  if($refused.Status-ne 400){throw "An exception that names no evaluation, rule or scope was not refused."}
+}
 $stale=Call Post "$ApiBaseUrl/portal/scheduling/proposals/$($p1.Body.versionId)/approve" $h @{expectedVersion=999};if($stale.Status-ne 409){throw "Stale expected version was not rejected."}
 $approved=Call Post "$ApiBaseUrl/portal/scheduling/proposals/$($p1.Body.versionId)/approve" $h @{expectedVersion=$p1.Body.versionNumber};if($approved.Status-ne 200-or$approved.Body.status-ne"APROBADA"){throw "Approval failed."}
 $published=Call Post "$ApiBaseUrl/portal/scheduling/proposals/$($p1.Body.versionId)/publish" $h @{expectedVersion=$p1.Body.versionNumber};if($published.Status-ne 200-or$published.Body.status-ne"PUBLICADA"){throw "Publication failed."}
