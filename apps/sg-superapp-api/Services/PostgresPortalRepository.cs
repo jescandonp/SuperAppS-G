@@ -3098,10 +3098,12 @@ public sealed class PostgresPortalRepository
         var status=request.Status.Trim().ToUpperInvariant();
         await using var cn=new NpgsqlConnection(_connectionString); await cn.OpenAsync(ct); await using var tx=await cn.BeginTransactionAsync(ct);
         await RequireScheduleStateAsync(cn,tx,versionId,request.ExpectedVersion,"PROPUESTA",ct);
+        // Counted before the edit lands, because afterwards every one of them is superseded.
+        var superseded=await CountStandingAssignmentDecisionsAsync(cn,tx,versionId,assignmentId,ct);
         await using (var cmd=new NpgsqlCommand("update schedule_assignments set employee_id=@e,status=@s,reasons=@r::jsonb,updated_at=now() where id=@id and schedule_version_id=@v",cn,tx))
         { cmd.Parameters.Add("e",NpgsqlDbType.Bigint).Value=request.EmployeeId.HasValue?request.EmployeeId.Value:DBNull.Value; cmd.Parameters.AddWithValue("s",status); cmd.Parameters.AddWithValue("r",JsonSerializer.Serialize(request.Reasons??Array.Empty<string>())); cmd.Parameters.AddWithValue("id",assignmentId); cmd.Parameters.AddWithValue("v",versionId); if(await cmd.ExecuteNonQueryAsync(ct)!=1) throw new KeyNotFoundException("La asignacion no existe."); }
         await RefreshScheduleMetricsAsync(cn,tx,versionId,ct);
-        await InsertAuditLogAsync(cn,tx,actorId,actor,"SCHEDULE_ASSIGNMENT_REVALIDATED","SCHEDULE_VERSION",versionId.ToString(),"jsonb_build_object('assignmentId',@id,'status',@status)",c=>{c.Parameters.AddWithValue("id",assignmentId);c.Parameters.AddWithValue("status",status);},ct);
+        await InsertAuditLogAsync(cn,tx,actorId,actor,"SCHEDULE_ASSIGNMENT_REVALIDATED","SCHEDULE_VERSION",versionId.ToString(),"jsonb_build_object('assignmentId',@id,'status',@status,'supersededDecisions',@superseded)",c=>{c.Parameters.AddWithValue("id",assignmentId);c.Parameters.AddWithValue("status",status);c.Parameters.AddWithValue("superseded",superseded);},ct);
         await tx.CommitAsync(ct); return (await GetScheduleVersionAsync(versionId,ct))!;
     }
 
@@ -3109,10 +3111,11 @@ public sealed class PostgresPortalRepository
     {
         await using var cn=new NpgsqlConnection(_connectionString); await cn.OpenAsync(ct); await using var tx=await cn.BeginTransactionAsync(ct);
         await RequireScheduleStateAsync(cn,tx,versionId,request.ExpectedVersion,"PROPUESTA",ct);
-        string ruleCode,scopeHash,outcome; bool exceptionAllowed; long? evaluatedAssignment; string factsJson,catalogJson;
+        string ruleCode,scopeHash,outcome; bool exceptionAllowed,superseded; long? evaluatedAssignment; string factsJson,catalogJson;
         const string evaluationSql=@"select e.rule_code,e.scope_hash,e.outcome,e.exception_allowed,e.assignment_id,
-e.facts_snapshot::text,pe.catalog_snapshot::text
+e.facts_snapshot::text,pe.catalog_snapshot::text,coalesce(a.updated_at>e.evaluated_at,false)
 from scheduling_rule_evaluations e
+left join schedule_assignments a on a.id=e.assignment_id
 join scheduling_rule_profiles rp on rp.id=e.rule_profile_id and rp.origin='SIMULATED' and rp.environment_scope='MVP_TEST'
 join scheduling_rule_profile_entries pe on pe.rule_profile_id=e.rule_profile_id and pe.rule_code=e.rule_code
 join schedule_versions sv on sv.id=e.schedule_version_id and sv.simulated=true and sv.rule_profile_id=rp.id
@@ -3123,10 +3126,15 @@ where e.id=@evaluation and e.schedule_version_id=@version for share of e";
             await using var rd=await evaluation.ExecuteReaderAsync(ct);
             if(!await rd.ReadAsync(ct))throw new KeyNotFoundException("La evaluacion MVP_TEST no pertenece a la propuesta simulada.");
             ruleCode=rd.GetString(0);scopeHash=rd.GetString(1);outcome=rd.GetString(2);exceptionAllowed=rd.GetBoolean(3);
-            evaluatedAssignment=rd.IsDBNull(4)?null:rd.GetInt64(4);factsJson=rd.GetString(5);catalogJson=rd.GetString(6);
+            evaluatedAssignment=rd.IsDBNull(4)?null:rd.GetInt64(4);factsJson=rd.GetString(5);catalogJson=rd.GetString(6);superseded=rd.GetBoolean(7);
         }
         if(!string.Equals(scopeHash,(request.ScopeHash??string.Empty).Trim(),StringComparison.Ordinal))
             throw new SchedulingScopeHashMismatchException();
+        // The assignment was edited after this evaluation, so it describes facts that no longer
+        // hold. Re-evaluating the edited assignment yields a fresh evaluation, and that is what
+        // a decision must bind to; this one can no longer receive any.
+        if(superseded)
+            throw new InvalidOperationException("La evaluacion quedo obsoleta por una edicion posterior; se debe reevaluar la asignacion.");
         if(!string.Equals(ruleCode,request.RuleCode.Trim(),StringComparison.Ordinal) || outcome!="EXCEPTION_REQUIRED" ||
            (ruleCode!="I9-R06" && !exceptionAllowed))
             throw new InvalidOperationException("La evaluacion no admite la excepcion solicitada.");
@@ -3198,8 +3206,30 @@ where exists(select 1 from schedule_versions sv join scheduling_rule_profiles rp
     private async Task<ScheduleWorkflowResponse> RequireScheduleStateAsync(NpgsqlConnection cn,NpgsqlTransaction tx,long id,int expected,string status,CancellationToken ct)
     { await using var cmd=new NpgsqlCommand("select sv.id,sv.schedule_id,s.project_id,sv.version_number,sv.status,s.period_start,s.period_end,sv.coverage_percent,sv.vacancy_count,sv.exception_count,coalesce((sv.source_snapshot->>'acceptedVacancy')::boolean,false),sv.created_by,sv.approved_by,sv.published_by from schedule_versions sv join schedules s on s.id=sv.schedule_id where sv.id=@id for update of sv",cn,tx);cmd.Parameters.AddWithValue("id",id);await using var rd=await cmd.ExecuteReaderAsync(ct);if(!await rd.ReadAsync(ct))throw new KeyNotFoundException("La propuesta no existe.");var item=ReadScheduleWorkflow(rd);if(item.VersionNumber!=expected)throw new DBConcurrencyException("La version esperada no coincide.");if(item.Status!=status)throw new InvalidOperationException($"La transicion requiere estado {status}.");return item; }
 
+    // Editing an assignment changes the facts the rules were decided on, so a fresh evaluation
+    // would derive a different scopeHash and the persisted one no longer describes this shift.
+    // Both scheduling_rule_evaluations and rule-bound schedule_exceptions are append-only by
+    // trigger: an approval that happened is a historical fact and is never rewritten. Staleness
+    // is therefore derived, not stored - an evaluation is superseded exactly when its assignment
+    // was touched after it was evaluated. That single predicate is what stops a superseded
+    // decision from counting in the summary and from admitting a new one.
+    private const string SupersededDecisionPredicate=
+        "exists(select 1 from scheduling_rule_evaluations e join schedule_assignments a on a.id=e.assignment_id "+
+        "where e.id=x.evaluation_id and a.updated_at>e.evaluated_at)";
+
+    private static async Task<int> CountStandingAssignmentDecisionsAsync(
+        NpgsqlConnection cn,NpgsqlTransaction tx,long versionId,long assignmentId,CancellationToken ct)
+    {
+        await using var cmd=new NpgsqlCommand(@"select count(*) from schedule_exceptions x
+join scheduling_rule_evaluations e on e.id=x.evaluation_id
+join schedule_assignments a on a.id=e.assignment_id
+where x.schedule_version_id=@version and e.assignment_id=@assignment and a.updated_at<=e.evaluated_at",cn,tx);
+        cmd.Parameters.AddWithValue("version",versionId);cmd.Parameters.AddWithValue("assignment",assignmentId);
+        return (int)(long)(await cmd.ExecuteScalarAsync(ct)??0L);
+    }
+
     private async Task RefreshScheduleMetricsAsync(NpgsqlConnection cn,NpgsqlTransaction tx,long id,CancellationToken ct)
-    { await using var cmd=new NpgsqlCommand("update schedule_versions sv set vacancy_count=(select count(*) from schedule_assignments where schedule_version_id=sv.id and status='VACANTE'),exception_count=(select count(*) from schedule_exceptions where schedule_version_id=sv.id),coverage_percent=coalesce((select round(100.0*count(*) filter(where status='ASIGNADA')/nullif(count(*),0),2) from schedule_assignments where schedule_version_id=sv.id),0) where sv.id=@id",cn,tx);cmd.Parameters.AddWithValue("id",id);await cmd.ExecuteNonQueryAsync(ct); }
+    { await using var cmd=new NpgsqlCommand("update schedule_versions sv set vacancy_count=(select count(*) from schedule_assignments where schedule_version_id=sv.id and status='VACANTE'),exception_count=(select count(*) from schedule_exceptions x where x.schedule_version_id=sv.id and not "+SupersededDecisionPredicate+"),coverage_percent=coalesce((select round(100.0*count(*) filter(where status='ASIGNADA')/nullif(count(*),0),2) from schedule_assignments where schedule_version_id=sv.id),0) where sv.id=@id",cn,tx);cmd.Parameters.AddWithValue("id",id);await cmd.ExecuteNonQueryAsync(ct); }
 
     private async Task<ScheduleWorkflowResponse?> QueryScheduleAsync(string filter,long id,DateOnly? period,CancellationToken ct)
     { await using var cn=new NpgsqlConnection(_connectionString);await cn.OpenAsync(ct);await using var cmd=new NpgsqlCommand($"select sv.id,sv.schedule_id,s.project_id,sv.version_number,sv.status,s.period_start,s.period_end,sv.coverage_percent,sv.vacancy_count,sv.exception_count,coalesce((sv.source_snapshot->>'acceptedVacancy')::boolean,false),sv.created_by,sv.approved_by,sv.published_by from schedule_versions sv join schedules s on s.id=sv.schedule_id where {filter}",cn);cmd.Parameters.AddWithValue("id",id);if(period.HasValue)cmd.Parameters.AddWithValue("period",period.Value);await using var rd=await cmd.ExecuteReaderAsync(ct);return await rd.ReadAsync(ct)?ReadScheduleWorkflow(rd):null; }

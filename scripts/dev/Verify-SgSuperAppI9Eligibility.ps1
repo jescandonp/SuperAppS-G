@@ -23,18 +23,34 @@ $admin = Get-Headers "admin.sg" "Admin123"
 $operations = Get-Headers "operaciones.sg" "Operaciones123"
 $th = Get-Headers "th.sg" "Th123456"
 
-$eligibleFacts = @{ active=$true; hasBlockingAbsence=$false; hasOverlap=$false; restRuleSatisfied=$true; hasBlockingLocationMismatch=$false; requirementReasons=@() }
+# The versioned rule evaluation is the only source of truth. The isolated booleans this file
+# used to post (hasOverlap, restRuleSatisfied and the rest) were a parallel truth that could
+# contradict the rules, and no longer exist in the contract.
+$scope = 'a' * 64
+function New-Evaluation([string]$rule, [string]$outcome, [string]$severity, [string]$code) {
+    @{ ruleCode=$rule; ruleProfileVersion=3; outcome=$outcome; severity=$severity; messageCode=$code
+       explanation='Evaluacion simulada MVP_TEST.'; scopeHash=$scope; exceptionAllowed=($outcome -eq 'EXCEPTION_REQUIRED') }
+}
+function New-Facts([object[]]$evaluations, [object[]]$requirements = @(), [bool]$active = $true) {
+    @{ active=$active; ruleProfileId=7; ruleProfileVersion=3; simulated=$true
+       ruleEvaluations=$evaluations; requirementReasons=$requirements }
+}
+$compliant = @(New-Evaluation 'I9-R03' 'COMPLIANT' 'INFO' 'I9_R03_COMPLIANT')
+
+$eligibleFacts = New-Facts $compliant
 $eligible = Invoke-Evaluation $operations $eligibleFacts
 if ($eligible.Status -eq 404) { throw "I9 eligibility endpoint is missing (HTTP 404)." }
 if ($eligible.Status -ne 200 -or -not $eligible.Body.eligible -or $eligible.Body.requiresException -or @($eligible.Body.reasons).Count -ne 0) { throw "Active eligible guard was not accepted." }
 
 $cases = @(
-    @{ Name="inactive"; Facts=@{ active=$false; hasBlockingAbsence=$false; hasOverlap=$false; restRuleSatisfied=$true; hasBlockingLocationMismatch=$false; requirementReasons=@() }; Code="EMPLOYEE_INACTIVE" },
-    @{ Name="incapacity"; Facts=@{ active=$true; hasBlockingAbsence=$true; hasOverlap=$false; restRuleSatisfied=$true; hasBlockingLocationMismatch=$false; requirementReasons=@() }; Code="BLOCKING_ABSENCE" },
-    @{ Name="overlap"; Facts=@{ active=$true; hasBlockingAbsence=$false; hasOverlap=$true; restRuleSatisfied=$true; hasBlockingLocationMismatch=$false; requirementReasons=@() }; Code="SHIFT_OVERLAP" },
-    @{ Name="rest"; Facts=@{ active=$true; hasBlockingAbsence=$false; hasOverlap=$false; restRuleSatisfied=$false; hasBlockingLocationMismatch=$false; requirementReasons=@() }; Code="MINIMUM_REST" },
-    @{ Name="location"; Facts=@{ active=$true; hasBlockingAbsence=$false; hasOverlap=$false; restRuleSatisfied=$true; hasBlockingLocationMismatch=$true; requirementReasons=@() }; Code="LOCATION_RULE" },
-    @{ Name="requirement"; Facts=@{ active=$true; hasBlockingAbsence=$false; hasOverlap=$false; restRuleSatisfied=$true; hasBlockingLocationMismatch=$false; requirementReasons=@(@{ code="REQUIREMENT_EXPIRED"; severity="BLOQUEANTE"; message="Requisito bloqueante vencido." }) }; Code="REQUIREMENT_EXPIRED" }
+    @{ Name="inactive"; Facts=(New-Facts $compliant @() $false); Code="EMPLOYEE_INACTIVE" },
+    @{ Name="incapacity"; Facts=(New-Facts @(New-Evaluation 'I9-R04' 'BLOCKED' 'BLOCKING' 'I9_R04_INCAPACITY_ACTIVE')); Code="I9_R04_INCAPACITY_ACTIVE" },
+    @{ Name="overlap"; Facts=(New-Facts @(New-Evaluation 'I9-R03' 'BLOCKED' 'BLOCKING' 'I9_R03_OVERLAP_APPROVED_BLOCKED')); Code="I9_R03_OVERLAP_APPROVED_BLOCKED" },
+    @{ Name="travel"; Facts=(New-Facts @(New-Evaluation 'I9-R05' 'BLOCKED' 'BLOCKING' 'I9_R05_PROHIBITED')); Code="I9_R05_PROHIBITED" },
+    @{ Name="unverified"; Facts=(New-Facts @(New-Evaluation 'I9-R07' 'WARNING' 'ERROR' 'I9_R07_DISABLED_UNVERIFIED')); Code="I9_R07_DISABLED_UNVERIFIED" },
+    @{ Name="missing evaluation"; Facts=(New-Facts @()); Code="RULE_EVALUATION_MISSING" },
+    @{ Name="orphan profile"; Facts=@{ active=$true; ruleProfileId=0; ruleProfileVersion=0; simulated=$true; ruleEvaluations=$compliant; requirementReasons=@() }; Code="RULE_PROFILE_MISSING" },
+    @{ Name="requirement"; Facts=(New-Facts $compliant @(@{ code="REQUIREMENT_EXPIRED"; severity="BLOQUEANTE"; message="Requisito bloqueante vencido." })); Code="REQUIREMENT_EXPIRED" }
 )
 foreach ($case in $cases) {
     $result = Invoke-Evaluation $admin $case.Facts
@@ -42,25 +58,43 @@ foreach ($case in $cases) {
     if (@($result.Body.reasons | Where-Object code -eq $case.Code).Count -ne 1) { throw "Blocking case $($case.Name) missing stable code $($case.Code)." }
 }
 
-$subsanableFacts = @{ active=$true; hasBlockingAbsence=$false; hasOverlap=$false; restRuleSatisfied=$true; hasBlockingLocationMismatch=$false; requirementReasons=@(@{ code="COURSE_RENEWAL_DUE"; severity="SUBSANABLE"; message="Curso subsanable." }) }
+# An evaluation whose declared profile version does not match the decision is not trusted.
+$mismatched = New-Facts @(@{ ruleCode='I9-R03'; ruleProfileVersion=99; outcome='COMPLIANT'; severity='INFO'
+    messageCode='I9_R03_COMPLIANT'; explanation='Version ajena.'; scopeHash=$scope; exceptionAllowed=$false })
+$mismatchedResult = Invoke-Evaluation $admin $mismatched
+if ($mismatchedResult.Body.eligible -or @($mismatchedResult.Body.reasons | Where-Object code -eq 'RULE_EVALUATION_UNTRUSTED').Count -ne 1) {
+    throw "An evaluation from another profile version must not be trusted."
+}
+
+$subsanableFacts = New-Facts $compliant @(@{ code="COURSE_RENEWAL_DUE"; severity="SUBSANABLE"; message="Curso subsanable." })
 $subsanable = Invoke-Evaluation $operations $subsanableFacts
 if (-not $subsanable.Body.eligible -or -not $subsanable.Body.requiresException) { throw "Subsanable requirement must remain eligible and require exception." }
 
-$informativeFacts = @{ active=$true; hasBlockingAbsence=$false; hasOverlap=$false; restRuleSatisfied=$true; hasBlockingLocationMismatch=$false; requirementReasons=@(@{ code="INFO_ONLY"; severity="INFORMATIVA"; message="Informacion." }) }
+# A rule that demands an exception keeps the candidate assignable but pending a decision.
+$pendingFacts = New-Facts @(New-Evaluation 'I9-R02' 'EXCEPTION_REQUIRED' 'WARNING' 'I9_R02_MIN_REST')
+$pending = Invoke-Evaluation $operations $pendingFacts
+if (-not $pending.Body.eligible -or -not $pending.Body.requiresException) { throw "An exception-required rule must stay eligible and pending." }
+if (@($pending.Body.reasons | Where-Object { $_.code -eq 'I9_R02_MIN_REST' -and $_.severity -eq 'SUBSANABLE' }).Count -ne 1) {
+    throw "An exception-required rule must be reported as SUBSANABLE."
+}
+
+$informativeFacts = New-Facts $compliant @(@{ code="INFO_ONLY"; severity="INFORMATIVA"; message="Informacion." })
 $informative = Invoke-Evaluation $admin $informativeFacts
 if (-not $informative.Body.eligible -or $informative.Body.requiresException) { throw "Informative requirement must not block or require exception." }
 
-$orderedFacts = @{
-    active=$false; hasBlockingAbsence=$true; hasOverlap=$true; restRuleSatisfied=$false; hasBlockingLocationMismatch=$true
-    requirementReasons=@(@{ code="REQ_SUBSANABLE"; severity="SUBSANABLE"; message="Subsanable." })
-}
+$orderedFacts = New-Facts @(
+    (New-Evaluation 'I9-R05' 'BLOCKED' 'BLOCKING' 'I9_R05_PROHIBITED'),
+    (New-Evaluation 'I9-R02' 'BLOCKED' 'BLOCKING' 'I9_R02_MIN_REST_BLOCKED'),
+    (New-Evaluation 'I9-R04' 'BLOCKED' 'BLOCKING' 'I9_R04_INCAPACITY_ACTIVE'),
+    (New-Evaluation 'I9-R03' 'BLOCKED' 'BLOCKING' 'I9_R03_OVERLAP_APPROVED_BLOCKED')
+) @(@{ code="REQ_SUBSANABLE"; severity="SUBSANABLE"; message="Subsanable." }) $false
 $ordered = Invoke-Evaluation $admin $orderedFacts
 $orderedCodes = @($ordered.Body.reasons | ForEach-Object code) -join ","
-if ($orderedCodes -ne "EMPLOYEE_INACTIVE,BLOCKING_ABSENCE,SHIFT_OVERLAP,MINIMUM_REST,LOCATION_RULE,REQ_SUBSANABLE") {
-    throw "Eligibility reasons are not returned in stable order: $orderedCodes"
+if ($orderedCodes -ne "EMPLOYEE_INACTIVE,I9_R02_MIN_REST_BLOCKED,I9_R03_OVERLAP_APPROVED_BLOCKED,I9_R04_INCAPACITY_ACTIVE,I9_R05_PROHIBITED,REQ_SUBSANABLE") {
+    throw "Eligibility reasons are not returned in stable rule order: $orderedCodes"
 }
 
-$invalidSeverityFacts = @{ active=$true; hasBlockingAbsence=$false; hasOverlap=$false; restRuleSatisfied=$true; hasBlockingLocationMismatch=$false; requirementReasons=@(@{ code="BAD"; severity="OPCIONAL"; message="Invalida." }) }
+$invalidSeverityFacts = New-Facts $compliant @(@{ code="BAD"; severity="OPCIONAL"; message="Invalida." })
 $invalidSeverity = Invoke-Evaluation $admin $invalidSeverityFacts
 if ($invalidSeverity.Status -ne 400) { throw "Unknown requirement severity must return HTTP 400." }
 

@@ -18,12 +18,26 @@ public sealed record ProjectedShiftDay(DateOnly Date, string ShiftCode, int Step
 
 public sealed record EligibilityReason(string Code, string Severity, string Message);
 
+// One persisted rule verdict, carrying the profile version and scope it was decided under so
+// it can never be re-read against a different snapshot.
+public sealed record RuleEvaluationReference(
+    string RuleCode,
+    int RuleProfileVersion,
+    string Outcome,
+    string Severity,
+    string MessageCode,
+    string Explanation,
+    string ScopeHash,
+    bool ExceptionAllowed);
+
+// The rule verdicts are the facts. Isolated booleans used to live here, duplicating what I9-R02
+// through I9-R05 already decide, which let a caller contradict the rules outright.
 public sealed record GuardSchedulingFacts(
     bool Active,
-    bool HasBlockingAbsence,
-    bool HasOverlap,
-    bool RestRuleSatisfied,
-    bool HasBlockingLocationMismatch,
+    long RuleProfileId,
+    int RuleProfileVersion,
+    bool Simulated,
+    IReadOnlyList<RuleEvaluationReference>? RuleEvaluations,
     IReadOnlyList<EligibilityReason>? RequirementReasons);
 
 public sealed record EligibilityResult(
@@ -46,7 +60,8 @@ public sealed record EligibleCandidate(
     decimal Equity,
     decimal AdditionalHours,
     decimal DistancePenalty,
-    decimal PublishedScheduleChange);
+    decimal PublishedScheduleChange,
+    IReadOnlyList<RuleEvaluationReference>? RuleEvaluations = null);
 
 public sealed record RequiredShiftRecommendationInput(
     long RequiredShiftId,

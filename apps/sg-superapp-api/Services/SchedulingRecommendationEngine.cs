@@ -63,6 +63,12 @@ public sealed class SchedulingRecommendationEngine
                 $"EQUITY={selected.Candidate.Equity:0.####}",
                 $"ACCUMULATED_ASSIGNMENTS={assignedCounts[selected.Candidate.EmployeeId] - 1}"
             };
+            // The decision must show which rule is pending and for which scope, so an approver
+            // can bind the exception to that snapshot and nothing else.
+            foreach (var pending in (selected.Candidate.RuleEvaluations ?? Array.Empty<RuleEvaluationReference>())
+                         .Where(evaluation => evaluation.Outcome == "EXCEPTION_REQUIRED")
+                         .OrderBy(evaluation => evaluation.RuleCode, StringComparer.Ordinal))
+                explanation.Add($"EXCEPTION_REQUIRED: {pending.RuleCode} {pending.ScopeHash}");
             explanation.AddRange(selected.Candidate.Eligibility.Reasons.Select(x => $"{x.Code}: {x.Message}"));
             assignments.Add(new(shift.RequiredShiftId, shift.PositionId, shift.Date, shift.StartsAt,
                 selected.Candidate.EmployeeId, "ASIGNADA", selected.Score, explanation));
