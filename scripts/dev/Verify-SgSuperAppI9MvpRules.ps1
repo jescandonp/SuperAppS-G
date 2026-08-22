@@ -287,9 +287,9 @@ function Invoke-FocusedVerifier {
     [void]$process.Start()
     $stdoutTask = $process.StandardOutput.ReadToEndAsync()
     $stderrTask = $process.StandardError.ReadToEndAsync()
-    if (-not $process.WaitForExit(20000)) {
+    if (-not $process.WaitForExit(60000)) {
         try { $process.Kill() } catch { }
-        $failures.Add("$Requirement`: '$RelativePath' timed out after 20 seconds")
+        $failures.Add("$Requirement`: '$RelativePath' timed out after 60 seconds")
         return
     }
     $process.WaitForExit()

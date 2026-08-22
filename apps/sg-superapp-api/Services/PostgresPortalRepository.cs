@@ -3132,9 +3132,18 @@ where e.id=@evaluation and e.schedule_version_id=@version for share of e";
         if(!CatalogAllowsMotive(catalogJson,request.MotiveCode.Trim()))throw new InvalidOperationException("El motivo no pertenece al catalogo versionado de la regla.");
         if(ruleCode=="I9-R06" && !await HasPersistedHrValidationsAsync(cn,tx,request.EvaluationId,factsJson,ct))throw new InvalidOperationException("R06 exige validacion persistida de Talento Humano ligada a cada evidencia.");
         const string insertSql=@"insert into schedule_exceptions(schedule_version_id,assignment_id,exception_type,reason,responsible,evaluation_id,rule_code,scope_hash,motive_code,decision,decided_by,decided_at,decision_detail)
-values(@v,@a,'RULE_EXCEPTION',@r,@p,@evaluation,@rule,@scope,@motive,'APPROVED',@actor,now(),jsonb_build_object('resolutionDate',@date,'source','PERSISTED_MVP_TEST_EVALUATION'))";
-        await using (var cmd=new NpgsqlCommand(insertSql,cn,tx))
-        { cmd.Parameters.AddWithValue("v",versionId);cmd.Parameters.Add("a",NpgsqlDbType.Bigint).Value=request.AssignmentId.HasValue?request.AssignmentId.Value:DBNull.Value;cmd.Parameters.AddWithValue("r",request.Reason.Trim());cmd.Parameters.AddWithValue("p",request.Responsible.Trim());cmd.Parameters.AddWithValue("evaluation",request.EvaluationId);cmd.Parameters.AddWithValue("rule",ruleCode);cmd.Parameters.AddWithValue("scope",scopeHash);cmd.Parameters.AddWithValue("motive",request.MotiveCode.Trim());cmd.Parameters.AddWithValue("actor",actor);cmd.Parameters.AddWithValue("date",resolutionDate.ToString("yyyy-MM-dd"));await cmd.ExecuteNonQueryAsync(ct); }
+values(@v,@a,'RULE_EXCEPTION',@r,@p,@evaluation,@rule,@scope,@motive,'APPROVED',@actor,now(),jsonb_build_object('resolutionDate',@date,'source','PERSISTED_MVP_TEST_EVALUATION'))
+on conflict on constraint uq_schedule_exceptions_evaluation_rule_scope_motive do nothing";
+        try
+        {
+            await using var cmd=new NpgsqlCommand(insertSql,cn,tx);
+            cmd.Parameters.AddWithValue("v",versionId);cmd.Parameters.Add("a",NpgsqlDbType.Bigint).Value=request.AssignmentId.HasValue?request.AssignmentId.Value:DBNull.Value;cmd.Parameters.AddWithValue("r",request.Reason.Trim());cmd.Parameters.AddWithValue("p",request.Responsible.Trim());cmd.Parameters.AddWithValue("evaluation",request.EvaluationId);cmd.Parameters.AddWithValue("rule",ruleCode);cmd.Parameters.AddWithValue("scope",scopeHash);cmd.Parameters.AddWithValue("motive",request.MotiveCode.Trim());cmd.Parameters.AddWithValue("actor",actor);cmd.Parameters.AddWithValue("date",resolutionDate.ToString("yyyy-MM-dd"));
+            if(await cmd.ExecuteNonQueryAsync(ct)!=1)throw new InvalidOperationException("Ya existe una decision para la misma evaluacion, regla, alcance y motivo.");
+        }
+        catch(PostgresException ex) when(ex.SqlState==PostgresErrorCodes.UniqueViolation && ex.ConstraintName=="uq_schedule_exceptions_evaluation_rule_scope_motive")
+        {
+            throw new InvalidOperationException("Ya existe una decision para la misma evaluacion, regla, alcance y motivo.",ex);
+        }
         await RefreshScheduleMetricsAsync(cn,tx,versionId,ct);
         await InsertAuditLogAsync(cn,tx,actorId,actor,"SCHEDULE_RULE_EXCEPTION_APPROVED","SCHEDULE_VERSION",versionId.ToString(),"jsonb_build_object('evaluationId',@evaluation,'ruleCode',@rule,'scopeHash',@scope,'motiveCode',@motive,'resolutionDate',@date,'environment','MVP_TEST')",c=>{c.Parameters.AddWithValue("evaluation",request.EvaluationId);c.Parameters.AddWithValue("rule",ruleCode);c.Parameters.AddWithValue("scope",scopeHash);c.Parameters.AddWithValue("motive",request.MotiveCode.Trim());c.Parameters.AddWithValue("date",resolutionDate.ToString("yyyy-MM-dd"));},ct);
         await tx.CommitAsync(ct); return (await GetScheduleVersionAsync(versionId,ct))!;

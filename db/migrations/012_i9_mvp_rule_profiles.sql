@@ -186,6 +186,12 @@ SELECT pg_temp.i9_mvp_constraint('schedule_exceptions','schedule_exceptions_eval
 DO $$
 BEGIN
  IF EXISTS(
+  SELECT 1 FROM schedule_exceptions
+  WHERE num_nonnulls(evaluation_id,rule_code,scope_hash,motive_code) NOT IN (0,4)
+ ) THEN
+  RAISE EXCEPTION 'I9_MVP_PARTIAL_SCHEMA_INCOMPATIBLE: schedule_exceptions contains a partial evaluation/rule/scope/motive identity';
+ END IF;
+ IF EXISTS(
   SELECT 1
   FROM schedule_exceptions e
   JOIN scheduling_rule_evaluations v ON v.id=e.evaluation_id
@@ -194,9 +200,18 @@ BEGIN
  ) THEN
   RAISE EXCEPTION 'I9_MVP_PARTIAL_SCHEMA_INCOMPATIBLE: schedule_exceptions rule_code/scope_hash does not match evaluation_id';
  END IF;
+ IF EXISTS(
+  SELECT 1 FROM schedule_exceptions
+  WHERE evaluation_id IS NOT NULL
+  GROUP BY evaluation_id,rule_code,scope_hash,motive_code
+  HAVING count(*)>1
+ ) THEN
+  RAISE EXCEPTION 'I9_MVP_PARTIAL_SCHEMA_INCOMPATIBLE: schedule_exceptions contains duplicate evaluation/rule/scope/motive identities';
+ END IF;
 END $$;
 SELECT pg_temp.i9_mvp_constraint('schedule_exceptions','schedule_exceptions_evaluation_identity_fkey','f','FOREIGN KEY(evaluation_id,rule_code,scope_hash) REFERENCES scheduling_rule_evaluations(id,rule_code,scope_hash) ON DELETE RESTRICT');
-SELECT pg_temp.i9_mvp_constraint('schedule_exceptions','schedule_exceptions_rule_audit_check','c',$d$CHECK (((evaluation_id IS NULL AND rule_code IS NULL AND scope_hash IS NULL AND motive_code IS NULL) OR (evaluation_id IS NOT NULL AND rule_code ~ '^I9-R0[1-7]$' AND scope_hash ~ '^[0-9a-f]{64}$' AND btrim(motive_code)<>'')) AND jsonb_typeof(decision_detail)='object' AND ((decision IS NULL AND decided_by IS NULL AND decided_at IS NULL) OR (decision IN('APPROVED','REJECTED','CANCELLED') AND btrim(decided_by)<>'' AND decided_at IS NOT NULL)))$d$);
+SELECT pg_temp.i9_mvp_constraint('schedule_exceptions','uq_schedule_exceptions_evaluation_rule_scope_motive','u','UNIQUE(evaluation_id,rule_code,scope_hash,motive_code)');
+SELECT pg_temp.i9_mvp_constraint('schedule_exceptions','schedule_exceptions_rule_audit_check','c',$d$CHECK (((num_nonnulls(evaluation_id,rule_code,scope_hash,motive_code)=0) OR (num_nonnulls(evaluation_id,rule_code,scope_hash,motive_code)=4 AND rule_code ~ '^I9-R0[1-7]$' AND scope_hash ~ '^[0-9a-f]{64}$' AND btrim(motive_code)<>'')) AND jsonb_typeof(decision_detail)='object' AND ((decision IS NULL AND decided_by IS NULL AND decided_at IS NULL) OR (decision IN('APPROVED','REJECTED','CANCELLED') AND btrim(decided_by)<>'' AND decided_at IS NOT NULL)))$d$);
 
 CREATE OR REPLACE FUNCTION i9_mvp_canonical_number(value_text TEXT)
 RETURNS TEXT LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE AS $$
@@ -346,12 +361,12 @@ CREATE OR REPLACE FUNCTION reject_active_rule_profile_entry_change()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
  IF TG_OP IN('UPDATE','DELETE')
-    AND EXISTS(SELECT 1 FROM scheduling_rule_profiles WHERE id=OLD.rule_profile_id AND status='ACTIVE') THEN
-  RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='ACTIVE rule profile entries are immutable';
+    AND EXISTS(SELECT 1 FROM scheduling_rule_profiles WHERE id=OLD.rule_profile_id AND status IN('ACTIVE','RETIRED')) THEN
+  RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='ACTIVE and RETIRED rule profile entries are immutable';
  END IF;
  IF TG_OP IN('INSERT','UPDATE')
-    AND EXISTS(SELECT 1 FROM scheduling_rule_profiles WHERE id=NEW.rule_profile_id AND status='ACTIVE') THEN
-  RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='ACTIVE rule profile entries are immutable';
+    AND EXISTS(SELECT 1 FROM scheduling_rule_profiles WHERE id=NEW.rule_profile_id AND status IN('ACTIVE','RETIRED')) THEN
+  RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='ACTIVE and RETIRED rule profile entries are immutable';
  END IF;
  RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
 END $$;
@@ -363,6 +378,18 @@ RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='rule evaluation history is immutable'; END $$;
 DROP TRIGGER IF EXISTS scheduling_rule_evaluations_immutable ON scheduling_rule_evaluations;
 CREATE TRIGGER scheduling_rule_evaluations_immutable BEFORE UPDATE OR DELETE ON scheduling_rule_evaluations FOR EACH ROW EXECUTE FUNCTION reject_rule_evaluation_change();
+
+CREATE OR REPLACE FUNCTION reject_i9_schedule_exception_change()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+ IF (TG_OP='DELETE' AND OLD.evaluation_id IS NOT NULL)
+    OR (TG_OP='UPDATE' AND (OLD.evaluation_id IS NOT NULL OR NEW.evaluation_id IS NOT NULL)) THEN
+  RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='I9 schedule exception history is immutable';
+ END IF;
+ RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
+END $$;
+DROP TRIGGER IF EXISTS schedule_exceptions_i9_immutable ON schedule_exceptions;
+CREATE TRIGGER schedule_exceptions_i9_immutable BEFORE UPDATE OR DELETE ON schedule_exceptions FOR EACH ROW EXECUTE FUNCTION reject_i9_schedule_exception_change();
 
 DROP INDEX IF EXISTS idx_scheduling_rule_profiles_active_lookup;
 CREATE INDEX idx_scheduling_rule_profiles_active_lookup ON scheduling_rule_profiles(profile_code,scope_code,environment_scope,effective_from,effective_to) WHERE status='ACTIVE';

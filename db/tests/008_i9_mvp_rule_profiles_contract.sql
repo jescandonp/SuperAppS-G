@@ -50,6 +50,20 @@ BEGIN
         RAISE EXCEPTION 'Persisted TH validation guards are missing';
     END IF;
 
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid='schedule_exceptions'::regclass
+          AND conname='uq_schedule_exceptions_evaluation_rule_scope_motive'
+          AND contype='u'
+    ) OR NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgrelid='schedule_exceptions'::regclass
+          AND tgname='schedule_exceptions_i9_immutable'
+          AND NOT tgisinternal
+    ) THEN
+        RAISE EXCEPTION 'I9 schedule exception identity or immutability guard is missing';
+    END IF;
+
     SELECT id
       INTO profile_id
       FROM scheduling_rule_profiles
@@ -225,6 +239,32 @@ BEGIN
         RAISE EXCEPTION 'Controlled ACTIVE to RETIRED transition failed';
     END IF;
 
+    BEGIN
+        UPDATE scheduling_rule_profile_entries
+           SET catalog_snapshot = jsonb_set(catalog_snapshot, '{tampered}', 'true'::jsonb)
+         WHERE rule_profile_id = profile_id AND rule_code = 'I9-R04';
+        RAISE EXCEPTION 'RETIRED profile entry UPDATE was accepted';
+    EXCEPTION WHEN SQLSTATE '55000' THEN NULL; END;
+
+    BEGIN
+        DELETE FROM scheduling_rule_profile_entries
+         WHERE rule_profile_id = profile_id AND rule_code = 'I9-R04';
+        RAISE EXCEPTION 'RETIRED profile entry DELETE was accepted';
+    EXCEPTION WHEN SQLSTATE '55000' THEN NULL; END;
+
+    BEGIN
+        UPDATE scheduling_rule_profile_entries
+           SET rule_profile_id = draft_profile_id
+         WHERE rule_profile_id = profile_id AND rule_code = 'I9-R04';
+        RAISE EXCEPTION 'Entry was moved from RETIRED profile to DRAFT profile';
+    EXCEPTION WHEN SQLSTATE '55000' THEN NULL; END;
+
+    BEGIN
+        INSERT INTO scheduling_rule_profile_entries(rule_profile_id,rule_code,parameters,catalog_snapshot,enabled)
+        VALUES(profile_id,'I9-R01','{}'::jsonb,'{}'::jsonb,FALSE);
+        RAISE EXCEPTION 'Entry was inserted into RETIRED profile';
+    EXCEPTION WHEN SQLSTATE '55000' THEN NULL; END;
+
     INSERT INTO scheduling_rule_profiles (
         profile_code, version, origin, environment_scope, scope_code,
         effective_from, status, checksum, created_by,
@@ -300,6 +340,17 @@ BEGIN
         RAISE EXCEPTION 'schedule_exceptions accepted a foreign scope_hash';
     EXCEPTION WHEN foreign_key_violation THEN NULL; END;
 
+    BEGIN
+        INSERT INTO schedule_exceptions (
+            schedule_version_id, exception_type, reason, responsible,
+            evaluation_id
+        ) VALUES (
+            schedule_version_id, 'RULE_EXCEPTION', 'Partial identity', 'contract.i9',
+            evaluation_id
+        );
+        RAISE EXCEPTION 'schedule_exceptions accepted a partial I9 identity';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+
     INSERT INTO schedule_exceptions (
         schedule_version_id, exception_type, reason, responsible,
         evaluation_id, rule_code, scope_hash, motive_code
@@ -309,9 +360,25 @@ BEGIN
     ) RETURNING id INTO exception_id;
 
     BEGIN
-        UPDATE schedule_exceptions SET scope_hash = repeat('f', 64) WHERE id = exception_id;
-        RAISE EXCEPTION 'schedule_exceptions UPDATE accepted a foreign scope_hash';
-    EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+        INSERT INTO schedule_exceptions (
+            schedule_version_id, exception_type, reason, responsible,
+            evaluation_id, rule_code, scope_hash, motive_code
+        ) VALUES (
+            schedule_version_id, 'RULE_EXCEPTION', 'Duplicate contract match', 'contract.i9',
+            evaluation_id, 'I9-R02', repeat('e', 64), 'CONTRACT_TEST'
+        );
+        RAISE EXCEPTION 'Duplicate I9 exception identity was accepted';
+    EXCEPTION WHEN unique_violation THEN NULL; END;
+
+    BEGIN
+        UPDATE schedule_exceptions SET reason = 'Tampered history' WHERE id = exception_id;
+        RAISE EXCEPTION 'Historical I9 schedule exception UPDATE was accepted';
+    EXCEPTION WHEN SQLSTATE '55000' THEN NULL; END;
+
+    BEGIN
+        DELETE FROM schedule_exceptions WHERE id = exception_id;
+        RAISE EXCEPTION 'Historical I9 schedule exception DELETE was accepted';
+    EXCEPTION WHEN SQLSTATE '55000' THEN NULL; END;
 
     BEGIN
         UPDATE scheduling_rule_evaluations SET outcome = 'COMPLIANT' WHERE id = evaluation_id;
