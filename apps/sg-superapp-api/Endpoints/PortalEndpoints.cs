@@ -1293,18 +1293,32 @@ public static class PortalEndpoints
     // until the schedule is evaluated again, while RULE_EXCEPTION_REQUIRED means a decision is
     // pending on an EXCEPTION_REQUIRED rule and RULE_EVALUATION_SUPERSEDED that an edit outran it.
     private static readonly string[] RuleGateCodes =
-        { "RULE_BLOCKED", "RULE_EXCEPTION_REQUIRED", "RULE_EVALUATION_MISSING", "RULE_EVALUATION_SUPERSEDED" };
+        { "RULE_BLOCKED", "RULE_UNVERIFIED", "RULE_EXCEPTION_REQUIRED", "RULE_EVALUATION_MISSING",
+          "RULE_EVALUATION_SUPERSEDED", "RULE_ASSIGNMENT_UNEVALUATED" };
+
+    // Each state asks a different thing of whoever reads it, so each gets its own title rather than
+    // one heading that would describe only some of them.
+    private static string RuleGateTitle(string code) => code switch
+    {
+        "RULE_BLOCKED" => "La programacion tiene reglas bloqueadas",
+        "RULE_UNVERIFIED" => "La programacion tiene reglas sin verificar",
+        "RULE_EXCEPTION_REQUIRED" => "La programacion tiene excepciones sin decidir",
+        "RULE_EVALUATION_SUPERSEDED" => "La programacion cambio despues de evaluarse",
+        "RULE_ASSIGNMENT_UNEVALUATED" => "La programacion tiene asignaciones sin evaluar",
+        _ => "La programacion no ha sido evaluada"
+    };
 
     private static IResult RuleGateProblem(SchedulingRuleGateException exception)
     {
+        var code = Array.IndexOf(RuleGateCodes, exception.Code) >= 0 ? exception.Code : "RULE_BLOCKED";
         var problem = new Microsoft.AspNetCore.Mvc.ProblemDetails
         {
-            Title = "La programacion tiene reglas sin decidir",
+            Title = RuleGateTitle(code),
             Detail = exception.Message,
             Status = StatusCodes.Status409Conflict
         };
         problem.Extensions["message"] = exception.Message;
-        problem.Extensions["code"] = Array.IndexOf(RuleGateCodes, exception.Code) >= 0 ? exception.Code : "RULE_BLOCKED";
+        problem.Extensions["code"] = code;
         return Results.Problem(problem);
     }
 

@@ -136,6 +136,78 @@ INSERT INTO scheduling_rule_evaluations(schedule_version_id,rule_profile_id,rule
   'Cruce con turno aprobado en escenario simulado.',jsonb_build_object('blockOnApproved',true),
   jsonb_build_object('overlapMinutes',60),repeat('c',64),FALSE,'NOT_REQUIRED','i9-mvpwf-003',now(),'operaciones.sg'
  FROM schedule_versions sv JOIN schedules s ON s.id=sv.schedule_id WHERE s.period_start=date '2026-09-02';
+-- An assignment no rule ever evaluated, beside a version-level verdict that must not vouch for it.
+INSERT INTO schedules(project_id,period_start,period_end,created_by)
+ SELECT id,date '2026-09-04',date '2026-09-04','operaciones.sg' FROM service_projects WHERE code='PROJECT-A';
+INSERT INTO schedules(project_id,period_start,period_end,created_by)
+ SELECT id,date '2026-09-05',date '2026-09-05','operaciones.sg' FROM service_projects WHERE code='PROJECT-A';
+INSERT INTO schedules(project_id,period_start,period_end,created_by)
+ SELECT id,date '2026-09-06',date '2026-09-06','operaciones.sg' FROM service_projects WHERE code='PROJECT-A';
+INSERT INTO schedules(project_id,period_start,period_end,created_by)
+ SELECT id,date '2026-09-07',date '2026-09-07','operaciones.sg' FROM service_projects WHERE code='PROJECT-A';
+INSERT INTO schedule_versions(schedule_id,version_number,status,created_by,simulated,rule_profile_id,rule_profile_version)
+ SELECT s.id,1,'PROPUESTA','operaciones.sg',TRUE,p.id,p.version FROM schedules s
+ CROSS JOIN scheduling_rule_profiles p WHERE s.period_start IN(date '2026-09-04',date '2026-09-05',date '2026-09-06')
+ AND p.profile_code='I9-MVP-SIMULATED' AND p.status='ACTIVE';
+-- Bound to an MVP profile yet not marked simulated: the schema admits this shape.
+INSERT INTO schedule_versions(schedule_id,version_number,status,created_by,simulated,rule_profile_id,rule_profile_version)
+ SELECT s.id,1,'PROPUESTA','operaciones.sg',FALSE,p.id,p.version FROM schedules s
+ CROSS JOIN scheduling_rule_profiles p WHERE s.period_start=date '2026-09-07'
+ AND p.profile_code='I9-MVP-SIMULATED' AND p.status='ACTIVE';
+INSERT INTO required_shifts(schedule_version_id,position_id,shift_date,starts_at,ends_at)
+ SELECT sv.id,sp.id,s.period_start,time '08:00',time '20:00'
+ FROM schedule_versions sv JOIN schedules s ON s.id=sv.schedule_id
+ CROSS JOIN service_positions sp WHERE sp.code='I9-WF-POSITION'
+ AND s.period_start IN(date '2026-09-04',date '2026-09-05',date '2026-09-06',date '2026-09-07');
+INSERT INTO schedule_assignments(schedule_version_id,required_shift_id,employee_id,status)
+ SELECT r.schedule_version_id,r.id,e.id,'ASIGNADA' FROM required_shifts r
+ JOIN schedule_versions sv ON sv.id=r.schedule_version_id JOIN schedules s ON s.id=sv.schedule_id
+ CROSS JOIN employees e WHERE e.identification_number='I9-WF-1'
+ AND s.period_start IN(date '2026-09-04',date '2026-09-05',date '2026-09-06',date '2026-09-07');
+-- 09-04: version-level COMPLIANT only. The assignment beside it was never evaluated.
+INSERT INTO scheduling_rule_evaluations(schedule_version_id,rule_profile_id,rule_code,outcome,severity,
+  message_code,explanation,parameters_snapshot,facts_snapshot,scope_hash,exception_allowed,exception_status,
+  correlation_id,evaluated_at,audit_actor)
+ SELECT sv.id,sv.rule_profile_id,'I9-R01','COMPLIANT','INFO','I9_R01_COMPLIANT','Jornada conforme.',
+  jsonb_build_object('maxDailyHours',12),jsonb_build_object('dailyHours',8),repeat('1',64),FALSE,'NOT_REQUIRED',
+  'i9-mvpwf-004',now(),'operaciones.sg'
+ FROM schedule_versions sv JOIN schedules s ON s.id=sv.schedule_id WHERE s.period_start=date '2026-09-04';
+-- 09-05: BLOCKED first, then the schedule is corrected and re-evaluated COMPLIANT.
+INSERT INTO scheduling_rule_evaluations(schedule_version_id,assignment_id,rule_profile_id,rule_code,outcome,severity,
+  message_code,explanation,parameters_snapshot,facts_snapshot,scope_hash,exception_allowed,exception_status,
+  correlation_id,evaluated_at,audit_actor)
+ SELECT sv.id,a.id,sv.rule_profile_id,'I9-R03','BLOCKED','BLOCKING','I9_R03_OVERLAP_APPROVED_BLOCKED','Cruce inicial.',
+  jsonb_build_object('blockOnApproved',true),jsonb_build_object('overlapMinutes',60),repeat('2',64),FALSE,'NOT_REQUIRED',
+  'i9-mvpwf-005a',now()-interval '2 hours','operaciones.sg'
+ FROM schedule_versions sv JOIN schedules s ON s.id=sv.schedule_id
+ JOIN schedule_assignments a ON a.schedule_version_id=sv.id WHERE s.period_start=date '2026-09-05';
+INSERT INTO scheduling_rule_evaluations(schedule_version_id,assignment_id,rule_profile_id,rule_code,outcome,severity,
+  message_code,explanation,parameters_snapshot,facts_snapshot,scope_hash,exception_allowed,exception_status,
+  correlation_id,evaluated_at,audit_actor)
+ SELECT sv.id,a.id,sv.rule_profile_id,'I9-R03','COMPLIANT','INFO','I9_R03_COMPLIANT','Cruce corregido.',
+  jsonb_build_object('blockOnApproved',true),jsonb_build_object('overlapMinutes',0),repeat('3',64),FALSE,'NOT_REQUIRED',
+  'i9-mvpwf-005b',now(),'operaciones.sg'
+ FROM schedule_versions sv JOIN schedules s ON s.id=sv.schedule_id
+ JOIN schedule_assignments a ON a.schedule_version_id=sv.id WHERE s.period_start=date '2026-09-05';
+-- 09-06: compliant now; the test edits the assignment and re-evaluates it over HTTP and SQL.
+INSERT INTO scheduling_rule_evaluations(schedule_version_id,assignment_id,rule_profile_id,rule_code,outcome,severity,
+  message_code,explanation,parameters_snapshot,facts_snapshot,scope_hash,exception_allowed,exception_status,
+  correlation_id,evaluated_at,audit_actor)
+ SELECT sv.id,a.id,sv.rule_profile_id,'I9-R01','COMPLIANT','INFO','I9_R01_COMPLIANT','Jornada conforme.',
+  jsonb_build_object('maxDailyHours',12),jsonb_build_object('dailyHours',8),repeat('4',64),FALSE,'NOT_REQUIRED',
+  'i9-mvpwf-006',now(),'operaciones.sg'
+ FROM schedule_versions sv JOIN schedules s ON s.id=sv.schedule_id
+ JOIN schedule_assignments a ON a.schedule_version_id=sv.id WHERE s.period_start=date '2026-09-06';
+-- A WARNING is the outcome of a disabled or unimplemented rule. Nothing may be built on it.
+INSERT INTO scheduling_rule_evaluations(schedule_version_id,assignment_id,rule_profile_id,rule_code,outcome,severity,
+  message_code,explanation,parameters_snapshot,facts_snapshot,scope_hash,exception_allowed,exception_status,
+  correlation_id,evaluated_at,audit_actor)
+ SELECT sv.id,a.id,sv.rule_profile_id,'I9-R07','WARNING','ERROR','I9_R07_DISABLED_UNVERIFIED','Regla desactivada.',
+  jsonb_build_object('changeInvalidatesApproval',true),jsonb_build_object('templateCode','T'),repeat('5',64),FALSE,
+  'NOT_REQUIRED','i9-mvpwf-008',now(),'operaciones.sg'
+ FROM schedule_versions sv JOIN schedules s ON s.id=sv.schedule_id
+ JOIN schedule_assignments a ON a.schedule_version_id=sv.id WHERE s.period_start=date '2026-09-01'
+ AND sv.status='PROPUESTA' AND false;
 '@
     Set-Content -LiteralPath $fixtureFile -Value $fixture -Encoding UTF8
     & $psql -X -w -v ON_ERROR_STOP=1 -f $fixtureFile | Out-Null
@@ -215,7 +287,7 @@ INSERT INTO scheduling_rule_evaluations(schedule_version_id,rule_profile_id,rule
     # A blocked rule can never be approved, with or without a decision.
     $blockedApprove = Call 'Post' "$base/portal/scheduling/proposals/$blockedVersion/approve" $headers @{ expectedVersion=1 }
     Q ($blockedApprove.Status -eq 409) 'WF-T07 a blocked rule cannot be approved'
-    Q ($blockedApprove.Content -match 'bloqueadas o sin verificar') 'WF-T07 the refusal names the blocking rule'
+    Q ($blockedApprove.Content -match 'reglas bloqueadas') 'WF-T07 the refusal names the blocking rule'
     Q ($blockedApprove.ContentType -like 'application/problem+json*' -and $blockedApprove.Content -match 'RULE_BLOCKED') 'WF-T07 the refusal is reported as a blocked rule'
 
     # A simulated version with nothing evaluated is unverified, not clean.
@@ -265,7 +337,62 @@ INSERT INTO scheduling_rule_evaluations(schedule_version_id,rule_profile_id,rule
         -ApiBaseUrl $base -ProjectId ([long]$projectId) -PeriodStart '2026-10-01' -PeriodEnd '2026-10-31' 2>&1
     Q ($LASTEXITCODE -eq 0 -and (($workflow -join "`n") -match 'I9 WORKFLOW PASS')) 'WF-T13 the pre-MVP workflow verifier passes again'
 
-    Q ($passed -eq 40) 'numbered workflow assertion count'
+    # An independent review drove these six states against the running API and found the gate blind
+    # to the first, and unable to recover from the second and third. They are regressions now.
+    $unevaluatedVersionId = Scalar "select sv.id from schedule_versions sv join schedules s on s.id=sv.schedule_id where s.period_start=date '2026-09-04'"
+    $recoveredVersion = Scalar "select sv.id from schedule_versions sv join schedules s on s.id=sv.schedule_id where s.period_start=date '2026-09-05'"
+    $editedVersion = Scalar "select sv.id from schedule_versions sv join schedules s on s.id=sv.schedule_id where s.period_start=date '2026-09-06'"
+    $unmarkedVersion = Scalar "select sv.id from schedule_versions sv join schedules s on s.id=sv.schedule_id where s.period_start=date '2026-09-07'"
+
+    # A version-level verdict does not vouch for a guard no rule ever looked at.
+    $unevaluated = Call 'Post' "$base/portal/scheduling/proposals/$unevaluatedVersionId/approve" $headers @{ expectedVersion=1 }
+    Q ($unevaluated.Status -eq 409 -and $unevaluated.Content -match 'RULE_ASSIGNMENT_UNEVALUATED') 'WF-T14 an assignment no rule evaluated cannot be approved'
+    Q ((Scalar "select status from schedule_versions where id=$unevaluatedVersionId") -eq 'PROPUESTA') 'WF-T14 the refusal leaves the proposal untouched'
+
+    # Re-evaluating a corrected schedule clears the earlier verdict: the history is append-only, so
+    # the gate must read the current verdict rather than every verdict ever recorded.
+    $recovered = Call 'Post' "$base/portal/scheduling/proposals/$recoveredVersion/approve" $headers @{ expectedVersion=1 }
+    Q ($recovered.Status -eq 200) 'WF-T15 a corrected and re-evaluated schedule can be approved again'
+
+    # The same, for an edit: after re-evaluation the assignment is described again and may proceed.
+    $editedAssignment = Scalar "select a.id from schedule_assignments a where a.schedule_version_id=$editedVersion"
+    $editedGuard = Scalar "select employee_id from schedule_assignments where id=$editedAssignment"
+    $edit = Call 'Put' "$base/portal/scheduling/proposals/$editedVersion/assignments/$editedAssignment" $headers @{ employeeId=[long]$editedGuard; status='ASIGNADA'; reasons=@('Revalidacion manual'); expectedVersion=1 }
+    Q ($edit.Status -eq 200) 'WF-T16 the assignment is edited'
+    $afterEditApprove = Call 'Post' "$base/portal/scheduling/proposals/$editedVersion/approve" $headers @{ expectedVersion=1 }
+    Q ($afterEditApprove.Status -eq 409 -and $afterEditApprove.Content -match 'RULE_EVALUATION_SUPERSEDED') 'WF-T16 the edit supersedes the evaluation that described the assignment'
+    & $psql -X -w -v ON_ERROR_STOP=1 -c "insert into scheduling_rule_evaluations(schedule_version_id,assignment_id,rule_profile_id,rule_code,outcome,severity,message_code,explanation,parameters_snapshot,facts_snapshot,scope_hash,exception_allowed,exception_status,correlation_id,evaluated_at,audit_actor) select sv.id,$editedAssignment,sv.rule_profile_id,'I9-R01','COMPLIANT','INFO','I9_R01_COMPLIANT','Reevaluado tras la edicion.',jsonb_build_object('maxDailyHours',12),jsonb_build_object('dailyHours',8),repeat('6',64),FALSE,'NOT_REQUIRED','i9-mvpwf-006b',now(),'operaciones.sg' from schedule_versions sv where sv.id=$editedVersion" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'could not re-evaluate the edited assignment' }
+    $reEvaluated = Call 'Post' "$base/portal/scheduling/proposals/$editedVersion/approve" $headers @{ expectedVersion=1 }
+    Q ($reEvaluated.Status -eq 200) 'WF-T16 re-evaluating the edited assignment clears the refusal'
+
+    # The gate keys on the rule profile, not on the simulated mark: a version bound to an MVP profile
+    # is governed whether or not anyone remembered to set the flag.
+    $unmarked = Call 'Post' "$base/portal/scheduling/proposals/$unmarkedVersion/approve" $headers @{ expectedVersion=1 }
+    Q ($unmarked.Status -eq 409 -and $unmarked.Content -match 'RULE_EVALUATION_MISSING') 'WF-T17 a profile-bound version is gated even when it is not marked simulated'
+
+    # A WARNING is what a disabled or unimplemented rule produces, and it accredits nothing. It is
+    # reported as its own state, not as a hard block, because the remedy is different.
+    & $psql -X -w -v ON_ERROR_STOP=1 -c "insert into scheduling_rule_evaluations(schedule_version_id,assignment_id,rule_profile_id,rule_code,outcome,severity,message_code,explanation,parameters_snapshot,facts_snapshot,scope_hash,exception_allowed,exception_status,correlation_id,evaluated_at,audit_actor) select sv.id,a.id,sv.rule_profile_id,'I9-R07','WARNING','ERROR','I9_R07_DISABLED_UNVERIFIED','Regla desactivada.',jsonb_build_object('changeInvalidatesApproval',true),jsonb_build_object('templateCode','T'),repeat('7',64),FALSE,'NOT_REQUIRED','i9-mvpwf-008',now(),'operaciones.sg' from schedule_versions sv join schedule_assignments a on a.schedule_version_id=sv.id where sv.id=$unevaluatedVersionId" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'could not add the unverified rule' }
+    $warned = Call 'Post' "$base/portal/scheduling/proposals/$unevaluatedVersionId/approve" $headers @{ expectedVersion=1 }
+    Q ($warned.Status -eq 409 -and $warned.Content -match 'RULE_UNVERIFIED') 'WF-T18 an unverified rule is refused as its own state'
+    Q ($warned.Content -notmatch 'RULE_BLOCKED') 'WF-T18 an unverified rule is not reported as a hard block'
+
+    # Generation belongs to a proposal. Letting it run on an approved version would add assignments
+    # the gate had already finished checking.
+    # A real shift with no candidates: the engine returns a vacancy, so the request reaches
+    # persistence and is judged there rather than being rejected as malformed.
+    $recoveredShift = Scalar "select id from required_shifts where schedule_version_id=$recoveredVersion"
+    $lateBody = @{ scheduleVersionId=[long]$recoveredVersion; idempotencyKey='wf-t19'
+        weights=@{ continuity=1; equity=1; additionalHoursPenalty=0.1; distancePenalty=0.1
+                   exceptionPenalty=5; stabilityPenalty=0.1 }
+        shifts=@(@{ requiredShiftId=[long]$recoveredShift; positionId=1; date='2026-09-05'; startsAt='08:00'; candidates=@() }) }
+    $lateGeneration = Call 'Post' "$base/portal/scheduling/recommendations/generate" $headers $lateBody
+    Q ($lateGeneration.Status -eq 409) 'WF-T19 generation is refused on a version that is no longer a proposal'
+    Q ([int](Scalar "select count(*) from schedule_generation_runs where schedule_version_id=$recoveredVersion and status='COMPLETADO'") -eq 0) 'WF-T19 the refused generation completes no run'
+
+    Q ($passed -eq 51) 'numbered workflow assertion count'
     Write-Output "I9 MVP WORKFLOW PASS $passed"
     exit 0
 }
@@ -280,5 +407,8 @@ finally {
     $env:PGOPTIONS=$null
     & $psql -X -w -v ON_ERROR_STOP=1 -c "DROP SCHEMA IF EXISTS $schema CASCADE" | Out-Null
     $clean = & $psql -X -w -Atqc "select to_regnamespace('$schema') is null"
+    # Cleared last, because every psql call above still needs them. Dot-sourcing this script would
+    # otherwise leave the database password behind in the caller's environment.
+    $env:PGHOST=$null; $env:PGPORT=$null; $env:PGDATABASE=$null; $env:PGUSER=$null; $env:PGPASSWORD=$null
     if ($clean -ne 't') { Write-Output 'I9 MVP WORKFLOW FAIL: temporal schema cleanup'; exit 1 }
 }

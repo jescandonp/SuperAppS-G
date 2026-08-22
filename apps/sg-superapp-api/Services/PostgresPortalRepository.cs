@@ -3008,13 +3008,13 @@ where e.schedule_version_id=@version", cn, tx);
             update schedule_versions
                set source_snapshot=@source::jsonb,
                    parameters_snapshot=@parameters::jsonb
-             where id=@versionId and status <> 'PUBLICADA'", connection, transaction))
+             where id=@versionId and status = 'PROPUESTA'", connection, transaction))
         {
             snapshot.Parameters.AddWithValue("source", sourceSnapshot);
             snapshot.Parameters.AddWithValue("parameters", parametersSnapshot);
             snapshot.Parameters.AddWithValue("versionId", request.ScheduleVersionId.Value);
             if (await snapshot.ExecuteNonQueryAsync(cancellationToken) != 1)
-                throw new InvalidOperationException("La version no existe o ya fue publicada.");
+                throw new InvalidOperationException("La generacion solo procede sobre una propuesta; la version no existe o ya fue aprobada o publicada.");
         }
 
         var persistedVerdicts = await LoadPersistedVerdictsAsync(
@@ -3237,44 +3237,67 @@ where exists(select 1 from schedule_versions sv join scheduling_rule_profiles rp
     // rule must have been decided. This mirrors SchedulingRuleEvaluationSummary.CanApproveOrPublish
     // over what is actually persisted: only COMPLIANT and NOT_APPLICABLE pass on their own, an
     // EXCEPTION_REQUIRED needs an approved decision bound to its exact evaluation, rule and scope,
-    // and BLOCKED or WARNING never pass - an unverified rule accredits nothing. An assignment edited
-    // after its evaluation has no verdict describing it any more and must be evaluated again.
-    // A version with no evaluation at all is not clean, it is unverified.
+    // and BLOCKED or WARNING never pass - an unverified rule accredits nothing.
+    //
+    // Two things this gate learned the hard way. First, it judges only the CURRENT verdict for each
+    // subject, not the whole table: scheduling_rule_evaluations is append-only, so re-evaluating a
+    // corrected schedule adds a row rather than replacing one, and aggregating the history would
+    // leave an old BLOCKED - or an evaluation the edit outran - condemning the version for ever,
+    // with the refusal telling the operator to do exactly what they had already done. Second, it
+    // counts assignments, not only evaluations: an assignment nothing ever evaluated is invisible to
+    // any aggregate over the evaluation rows, and a version-level verdict must not be read as
+    // vouching for guards it never looked at. That is the unknown this module refuses to presume on.
     private static async Task<SchedulingTransitionEvidence> RequireEveryRuleDecidedAsync(
         NpgsqlConnection cn,NpgsqlTransaction tx,long versionId,CancellationToken ct)
     {
-        const string sql=@"select sv.simulated,coalesce(sv.rule_profile_id,0),coalesce(sv.rule_profile_version,0),
-count(e.id),
-count(e.id) filter(where a.updated_at>e.evaluated_at),
-count(e.id) filter(where coalesce(a.updated_at<=e.evaluated_at,true) and e.outcome in('BLOCKED','WARNING')),
-count(e.id) filter(where coalesce(a.updated_at<=e.evaluated_at,true) and e.outcome='EXCEPTION_REQUIRED'
-  and not(e.exception_allowed and exists(select 1 from schedule_exceptions x
-    where x.evaluation_id=e.id and x.rule_code=e.rule_code and x.scope_hash=e.scope_hash and x.decision='APPROVED'))),
-count(e.id) filter(where e.outcome='EXCEPTION_REQUIRED' and exists(select 1 from schedule_exceptions x
-    where x.evaluation_id=e.id and x.rule_code=e.rule_code and x.scope_hash=e.scope_hash and x.decision='APPROVED'))
-from schedule_versions sv
-left join scheduling_rule_evaluations e on e.schedule_version_id=sv.id
-left join schedule_assignments a on a.id=e.assignment_id
-where sv.id=@version group by sv.simulated,sv.rule_profile_id,sv.rule_profile_version";
-        bool simulated; long profileId,profileVersion,total,superseded,blocked,pending,decided;
+        const string sql=@"with current as (
+  select distinct on (coalesce(e.assignment_id,0),e.rule_code)
+         e.id,e.assignment_id,e.rule_code,e.scope_hash,e.outcome,e.exception_allowed,e.evaluated_at
+  from scheduling_rule_evaluations e
+  where e.schedule_version_id=@version
+  order by coalesce(e.assignment_id,0),e.rule_code,e.evaluated_at desc,e.id desc),
+decided as (
+  select c.id from current c
+  where c.outcome='EXCEPTION_REQUIRED' and c.exception_allowed and exists(
+    select 1 from schedule_exceptions x
+    where x.evaluation_id=c.id and x.rule_code=c.rule_code and x.scope_hash=c.scope_hash
+      and x.decision='APPROVED'))
+select sv.simulated,coalesce(sv.rule_profile_id,0),coalesce(sv.rule_profile_version,0),
+(select count(*) from current),
+(select count(*) from current c join schedule_assignments a on a.id=c.assignment_id
+   where a.updated_at>c.evaluated_at),
+(select count(*) from current c where c.outcome='BLOCKED'),
+(select count(*) from current c where c.outcome='WARNING'),
+(select count(*) from current c where c.outcome='EXCEPTION_REQUIRED' and c.id not in(select id from decided)),
+(select count(*) from decided),
+(select count(*) from schedule_assignments a where a.schedule_version_id=sv.id
+   and not exists(select 1 from current c where c.assignment_id=a.id))
+from schedule_versions sv where sv.id=@version";
+        bool simulated; long profileId,profileVersion,total,superseded,blocked,unverified,pending,decided,unevaluated;
         await using(var cmd=new NpgsqlCommand(sql,cn,tx))
         {
             cmd.Parameters.AddWithValue("version",versionId);
             await using var rd=await cmd.ExecuteReaderAsync(ct);
             if(!await rd.ReadAsync(ct))throw new KeyNotFoundException("La version de programacion no existe.");
             simulated=rd.GetBoolean(0);profileId=rd.GetInt64(1);profileVersion=rd.GetInt32(2);
-            total=rd.GetInt64(3);superseded=rd.GetInt64(4);blocked=rd.GetInt64(5);pending=rd.GetInt64(6);decided=rd.GetInt64(7);
+            total=rd.GetInt64(3);superseded=rd.GetInt64(4);blocked=rd.GetInt64(5);unverified=rd.GetInt64(6);
+            pending=rd.GetInt64(7);decided=rd.GetInt64(8);unevaluated=rd.GetInt64(9);
         }
-        // A version that never entered the versioned-rule regime is left to the workflow it was
-        // built under; this gate governs the MVP profiles, and silently passing one of those would
-        // be the fail-open case it exists to prevent.
-        if(!simulated&&total==0)return new SchedulingTransitionEvidence(false,0,0,0,0);
+        // A version that carries no rule profile never entered the versioned-rule regime and is left
+        // to the workflow it was built under. The test is the profile, not the simulated mark: the
+        // schema admits rule_profile_id with simulated=false, and keying on the mark would let such
+        // a version walk past the gate untouched.
+        if(profileId==0&&total==0)return new SchedulingTransitionEvidence(false,0,0,0,0);
         if(total==0)
-            throw new SchedulingRuleGateException("RULE_EVALUATION_MISSING","La version simulada no tiene evaluacion de reglas persistida; no se presume cumplimiento.");
+            throw new SchedulingRuleGateException("RULE_EVALUATION_MISSING","La version no tiene evaluacion de reglas persistida; no se presume cumplimiento.");
+        if(unevaluated>0)
+            throw new SchedulingRuleGateException("RULE_ASSIGNMENT_UNEVALUATED","Hay asignaciones que ninguna regla ha evaluado; no se presume cumplimiento sobre ellas.");
         if(superseded>0)
-            throw new SchedulingRuleGateException("RULE_EVALUATION_SUPERSEDED","Hay asignaciones editadas despues de su evaluacion; se deben reevaluar antes de aprobar o publicar.");
+            throw new SchedulingRuleGateException("RULE_EVALUATION_SUPERSEDED","Hay asignaciones editadas despues de su evaluacion vigente; se deben reevaluar antes de aprobar o publicar.");
         if(blocked>0)
-            throw new SchedulingRuleGateException("RULE_BLOCKED","Hay reglas bloqueadas o sin verificar; no se puede aprobar ni publicar.");
+            throw new SchedulingRuleGateException("RULE_BLOCKED","Hay reglas bloqueadas; no se puede aprobar ni publicar.");
+        if(unverified>0)
+            throw new SchedulingRuleGateException("RULE_UNVERIFIED","Hay reglas sin verificar; una regla sin verificar no acredita nada.");
         if(pending>0)
             throw new SchedulingRuleGateException("RULE_EXCEPTION_REQUIRED","Hay excepciones requeridas sin decision aprobada; no se puede aprobar ni publicar.");
         return new SchedulingTransitionEvidence(simulated,profileId,profileVersion,total,decided);

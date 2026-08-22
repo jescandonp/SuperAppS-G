@@ -688,7 +688,7 @@ $focused = @(
     @{ R='MVP generation verifier'; P='scripts/dev/Verify-SgSuperAppI9MvpGeneration.ps1'; Pass='I9 MVP GENERATION PASS 13' },
     # Stands the API up against its own schema, so it also carries the eligibility, replanning and
     # pre-MVP workflow verifiers, none of which can run without one.
-    @{ R='MVP workflow verifier'; P='scripts/dev/Verify-SgSuperAppI9MvpWorkflow.ps1'; Pass='I9 MVP WORKFLOW PASS 41' }
+    @{ R='MVP workflow verifier'; P='scripts/dev/Verify-SgSuperAppI9MvpWorkflow.ps1'; Pass='I9 MVP WORKFLOW PASS 52' }
 )
 foreach ($verifier in $focused) { Invoke-FocusedVerifier $verifier.R $verifier.P $verifier.Pass }
 
