@@ -70,7 +70,7 @@ public sealed class SchedulingRuleEvaluator
         ValidateFacts(facts);
 
         var results = profile.Entries
-            .Where(entry => entry.Enabled || entry.RuleCode is "I9-R04" or "I9-R06")
+            .Where(entry => entry.Enabled || entry.RuleCode is "I9-R04" or "I9-R06" or "I9-R07")
             .OrderBy(entry => entry.RuleCode, StringComparer.Ordinal)
             .Select(entry => CreateEvaluation(profile, entry, projectCode, period, facts))
             .ToArray();
@@ -177,7 +177,7 @@ public sealed class SchedulingRuleEvaluator
     {
         var sanitizedFacts = SanitizeFacts(entry.RuleCode, facts);
         var scopeHash = ComputeScopeHash(profile, entry, projectCode, period, sanitizedFacts);
-        if (!entry.Enabled && entry.RuleCode is ("I9-R04" or "I9-R06"))
+        if (!entry.Enabled && entry.RuleCode is ("I9-R04" or "I9-R06" or "I9-R07"))
             return new RuleEvaluation(
                 entry.RuleCode,
                 profile.Version,
@@ -197,6 +197,7 @@ public sealed class SchedulingRuleEvaluator
             "I9-R04" => EvaluateNoveltyRequirementRule("EvaluateR04", entry.Parameters, entry.CatalogSnapshot, sanitizedFacts),
             "I9-R05" => EvaluateOverlapTravelRule("EvaluateR05", entry.Parameters, entry.CatalogSnapshot, sanitizedFacts),
             "I9-R06" => EvaluateNoveltyRequirementRule("EvaluateR06", entry.Parameters, entry.CatalogSnapshot, sanitizedFacts, projectCode),
+            "I9-R07" => EvaluateTemplateDeviationRule("EvaluateR07", entry.Parameters, entry.CatalogSnapshot, sanitizedFacts),
             _ => null
         };
         if (decision is not null)
@@ -256,6 +257,36 @@ public sealed class SchedulingRuleEvaluator
         SchedulingRuleSeverity.BLOCKING,
         "I9_OVERLAP_TRAVEL_EVALUATOR_UNAVAILABLE",
         "El evaluador de solapamiento o traslado no esta disponible; el MVP falla de forma cerrada.",
+        ExceptionAllowed: false);
+
+    private static RuleDecision EvaluateTemplateDeviationRule(string methodName, params object[] arguments)
+    {
+        try
+        {
+            var rulesType = typeof(SchedulingRuleEvaluator).Assembly
+                .GetType("Sg.SuperApp.Api.Services.SchedulingTemplateDeviationRule", throwOnError: false);
+            var method = rulesType?.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static);
+            var decision = method?.Invoke(null, arguments);
+            if (decision is null ||
+                decision.GetType().GetProperty("Outcome")?.GetValue(decision) is not SchedulingRuleOutcome outcome ||
+                decision.GetType().GetProperty("Severity")?.GetValue(decision) is not SchedulingRuleSeverity severity ||
+                decision.GetType().GetProperty("MessageCode")?.GetValue(decision) is not string messageCode ||
+                decision.GetType().GetProperty("Explanation")?.GetValue(decision) is not string explanation ||
+                decision.GetType().GetProperty("ExceptionAllowed")?.GetValue(decision) is not bool exceptionAllowed)
+                return TemplateDeviationEvaluatorUnavailable();
+            return new RuleDecision(outcome, severity, messageCode, explanation, exceptionAllowed);
+        }
+        catch (TargetInvocationException)
+        {
+            return TemplateDeviationEvaluatorUnavailable();
+        }
+    }
+
+    private static RuleDecision TemplateDeviationEvaluatorUnavailable() => new(
+        SchedulingRuleOutcome.WARNING,
+        SchedulingRuleSeverity.ERROR,
+        "I9_TEMPLATE_DEVIATION_EVALUATOR_UNAVAILABLE",
+        "El evaluador de desviacion de plantilla no esta disponible; no se acredita cumplimiento.",
         ExceptionAllowed: false);
 
     private static RuleDecision EvaluateNoveltyRequirementRule(string methodName, params object[] arguments)
