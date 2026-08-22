@@ -23,7 +23,6 @@ WITH permission_matrix AS (
             ('OPERACIONES', 'EXPORT'),
             ('OPERACIONES', 'AUDIT'),
             ('TH', 'VIEW'),
-            ('TH', 'APPROVE_EXCEPTION'),
             ('TH', 'VALIDATE_REQUIREMENT'),
             ('GERENCIA', 'VIEW'),
             ('GERENCIA', 'EXPORT')
@@ -46,7 +45,7 @@ WITH permission_matrix AS (
             ('OPERACIONES', 'VIEW'), ('OPERACIONES', 'GENERATE'),
             ('OPERACIONES', 'APPROVE_EXCEPTION'), ('OPERACIONES', 'APPROVE'),
             ('OPERACIONES', 'PUBLISH'), ('OPERACIONES', 'EXPORT'), ('OPERACIONES', 'AUDIT'),
-            ('TH', 'VIEW'), ('TH', 'APPROVE_EXCEPTION'), ('TH', 'VALIDATE_REQUIREMENT'),
+            ('TH', 'VIEW'), ('TH', 'VALIDATE_REQUIREMENT'),
             ('GERENCIA', 'VIEW'), ('GERENCIA', 'EXPORT')
     ) AS t(role_code, action_code)
 )

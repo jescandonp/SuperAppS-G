@@ -310,8 +310,8 @@ BEGIN
         FROM role_permissions rp
         JOIN roles r ON r.id = rp.role_id
         WHERE r.code = 'ADMIN' AND rp.module_code = 'SCHEDULING'
-          AND rp.action_code IN ('VIEW', 'CONFIGURE', 'GENERATE', 'APPROVE_EXCEPTION', 'APPROVE', 'PUBLISH', 'EXPORT', 'AUDIT')
-          AND rp.allowed) <> 8 THEN
+          AND rp.action_code IN ('VIEW', 'CONFIGURE', 'GENERATE', 'APPROVE_EXCEPTION', 'VALIDATE_REQUIREMENT', 'APPROVE', 'PUBLISH', 'EXPORT', 'AUDIT')
+          AND rp.allowed) <> 9 THEN
         RAISE EXCEPTION 'ADMIN scheduling permission matrix is incomplete';
     END IF;
 
@@ -334,8 +334,8 @@ BEGIN
     IF (SELECT count(*)
         FROM role_permissions rp JOIN roles r ON r.id = rp.role_id
         WHERE r.code = 'TH' AND rp.module_code = 'SCHEDULING'
-          AND rp.action_code IN ('VIEW', 'APPROVE_EXCEPTION') AND rp.allowed) <> 2 THEN
-        RAISE EXCEPTION 'TH scheduling permissions must cover view and availability exceptions';
+          AND rp.action_code IN ('VIEW', 'VALIDATE_REQUIREMENT') AND rp.allowed) <> 2 THEN
+        RAISE EXCEPTION 'TH scheduling permissions must cover view and requirement validation';
     END IF;
 
     IF (SELECT count(*)
@@ -353,9 +353,9 @@ BEGIN
           AND rp.module_code = 'SCHEDULING'
           AND (
               NOT rp.allowed
-              OR (r.code = 'ADMIN' AND rp.action_code NOT IN ('VIEW', 'CONFIGURE', 'GENERATE', 'APPROVE_EXCEPTION', 'APPROVE', 'PUBLISH', 'EXPORT', 'AUDIT'))
+              OR (r.code = 'ADMIN' AND rp.action_code NOT IN ('VIEW', 'CONFIGURE', 'GENERATE', 'APPROVE_EXCEPTION', 'VALIDATE_REQUIREMENT', 'APPROVE', 'PUBLISH', 'EXPORT', 'AUDIT'))
               OR (r.code = 'OPERACIONES' AND rp.action_code NOT IN ('VIEW', 'GENERATE', 'APPROVE_EXCEPTION', 'APPROVE', 'PUBLISH', 'EXPORT', 'AUDIT'))
-              OR (r.code = 'TH' AND rp.action_code NOT IN ('VIEW', 'APPROVE_EXCEPTION'))
+              OR (r.code = 'TH' AND rp.action_code NOT IN ('VIEW', 'VALIDATE_REQUIREMENT'))
               OR (r.code = 'GERENCIA' AND rp.action_code NOT IN ('VIEW', 'EXPORT'))
           )
     ) THEN

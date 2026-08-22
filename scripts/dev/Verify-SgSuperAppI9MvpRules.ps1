@@ -552,6 +552,17 @@ $implementations = @(
     @{ R='I9-R07 rule'; P='apps/sg-superapp-api/Services/SchedulingTemplateDeviationRule.cs'; X=@((Pattern 'I9-R07' 'I9-R07'),(Pattern 'template' '(?i)(template|plantilla)'),(Pattern 'version' '(?i)version'),(Pattern 'anchor' '(?i)(anchor|anclaje)'),(Pattern 'expected' '(?i)(expected|esperado)'),(Pattern 'proposed' '(?i)(proposed|propuesto)'),(Pattern 'cell' '(?i)(cell|celda)'),(Pattern 'scopeHash' '(?i)scopeHash')) }
 )
 foreach ($item in $implementations) { Assert-FileContains $item.R $item.P $item.X }
+$i9PermissionSeedPath = Join-Path $repoRoot 'db/seeds/009_i9_scheduling_permissions.sql'
+if (-not (Test-Path -LiteralPath $i9PermissionSeedPath -PathType Leaf)) {
+    $failures.Add("I9-R06 permission segregation: missing file 'db/seeds/009_i9_scheduling_permissions.sql'")
+} else {
+    $i9PermissionSeed = Get-EffectiveContent $i9PermissionSeedPath
+    if ($i9PermissionSeed -match "\('TH',\s*'APPROVE_EXCEPTION'\)" -or
+        $i9PermissionSeed -notmatch "\('TH',\s*'VALIDATE_REQUIREMENT'\)" -or
+        $i9PermissionSeed -notmatch "\('OPERACIONES',\s*'APPROVE_EXCEPTION'\)") {
+        $failures.Add('I9-R06 permission segregation: TH must validate and operations must approve exceptions')
+    }
+}
 Assert-FileContains 'Common evaluator R01/R02 linkage' 'apps/sg-superapp-api/Services/SchedulingRuleEvaluator.cs' @(
     (Pattern 'R01 real evaluator call' 'SchedulingWorkRestRules\.EvaluateR01\s*\('),
     (Pattern 'R02 real evaluator call' 'SchedulingWorkRestRules\.EvaluateR02\s*\('),

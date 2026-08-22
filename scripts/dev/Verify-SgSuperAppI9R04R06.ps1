@@ -21,7 +21,8 @@ $authorizationBoundary = Join-Path $repoRoot 'apps/sg-superapp-api/Endpoints/Por
 $ruleEndpoints = Join-Path $repoRoot 'apps/sg-superapp-api/Endpoints/SchedulingRuleEndpoints.cs'
 $portalRepository = Join-Path $repoRoot 'apps/sg-superapp-api/Services/PostgresPortalRepository.cs'
 $migration = Join-Path $repoRoot 'db/migrations/012_i9_mvp_rule_profiles.sql'
-if (@(($files + $authorizationService + $authorizationBoundary + $ruleEndpoints + $portalRepository + $migration) | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) }).Count) {
+$permissionSeed = Join-Path $repoRoot 'db/seeds/009_i9_scheduling_permissions.sql'
+if (@(($files + $authorizationService + $authorizationBoundary + $ruleEndpoints + $portalRepository + $migration + $permissionSeed) | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) }).Count) {
     Write-Output 'I9 R04 R06 FAIL: required source missing'
     exit 1
 }
@@ -57,6 +58,11 @@ $allowedFactsContract = [regex]::Match($evaluator, '(?s)AllowedNestedFacts\s*=\s
 if ($allowedFactsContract -match '"hrValidated"|"hrValidation"|"validationId"|"validatorRoleKey"|"validatedAt"') { Write-Output 'I9 R04 R06 FAIL: client-controlled TH validation fact'; exit 1 }
 foreach ($pattern in @('scheduling_rule_hr_validations', 'VALIDATE_REQUIREMENT', 'ValidateRequirementEvidenceAsync', 'SCHEDULE_REQUIREMENT_VALIDATION_DENIED', 'TH validation history is immutable')) {
     if ($validationBoundary -notmatch $pattern) { Write-Output "I9 R04 R06 FAIL: persisted TH validation contract $pattern"; exit 1 }
+}
+$permissionSeedText = Get-Content -LiteralPath $permissionSeed -Raw
+if ($permissionSeedText -match "\('TH',\s*'APPROVE_EXCEPTION'\)") { Write-Output 'I9 R04 R06 FAIL: TH cannot approve exceptions'; exit 1 }
+if ($permissionSeedText -notmatch "\('TH',\s*'VALIDATE_REQUIREMENT'\)" -or $permissionSeedText -notmatch "\('OPERACIONES',\s*'APPROVE_EXCEPTION'\)") {
+    Write-Output 'I9 R04 R06 FAIL: segregated TH and operations permissions missing'; exit 1
 }
 
 function Remove-CSharpComments([string]$source) {
@@ -285,11 +291,19 @@ Q(38,passed,"numbered rules scenario count"); Console.WriteLine($"I9 R04 R06 RUL
         & $psql -X -w -v ON_ERROR_STOP=1 -c "CREATE SCHEMA $schema" | Out-Null
         if ($LASTEXITCODE -ne 0) { Write-Output 'I9 R04 R06 BLOCKED: cannot create temporal schema'; exit 2 }
         $env:PGOPTIONS = "--search_path=$schema,public"
-        Get-ChildItem (Join-Path $repoRoot 'db/migrations') -Filter '*.sql' | Sort-Object Name | ForEach-Object {
-            & $psql -X -w -v ON_ERROR_STOP=1 -f $_.FullName | Out-Null
-            if ($LASTEXITCODE -ne 0) { throw "migration failed: $($_.Name)" }
-        }
         1..2 | ForEach-Object {
+            Get-ChildItem (Join-Path $repoRoot 'db/migrations') -Filter '*.sql' | Sort-Object Name | ForEach-Object {
+                & $psql -X -w -v ON_ERROR_STOP=1 -f $_.FullName | Out-Null
+                if ($LASTEXITCODE -ne 0) { throw "migration failed: $($_.Name)" }
+            }
+            & $psql -X -w -v ON_ERROR_STOP=1 -f (Join-Path $repoRoot 'db/seeds/001_roles_and_permissions.sql') | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'base permissions seed failed' }
+            & $psql -X -w -v ON_ERROR_STOP=1 -f (Join-Path $repoRoot 'db/seeds/010_i9_shift_templates.sql') | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'shift templates seed failed' }
+            & $psql -X -w -v ON_ERROR_STOP=1 -f $permissionSeed | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'scheduling permissions seed failed' }
+            & $psql -X -w -v ON_ERROR_STOP=1 -f (Join-Path $repoRoot 'db/tests/007_i9_scheduling_contract.sql') | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'scheduling database contract failed' }
             & $psql -X -w -v ON_ERROR_STOP=1 -f (Join-Path $repoRoot 'db/seeds/011_i9_mvp_simulated_rule_profile.sql') | Out-Null
             if ($LASTEXITCODE -ne 0) { throw 'seed failed' }
             & $psql -X -w -v ON_ERROR_STOP=1 -f (Join-Path $repoRoot 'db/tests/008_i9_mvp_rule_profiles_contract.sql') | Out-Null
@@ -302,8 +316,11 @@ Q(38,passed,"numbered rules scenario count"); Console.WriteLine($"I9 R04 R06 RUL
         $env:I9_TEMP_CONNECTION = "Host=$($parts.Host);Port=$($parts.Port);Database=$($parts.Database);Username=$($parts.Username);Password=$($parts.Password);Search Path=$schema,public"
 @'
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
+using Sg.SuperApp.Api.Contracts.Auth;
 using Sg.SuperApp.Api.Contracts.Portal;
 using Sg.SuperApp.Api.Domain;
 using Sg.SuperApp.Api.Services;
@@ -314,11 +331,16 @@ var validator=new SchedulingRuleProfileValidator();var profileRepository=new Sch
 static JsonElement J(string value){using var d=JsonDocument.Parse(value);return d.RootElement.Clone();}
 static void Q(bool value,string label){if(!value)throw new Exception(label);Console.WriteLine(label+" PASS");}
 static async Task<long> ValidationCount(string connectionString,long evaluationId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select count(*) from scheduling_rule_hr_validations where evaluation_id=@id",c);q.Parameters.AddWithValue("id",evaluationId);return (long)(await q.ExecuteScalarAsync()??0L);}
+static async Task<long> ExceptionCount(string connectionString,long evaluationId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select count(*) from schedule_exceptions where evaluation_id=@id",c);q.Parameters.AddWithValue("id",evaluationId);return (long)(await q.ExecuteScalarAsync()??0L);}
+static async Task<long> DeniedAuditCount(string connectionString,long actorId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select count(*) from audit_log where actor_user_id=@actor and event_type='SCHEDULE_RULE_EXCEPTION_DENIED' and result='DENIED'",c);q.Parameters.AddWithValue("actor",actorId);return (long)(await q.ExecuteScalarAsync()??0L);}
+static async Task<int> HttpStatus(IResult result){using var services=new ServiceCollection().AddLogging().BuildServiceProvider();var context=new DefaultHttpContext{RequestServices=services};await result.ExecuteAsync(context);return context.Response.StatusCode;}
 static async Task<(int Version,string Outcome,string ScopeHash,string Parameters,string Facts,string Status)> PersistedSnapshot(string connectionString,long evaluationId){await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync();await using var q=new NpgsqlCommand("select p.version,e.outcome,e.scope_hash,e.parameters_snapshot::text,e.facts_snapshot::text,e.exception_status from scheduling_rule_evaluations e join scheduling_rule_profiles p on p.id=e.rule_profile_id where e.id=@id",c);q.Parameters.AddWithValue("id",evaluationId);await using var r=await q.ExecuteReaderAsync();if(!await r.ReadAsync())throw new Exception("persisted snapshot");return(r.GetInt32(0),r.GetString(1),r.GetString(2),r.GetString(3),r.GetString(4),r.GetString(5));}
-long actorId,versionId;
+long actorId,thActorId,versionId;
 await using(var cn=new NpgsqlConnection(connectionString)){await cn.OpenAsync();
- await using var cmd=new NpgsqlCommand(@"insert into app_users(full_name,username,password_hash) values('I9 Demo Actor','i9.demo.actor','not-a-real-password') returning id;
-insert into clients(code,name,status) values('I9-DEMO-CLIENT','I9 Demo Client','ACTIVO') returning id;",cn);await using var rd=await cmd.ExecuteReaderAsync();await rd.ReadAsync();actorId=rd.GetInt64(0);await rd.NextResultAsync();await rd.ReadAsync();var clientId=rd.GetInt64(0);await rd.CloseAsync();
+ await using var cmd=new NpgsqlCommand(@"insert into app_users(full_name,username,password_hash) values('I9 Operations Actor','i9.demo.ops','not-a-real-password') returning id;
+insert into app_users(full_name,username,password_hash) values('I9 TH Actor','i9.demo.th','not-a-real-password') returning id;
+insert into clients(code,name,status) values('I9-DEMO-CLIENT','I9 Demo Client','ACTIVO') returning id;",cn);await using var rd=await cmd.ExecuteReaderAsync();await rd.ReadAsync();actorId=rd.GetInt64(0);await rd.NextResultAsync();await rd.ReadAsync();thActorId=rd.GetInt64(0);await rd.NextResultAsync();await rd.ReadAsync();var clientId=rd.GetInt64(0);await rd.CloseAsync();
+ await using var grants=new NpgsqlCommand(@"insert into user_roles(user_id,role_id) select @ops,id from roles where code='OPERACIONES';insert into user_roles(user_id,role_id) select @th,id from roles where code='TH'",cn);grants.Parameters.AddWithValue("ops",actorId);grants.Parameters.AddWithValue("th",thActorId);await grants.ExecuteNonQueryAsync();
  await using var fixture=new NpgsqlCommand(@"with p as (insert into service_projects(client_id,code,name,effective_from,status,created_at,updated_at) values(@client,'PROJECT-A','Project A',date '2026-01-01','ACTIVO',now(),now()) returning id),s as (insert into schedules(project_id,period_start,period_end,created_by) select id,date '2026-08-21',date '2026-08-21','i9.demo.actor' from p returning id) insert into schedule_versions(schedule_id,version_number,status,created_by) select id,1,'PROPUESTA','i9.demo.actor' from s returning id",cn);fixture.Parameters.AddWithValue("client",clientId);versionId=(long)(await fixture.ExecuteScalarAsync()??throw new Exception("fixture"));}
 var profile=await profileRepository.LoadActiveAsync("PROJECT-A",new DateOnly(2026,8,21),SchedulingEnvironmentScope.MVP_TEST,CancellationToken.None);
 var facts=J("""{"dailyHours":8,"weeklyHours":42,"writtenAgreement":false,"previousShiftEnd":"2026-08-20T20:00:00-05:00","proposedShiftStart":"2026-08-21T08:00:00-05:00","proposedShiftEnd":"2026-08-21T20:00:00-05:00","assignmentId":"ASSIGN-1","scheduleVersionId":"SCHEDULE-1","employeeId":"GUARD-1","positionCode":"POSITION-1","shiftId":"SHIFT-1","shiftStart":"2026-08-21T08:00:00-05:00","shiftEnd":"2026-08-21T20:00:00-05:00","noveltyEvaluations":[{"noveltyId":"NOV-1","sourceSystem":"HR-DEMO","sourceCode":"A","sourceStatus":"PENDING","semanticCategory":"ABSENCE_PENDING_CONFIRMATION","mappingVersion":"MAP-V2","validFrom":"2026-08-21T08:00:00-05:00","validTo":"2026-08-21T20:00:00-05:00"}],"requirementEvaluations":[{"evaluationId":"EVAL-COURSE","requirementCode":"COURSE-DEMO","category":"COURSE","catalogVersion":"REQ-V2","sourceSystem":"I3-DEMO","sourceRequirementCode":"SRC-COURSE-DEMO","sourceStatus":"ACTIVE","evidenceId":"EVID-COURSE","evidenceSource":"I3-DEMO","evidenceType":"DEMO_RECORD","evidenceState":"MISSING","validFrom":"2026-08-21T08:00:00-05:00","validTo":"2026-08-21T20:00:00-05:00","hrValidation":{"validationId":"TH-COURSE","validatorRoleKey":"TH-VALIDATOR","validatedAt":"2026-08-20T12:00:00-05:00","evidenceId":"EVID-COURSE"}},{"evaluationId":"EVAL-ACC","requirementCode":"ACCREDITATION-DEMO","category":"ACCREDITATION","catalogVersion":"REQ-V2","sourceSystem":"I3-DEMO","sourceRequirementCode":"SRC-ACCREDITATION-DEMO","sourceStatus":"ACTIVE","evidenceId":"EVID-ACC","evidenceSource":"I3-DEMO","evidenceType":"DEMO_RECORD","evidenceState":"MISSING","validFrom":"2026-08-21T08:00:00-05:00","validTo":"2026-08-21T20:00:00-05:00","hrValidation":{"validationId":"TH-ACC","validatorRoleKey":"TH-VALIDATOR","validatedAt":"2026-08-20T12:00:00-05:00","evidenceId":"EVID-ACC"}}]}""");
@@ -329,7 +351,9 @@ var r04=saved.Single(x=>x.Evaluation.RuleCode=="I9-R04");var r06=saved.Single(x=
 Q(await portalRepository.AuditScheduleExceptionDenialAsync(versionId,actorId,"i9.demo.actor"),"R04-T19");
 await portalRepository.CreateScheduleExceptionAsync(versionId,new(null,r04.Id,"I9-R04","HR_VALIDATED_DEMO","demo","OPS","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");Q(true,"R04-T20");
 try{await portalRepository.CreateScheduleExceptionAsync(versionId+999,new(null,r04.Id,"I9-R04","HR_VALIDATED_DEMO","demo","OPS","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");throw new Exception("reuse accepted");}catch(KeyNotFoundException){}Q(true,"R04-T21");
-Q(!r06.Evaluation.ExceptionAllowed,"R06-T12");await httpRepository.ValidateRequirementEvidenceAsync(r06.Id,"EVID-COURSE",actorId,"i9.demo.actor",CancellationToken.None);await httpRepository.ValidateRequirementEvidenceAsync(r06.Id,"EVID-ACC",actorId,"i9.demo.actor",CancellationToken.None);await portalRepository.CreateScheduleExceptionAsync(versionId,new(null,r06.Id,"I9-R06","HR_VALIDATED_DEMO","demo","TH","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");Q(true,"R06-T13");
+Q(!r06.Evaluation.ExceptionAllowed,"R06-T12");Q(await portalRepository.HasPermissionAsync(thActorId,"SCHEDULING","VALIDATE_REQUIREMENT"),"R06-T13 TH validate permission");await httpRepository.ValidateRequirementEvidenceAsync(r06.Id,"EVID-COURSE",thActorId,"i9.demo.th",CancellationToken.None);await httpRepository.ValidateRequirementEvidenceAsync(r06.Id,"EVID-ACC",thActorId,"i9.demo.th",CancellationToken.None);
+var exceptionCountBefore=await ExceptionCount(connectionString,r06.Id);var deniedAuditBefore=await DeniedAuditCount(connectionString,thActorId);var thAuthorization=new PortalAuthorizationService(new RequestUserContext{User=new UserProfileResponse(thActorId,"I9 TH Actor","i9.demo.th","TH",true,null)},portalRepository);var thDenied=await thAuthorization.RequireAsync("SCHEDULING","APPROVE_EXCEPTION",CancellationToken.None);Q(thDenied is not null&&await HttpStatus(thDenied)==403,"R06-T13 TH approve denied");Q(await portalRepository.AuditScheduleExceptionDenialAsync(versionId,thActorId,"i9.demo.th"),"R06-T13 TH denial audited");Q(exceptionCountBefore==await ExceptionCount(connectionString,r06.Id),"R06-T13 TH denial no mutation");Q(await DeniedAuditCount(connectionString,thActorId)==deniedAuditBefore+1,"R06-T13 TH denied audit persisted");
+var opsAuthorization=new PortalAuthorizationService(new RequestUserContext{User=new UserProfileResponse(actorId,"I9 Operations Actor","i9.demo.ops","OPERACIONES",true,null)},portalRepository);Q(await opsAuthorization.RequireAsync("SCHEDULING","APPROVE_EXCEPTION",CancellationToken.None) is null,"R06-T13 operations approve permission");await portalRepository.CreateScheduleExceptionAsync(versionId,new(null,r06.Id,"I9-R06","HR_VALIDATED_DEMO","demo","OPS","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.ops");Q(true,"R06-T13");
 var noHrBatch=evaluator.Evaluate(profile,"PROJECT-A",new DateOnly(2026,8,21),cleanFacts);var noHrSaved=await httpRepository.PersistEvaluationsAsync(versionId,null,"PROJECT-A",noHrBatch,"i9.demo.actor",CancellationToken.None);var noHrR06=noHrSaved.Single(x=>x.Evaluation.RuleCode=="I9-R06");try{await portalRepository.CreateScheduleExceptionAsync(versionId,new(null,noHrR06.Id,"I9-R06","HR_VALIDATED_DEMO","demo","TH","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");throw new Exception("no HR accepted");}catch(InvalidOperationException){}Q(true,"R06-T14");
 var validationCountBefore=await ValidationCount(connectionString,noHrR06.Id);Q(await httpRepository.AuditRequirementValidationDenialAsync(noHrR06.Id,actorId,"i9.demo.actor",CancellationToken.None),"R06-T15 audit");Q(validationCountBefore==await ValidationCount(connectionString,noHrR06.Id),"R06-T15 no mutation");try{await portalRepository.CreateScheduleExceptionAsync(versionId+999,new(null,r06.Id,"I9-R06","HR_VALIDATED_DEMO","demo","TH","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");throw new Exception("wrong version accepted");}catch(KeyNotFoundException){}Q(true,"R06-T16");
 var changed=J(cleanFacts.GetRawText().Replace("SHIFT-1","SHIFT-2"));var changedBatch=evaluator.Evaluate(profile,"PROJECT-A",new DateOnly(2026,8,21),changed);var changedSaved=await httpRepository.PersistEvaluationsAsync(versionId,null,"PROJECT-A",changedBatch,"i9.demo.actor",CancellationToken.None);Q(changedSaved.Single(x=>x.Evaluation.RuleCode=="I9-R06").Evaluation.ScopeHash!=r06.Evaluation.ScopeHash,"R06-T17");
