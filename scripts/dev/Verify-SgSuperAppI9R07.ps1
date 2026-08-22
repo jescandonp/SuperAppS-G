@@ -11,12 +11,15 @@ $rule=Get-Content $files[5] -Raw;$evaluator=Get-Content $files[6] -Raw
 foreach($p in @('EvaluateR07\s*\(','I9_R07_COMPLIANT','I9_R07_DEVIATION','I9_R07_MIXED_GUARDS','I9_R07_TEMPLATE_UNAVAILABLE','I9_R07_INVALID_INPUT','templateCode','templateVersion','anchorDate','expectedCells','proposedCells','shiftCode')){
   if($rule-notmatch ("(?s)"+$p)){Write-Output "I9 R07 FAIL: rule contract $p";exit 1}
 }
-foreach($p in @('"I9-R07"\s*=>','SchedulingTemplateDeviationRule','if\s*\(!entry\.Enabled\)')){
+foreach($p in @('"I9-R07"\s*=>','SchedulingTemplateDeviationRule')){
   if($evaluator-notmatch ("(?s)"+$p)){Write-Output "I9 R07 FAIL: evaluator does not dispatch R07 ($p)";exit 1}
+}
+if($evaluator-notmatch '(?s)if\s*\(\s*!\s*\w+\.Enabled\s*\)'){
+  Write-Output 'I9 R07 FAIL: evaluator does not report disabled rules';exit 1
 }
 # No rule may be dropped for being disabled: a missing evaluation would let the summary approve
 # by omission. This is the shared fail-closed contract for all seven rules, not just R07.
-if($evaluator-match '(?s)\.Where\s*\(\s*entry\s*=>\s*entry\.Enabled'){
+if($evaluator-match '(?s)\.Where\s*\(\s*\w+\s*=>\s*\w+\.Enabled'){
   Write-Output 'I9 R07 FAIL: evaluator still drops disabled rules from the batch';exit 1
 }
 # Contract point 7 (deterministic comparison that never infers a different template) cannot be
@@ -44,8 +47,15 @@ Write-Output 'R07-T11 ROUTE LINKAGE PASS'
 $seedText=Get-Content $seed -Raw
 $r07Entry=[regex]::Match($seedText,"(?s)\('I9-R07',(?<body>(?:(?!\('I9-R).)*?)\)\s*\)").Groups['body'].Value
 if([string]::IsNullOrWhiteSpace($r07Entry)){Write-Output 'I9 R07 BLOCKED: simulated R07 profile entry unavailable';exit 2}
-foreach($p in @('approvedMotiveCodes','OTHER','SIMULATED_DEMO_NOT_INSTITUTIONAL','templateCodes','changeInvalidatesApproval')){
+foreach($p in @('approvedMotiveCodes','OTHER','SIMULATED_DEMO_NOT_INSTITUTIONAL','templateCodes','templateVersions','changeInvalidatesApproval')){
   if($r07Entry-notmatch [regex]::Escape($p)){Write-Output "I9 R07 FAIL: simulated R07 catalog missing $p";exit 1}
+}
+$templateSeed=Get-Content (Join-Path $repoRoot 'db/seeds/010_i9_shift_templates.sql') -Raw
+foreach($declared in ([regex]::Matches($r07Entry,'"templateVersions":\[(?<list>[^\]]*)\]')[0].Groups['list'].Value -split ',')){
+  $version=$declared.Trim().Trim('"')
+  if($version -and $templateSeed -notmatch ("(?m),\s*" + [regex]::Escape($version) + "\s*,")){
+    Write-Output "I9 R07 FAIL: catalog declares template version $version, which shift_templates does not install"; exit 1
+  }
 }
 Write-Output 'R07-T07 R07-T08 CATALOG CONTRACT PASS'
 Write-Output 'I9 R07 STATIC PASS'
@@ -62,7 +72,7 @@ using System.Text.Json; using System.Text.RegularExpressions; using Sg.SuperApp.
 static JsonElement J(string s){using var d=JsonDocument.Parse(s);return d.RootElement.Clone();}
 const string R7="I9-R07", R3="I9-R03"; var e=new SchedulingRuleEvaluator();
 var p7=J("{\"compareBy\":[\"templateVersion\",\"anchor\",\"cell\"],\"changeInvalidatesApproval\":true}");
-var cat7=J("{\"classification\":\"SIMULATED_DEMO_NOT_INSTITUTIONAL\",\"templateCodes\":[\"2X2\",\"4X2\",\"6X1\"],\"templateVersions\":[\"TPL-V1\",\"TPL-V2\"],\"approvedMotiveCodes\":[\"OPERATIONAL_NEED_DEMO\",\"COVERAGE_DEMO\",\"OTHER\"]}");
+var cat7=J("{\"classification\":\"SIMULATED_DEMO_NOT_INSTITUTIONAL\",\"templateCodes\":[\"2X2\",\"4X2\",\"6X1\"],\"templateVersions\":[\"1\",\"2\"],\"approvedMotiveCodes\":[\"OPERATIONAL_NEED_DEMO\",\"COVERAGE_DEMO\",\"OTHER\"]}");
 var p3=J("{\"intervalSemantics\":\"HALF_OPEN\",\"adjacentIntervalsOverlap\":false}");
 SchedulingRuleProfile P(JsonElement? c=null,bool on=true,int v=1)=>new(7,"MVP",v,SchedulingRuleOrigin.SIMULATED,SchedulingEnvironmentScope.MVP_TEST,"PROJECT-A",new DateOnly(2026,1,1),null,SchedulingRuleProfileStatus.ACTIVE,new string((char)('a'+v),64),new[]{new SchedulingRuleProfileEntry(R7,p7,c??cat7,on)});
 SchedulingRuleProfile PBoth()=>new(7,"MVP",1,SchedulingRuleOrigin.SIMULATED,SchedulingEnvironmentScope.MVP_TEST,"PROJECT-A",new DateOnly(2026,1,1),null,SchedulingRuleProfileStatus.ACTIVE,new string('a',64),new[]{new SchedulingRuleProfileEntry(R3,p3,J("{}"),true),new SchedulingRuleProfileEntry(R7,p7,cat7,true)});
@@ -73,7 +83,7 @@ SchedulingRuleSeverity S(SchedulingRuleOutcome o)=>o==SchedulingRuleOutcome.COMP
 void C(RuleEvaluation x,SchedulingRuleOutcome o,string c,string n,bool? exception=null){Q(o,x.Outcome,n+" outcome");Q(S(o),x.Severity,n+" severity");Q(exception??(o==SchedulingRuleOutcome.EXCEPTION_REQUIRED),x.ExceptionAllowed,n+" exception");Q(c,x.MessageCode,n+" code");Q(false,string.IsNullOrWhiteSpace(x.Explanation),n+" explanation");if(!Regex.IsMatch(x.ScopeHash,"^[a-f0-9]{64}$"))throw new Exception(n+" hash");if(x.Explanation.Length>1000)throw new Exception(n+" explanation exceeds the persisted limit");}
 string Cell(string guard,string date,string cell,string shift)=>$"{{\"employeeId\":\"{guard}\",\"date\":\"{date}\",\"cell\":\"{cell}\",\"shiftCode\":\"{shift}\"}}";
 string Cells(params string[] items)=>"["+string.Join(",",items)+"]";
-string F(string expected,string proposed,string template="2X2",string version="TPL-V1",string anchor="2026-08-01",string asn="assignment-a",string ver="v-a")=>$"{{\"assignmentId\":\"{asn}\",\"scheduleVersionId\":\"{ver}\",\"templateCode\":\"{template}\",\"templateVersion\":\"{version}\",\"anchorDate\":\"{anchor}\",\"expectedCells\":{expected},\"proposedCells\":{proposed}}}";
+string F(string expected,string proposed,string template="2X2",string version="1",string anchor="2026-08-01",string asn="assignment-a",string ver="v-a")=>$"{{\"assignmentId\":\"{asn}\",\"scheduleVersionId\":\"{ver}\",\"templateCode\":\"{template}\",\"templateVersion\":\"{version}\",\"anchorDate\":\"{anchor}\",\"expectedCells\":{expected},\"proposedCells\":{proposed}}}";
 string Base(string guard="guard-a",string c1="D",string c2="N",string c3="X")=>Cells(Cell(guard,"2026-08-17","C1",c1),Cell(guard,"2026-08-18","C2",c2),Cell(guard,"2026-08-19","C3",c3));
 var passed=0;void Done(string id){passed++;Console.WriteLine(id+" PASS");}
 void T(string id,string f,SchedulingRuleOutcome o,string c,bool approvable,bool? exception=null){var x=E(f,null,null);C(R(x,R7),o,c,id,exception);Q(1,x.Summary.Total,id+" total");Q(approvable,x.Summary.CanApproveOrPublish,id+" approve");Done(id);}
@@ -137,7 +147,7 @@ var t13=E(F(Cells(Cell("guard-a","2026-08-17","C1","D"),Cell("guard-a","2026-08-
 Q(false,R(t13,R7).ScopeHash==t10Hash,"R07-T13 added cell hash");Q(false,t13.Summary.CanApproveOrPublish,"R07-T13 approval invalidated");Done("R07-T13");
 
 // T14 changing the selected template or version recomputes and invalidates.
-var t14Template=R(E(F(Base(),Base(c2:"D"),template:"4X2")),R7);var t14Version=R(E(F(Base(),Base(c2:"D"),version:"TPL-V2")),R7);
+var t14Template=R(E(F(Base(),Base(c2:"D"),template:"4X2")),R7);var t14Version=R(E(F(Base(),Base(c2:"D"),version:"2")),R7);
 Q(false,t14Template.ScopeHash==t10Hash,"R07-T14 template hash");Q(false,t14Version.ScopeHash==t10Hash,"R07-T14 version hash");Done("R07-T14");
 
 // T15 changing the cycle anchor recomputes the affected sequence.
@@ -156,7 +166,7 @@ Q(t17a.FactsSnapshot.GetRawText(),t17b.FactsSnapshot.GetRawText(),"R07-T17 facts
 Q(t17a.ParametersSnapshot.GetRawText(),t17b.ParametersSnapshot.GetRawText(),"R07-T17 parameters snapshot");Done("R07-T17");
 
 // T18 an approved template deviation never releases an absolute R03 block.
-var t18Facts=$"{{\"assignmentId\":\"assignment-a\",\"scheduleVersionId\":\"v-a\",\"employeeId\":\"guard-a\",\"proposedShiftStart\":\"2026-08-17T08:00:00-05:00\",\"proposedShiftEnd\":\"2026-08-17T16:00:00-05:00\",\"existingIntervals\":[{{\"employeeId\":\"guard-a\",\"start\":\"2026-08-17T10:00:00-05:00\",\"end\":\"2026-08-17T18:00:00-05:00\",\"status\":\"APPROVED\"}}],\"templateCode\":\"2X2\",\"templateVersion\":\"TPL-V1\",\"anchorDate\":\"2026-08-01\",\"expectedCells\":{Base()},\"proposedCells\":{Base(c2:"D")}}}";
+var t18Facts=$"{{\"assignmentId\":\"assignment-a\",\"scheduleVersionId\":\"v-a\",\"employeeId\":\"guard-a\",\"proposedShiftStart\":\"2026-08-17T08:00:00-05:00\",\"proposedShiftEnd\":\"2026-08-17T16:00:00-05:00\",\"existingIntervals\":[{{\"employeeId\":\"guard-a\",\"start\":\"2026-08-17T10:00:00-05:00\",\"end\":\"2026-08-17T18:00:00-05:00\",\"status\":\"APPROVED\"}}],\"templateCode\":\"2X2\",\"templateVersion\":\"1\",\"anchorDate\":\"2026-08-01\",\"expectedCells\":{Base()},\"proposedCells\":{Base(c2:"D")}}}";
 var t18Hash=R(E(t18Facts,PBoth()),R7).ScopeHash;var t18=E(t18Facts,PBoth(),new HashSet<string>{t18Hash});
 C(R(t18,R3),SchedulingRuleOutcome.BLOCKED,"I9_R03_OVERLAP_APPROVED_BLOCKED","R07-T18 R03");
 C(R(t18,R7),SchedulingRuleOutcome.EXCEPTION_REQUIRED,"I9_R07_DEVIATION","R07-T18 R07");
@@ -167,8 +177,8 @@ T("R07-T19",F(Base(),Base(),template:"9X9"),SchedulingRuleOutcome.WARNING,"I9_R0
 C(R(E(F("[]",Base())),R7),SchedulingRuleOutcome.WARNING,"I9_R07_TEMPLATE_UNAVAILABLE","R07-T19 empty expected",false);
 
 // T19 regression: a version the versioned catalog does not authorise never presumes compliance.
-C(R(E(F(Base(),Base(),version:"TPL-V999")),R7),SchedulingRuleOutcome.WARNING,"I9_R07_TEMPLATE_UNAVAILABLE","R07-T19 unknown version",false);
-C(R(E(F(Base(),Base(c2:"D"),version:"TPL-V999")),R7),SchedulingRuleOutcome.WARNING,"I9_R07_TEMPLATE_UNAVAILABLE","R07-T19 unknown version with deviation",false);
+C(R(E(F(Base(),Base(),version:"999")),R7),SchedulingRuleOutcome.WARNING,"I9_R07_TEMPLATE_UNAVAILABLE","R07-T19 unknown version",false);
+C(R(E(F(Base(),Base(c2:"D"),version:"999")),R7),SchedulingRuleOutcome.WARNING,"I9_R07_TEMPLATE_UNAVAILABLE","R07-T19 unknown version with deviation",false);
 Console.WriteLine("R07-T19 VERSION GATE PASS");
 
 // The persisted explanation must fit VARCHAR(1000) even with maximum-length anonymous codes.
@@ -180,8 +190,8 @@ C(longEvaluation,SchedulingRuleOutcome.EXCEPTION_REQUIRED,"I9_R07_DEVIATION","ma
 Console.WriteLine("EXPLANATION LENGTH BOUND PASS");
 
 // T20 the historical snapshot keeps the original template, version and values.
-var t20=R(E(F(Base(),Base(c2:"D"),version:"TPL-V1")),R7);
-foreach(var token in new[]{"TPL-V1","2X2","2026-08-01"})if(!t20.FactsSnapshot.GetRawText().Contains(token,StringComparison.Ordinal))throw new Exception("R07-T20 snapshot omits "+token);
+var t20=R(E(F(Base(),Base(c2:"D"),version:"1")),R7);
+foreach(var token in new[]{"\"templateVersion\":\"1\"","2X2","2026-08-01"})if(!t20.FactsSnapshot.GetRawText().Contains(token,StringComparison.Ordinal))throw new Exception("R07-T20 snapshot omits "+token);
 Done("R07-T20");
 
 // T21 several cells of the same guard travel in one exact grouped decision.

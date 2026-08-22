@@ -38,7 +38,7 @@ WITH desired(rule_code,parameters,catalog_snapshot) AS (VALUES
     {"projectCode":"PROJECT-A","positionCode":"POSITION-1","requirementCode":"ACCREDITATION-DEMO","category":"ACCREDITATION","catalogVersion":"REQ-V2","sourceSystem":"I3-DEMO","sourceRequirementCode":"SRC-ACCREDITATION-DEMO","sourceStatus":"ACTIVE","evidenceType":"DEMO_RECORD","evidenceSource":"I3-DEMO","effectiveFrom":"2026-01-01T00:00:00Z","effectiveTo":null,"informativeRemediable":false}
   ]}'::jsonb),
  ('I9-R07','{"compareBy":["templateVersion","anchor","cell"],"changeInvalidatesApproval":true}'::jsonb,
-  '{"classification":"SIMULATED_DEMO_NOT_INSTITUTIONAL","templateCodes":["2X2","4X2","6X1"],"templateVersions":["TPL-V1","TPL-V2"],"approvedMotiveCodes":["OPERATIONAL_NEED_DEMO","COVERAGE_DEMO","OTHER"]}'::jsonb)
+  '{"classification":"SIMULATED_DEMO_NOT_INSTITUTIONAL","templateCodes":["2X2","4X2","6X1"],"templateVersions":["1"],"approvedMotiveCodes":["OPERATIONAL_NEED_DEMO","COVERAGE_DEMO","OTHER"]}'::jsonb)
 )
 INSERT INTO scheduling_rule_profile_entries(rule_profile_id,rule_code,parameters,catalog_snapshot,enabled)
 SELECT p.id,d.rule_code,d.parameters,d.catalog_snapshot,TRUE

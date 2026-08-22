@@ -120,22 +120,34 @@ public static class SchedulingTemplateDeviationRule
             .ToArray();
     }
 
+    // scheduling_rule_evaluations.explanation is VARCHAR(1000) and cell and shift codes are
+    // caller supplied, up to 80 characters each. Rather than truncating the finished sentence,
+    // which would drop exactly the tail that says how many more cells are affected, the text is
+    // built to fit: fewer cells are enumerated until it does. The full set always remains in
+    // the facts snapshot.
     private static string Describe(string templateCode, string templateVersion, IReadOnlyList<TemplateDeviation> deviations)
     {
-        var enumerated = deviations.Take(MaximumEnumeratedCells)
+        for (var take = Math.Min(MaximumEnumeratedCells, deviations.Count); take >= 1; take--)
+        {
+            var candidate = Compose(templateCode, templateVersion, deviations, take);
+            if (candidate.Length <= MaximumExplanationLength) return candidate;
+        }
+        return $"La asignacion se aparta de la plantilla obligatoria en " +
+               $"{deviations.Count.ToString(CultureInfo.InvariantCulture)} celdas; el detalle exacto " +
+               "queda en el snapshot de hechos.";
+    }
+
+    private static string Compose(
+        string templateCode, string templateVersion, IReadOnlyList<TemplateDeviation> deviations, int take)
+    {
+        var enumerated = deviations.Take(take)
             .Select(deviation => $"la celda {deviation.Cell} del {deviation.Date} esperaba {deviation.Expected} y propone {deviation.Proposed}");
-        var remaining = deviations.Count - MaximumEnumeratedCells;
+        var remaining = deviations.Count - take;
         var tail = remaining > 0
             ? $"; y {remaining.ToString(CultureInfo.InvariantCulture)} celdas mas requieren la misma decision."
             : ".";
-        var explanation = $"La asignacion se aparta de la plantilla obligatoria {templateCode} version {templateVersion}: " +
-                          string.Join("; ", enumerated) + tail;
-        // scheduling_rule_evaluations.explanation is VARCHAR(1000); cell and shift codes are
-        // caller supplied and can each reach 80 characters, so the text is bounded here rather
-        // than failing the whole batch on insert.
-        return explanation.Length <= MaximumExplanationLength
-            ? explanation
-            : explanation[..(MaximumExplanationLength - 1)] + "\u2026";
+        return $"La asignacion se aparta de la plantilla obligatoria {templateCode} version {templateVersion}: " +
+               string.Join("; ", enumerated) + tail;
     }
 
     private static bool TryReadCells(JsonElement facts, string name, out IReadOnlyList<TemplateCell> cells)
