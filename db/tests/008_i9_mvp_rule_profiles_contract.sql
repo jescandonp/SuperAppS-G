@@ -19,11 +19,35 @@ BEGIN
         FROM unnest(ARRAY[
             'scheduling_rule_profiles',
             'scheduling_rule_profile_entries',
-            'scheduling_rule_evaluations'
+            'scheduling_rule_evaluations',
+            'scheduling_rule_hr_validations'
         ]) AS expected(table_name)
         WHERE to_regclass(expected.table_name) IS NULL
     ) THEN
         RAISE EXCEPTION 'I9 MVP rule profile tables are missing';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM unnest(ARRAY[
+            'evaluation_id','rule_code','scope_hash','evidence_id','status',
+            'validator_user_id','validator_username','validated_at','audit_detail'
+        ]) AS expected(column_name)
+        WHERE NOT EXISTS (
+            SELECT 1 FROM information_schema.columns c
+            WHERE c.table_schema = current_schema()
+              AND c.table_name = 'scheduling_rule_hr_validations'
+              AND c.column_name = expected.column_name
+              AND c.is_nullable = 'NO'
+        )
+    ) THEN
+        RAISE EXCEPTION 'Persisted TH validation contract is incomplete';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid='scheduling_rule_hr_validations'::regclass AND tgname='scheduling_rule_hr_validation_scope' AND NOT tgisinternal)
+       OR NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid='scheduling_rule_hr_validations'::regclass AND tgname='scheduling_rule_hr_validations_immutable' AND NOT tgisinternal)
+       OR NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='scheduling_rule_hr_validations'::regclass AND conname='scheduling_rule_hr_validation_evaluation_fkey' AND contype='f')
+       OR NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='scheduling_rule_hr_validations'::regclass AND conname='uq_scheduling_rule_hr_validation_evidence' AND contype='u') THEN
+        RAISE EXCEPTION 'Persisted TH validation guards are missing';
     END IF;
 
     SELECT id
