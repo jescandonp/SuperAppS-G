@@ -373,4 +373,55 @@ CREATE INDEX idx_scheduling_rule_evaluations_scope_hash ON scheduling_rule_evalu
 DROP INDEX IF EXISTS idx_schedule_exceptions_evaluation;
 CREATE INDEX idx_schedule_exceptions_evaluation ON schedule_exceptions(evaluation_id) WHERE evaluation_id IS NOT NULL;
 
+CREATE TABLE IF NOT EXISTS scheduling_rule_hr_validations ();
+ALTER TABLE scheduling_rule_hr_validations
+ ADD COLUMN IF NOT EXISTS id BIGSERIAL,
+ ADD COLUMN IF NOT EXISTS evaluation_id BIGINT,
+ ADD COLUMN IF NOT EXISTS rule_code VARCHAR(20),
+ ADD COLUMN IF NOT EXISTS scope_hash CHAR(64),
+ ADD COLUMN IF NOT EXISTS evidence_id VARCHAR(80),
+ ADD COLUMN IF NOT EXISTS status VARCHAR(20),
+ ADD COLUMN IF NOT EXISTS validator_user_id BIGINT,
+ ADD COLUMN IF NOT EXISTS validator_username VARCHAR(80),
+ ADD COLUMN IF NOT EXISTS validated_at TIMESTAMPTZ,
+ ADD COLUMN IF NOT EXISTS audit_detail JSONB;
+ALTER TABLE scheduling_rule_hr_validations
+ ALTER COLUMN status SET DEFAULT 'VALIDATED',
+ ALTER COLUMN validated_at SET DEFAULT NOW(),
+ ALTER COLUMN audit_detail SET DEFAULT '{}'::jsonb;
+ALTER TABLE scheduling_rule_hr_validations
+ ALTER COLUMN evaluation_id SET NOT NULL, ALTER COLUMN rule_code SET NOT NULL,
+ ALTER COLUMN scope_hash SET NOT NULL, ALTER COLUMN evidence_id SET NOT NULL,
+ ALTER COLUMN status SET NOT NULL, ALTER COLUMN validator_user_id SET NOT NULL,
+ ALTER COLUMN validator_username SET NOT NULL, ALTER COLUMN validated_at SET NOT NULL,
+ ALTER COLUMN audit_detail SET NOT NULL;
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_hr_validations','scheduling_rule_hr_validations_pkey','p','PRIMARY KEY(id)');
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_hr_validations','uq_scheduling_rule_hr_validation_evidence','u','UNIQUE(evaluation_id,rule_code,scope_hash,evidence_id)');
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_hr_validations','scheduling_rule_hr_validation_evaluation_fkey','f','FOREIGN KEY(evaluation_id,rule_code,scope_hash) REFERENCES scheduling_rule_evaluations(id,rule_code,scope_hash) ON DELETE RESTRICT');
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_hr_validations','scheduling_rule_hr_validation_user_fkey','f','FOREIGN KEY(validator_user_id) REFERENCES app_users(id) ON DELETE RESTRICT');
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_hr_validations','ck_scheduling_rule_hr_validation_values','c',$d$CHECK(rule_code='I9-R06' AND scope_hash~'^[0-9a-f]{64}$' AND btrim(evidence_id)<>'' AND status='VALIDATED' AND btrim(validator_username)<>'' AND jsonb_typeof(audit_detail)='object')$d$);
+
+CREATE OR REPLACE FUNCTION enforce_i9_hr_validation_scope()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+ IF NOT EXISTS(
+  SELECT 1 FROM scheduling_rule_evaluations e
+  JOIN scheduling_rule_profiles p ON p.id=e.rule_profile_id
+  JOIN schedule_versions sv ON sv.id=e.schedule_version_id
+  WHERE e.id=NEW.evaluation_id AND e.rule_code=NEW.rule_code AND e.scope_hash=NEW.scope_hash
+    AND e.rule_code='I9-R06' AND e.outcome='EXCEPTION_REQUIRED'
+    AND p.origin='SIMULATED' AND p.environment_scope='MVP_TEST' AND sv.simulated=true
+    AND EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(e.facts_snapshot->'requirementEvaluations','[]'::jsonb)) f
+               WHERE f->>'evidenceId'=NEW.evidence_id)
+ ) THEN RAISE EXCEPTION USING ERRCODE='23514',MESSAGE='TH validation must match persisted SIMULATED/MVP_TEST R06 evidence'; END IF;
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS scheduling_rule_hr_validation_scope ON scheduling_rule_hr_validations;
+CREATE TRIGGER scheduling_rule_hr_validation_scope BEFORE INSERT ON scheduling_rule_hr_validations FOR EACH ROW EXECUTE FUNCTION enforce_i9_hr_validation_scope();
+CREATE OR REPLACE FUNCTION reject_i9_hr_validation_change()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='TH validation history is immutable'; END $$;
+DROP TRIGGER IF EXISTS scheduling_rule_hr_validations_immutable ON scheduling_rule_hr_validations;
+CREATE TRIGGER scheduling_rule_hr_validations_immutable BEFORE UPDATE OR DELETE ON scheduling_rule_hr_validations FOR EACH ROW EXECUTE FUNCTION reject_i9_hr_validation_change();
+CREATE INDEX IF NOT EXISTS idx_scheduling_rule_hr_validations_evaluation ON scheduling_rule_hr_validations(evaluation_id,evidence_id);
+
 COMMIT;

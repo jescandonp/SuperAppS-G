@@ -205,6 +205,35 @@ public static class SchedulingRuleEndpoints
             catch (NpgsqlException) { return DatabaseUnavailable(); }
         });
 
+        app.MapPost("/api/portal/scheduling/rules/evaluations/{evaluationId:long}/hr-validations", async (
+            long evaluationId,
+            ValidateSchedulingRequirementRequest request,
+            PortalAuthorizationService authorization,
+            RequestUserContext userContext,
+            SchedulingRuleHttpRepository repository,
+            CancellationToken cancellationToken) =>
+        {
+            var denied=await authorization.RequireAsync("SCHEDULING","VALIDATE_REQUIREMENT",cancellationToken);
+            if(denied is not null && userContext.User is not null)
+                await repository.AuditRequirementValidationDenialAsync(evaluationId,userContext.User.Id,userContext.User.Username,cancellationToken);
+            if(denied is not null)return denied;
+            if(evaluationId<=0 || request is null || string.IsNullOrWhiteSpace(request.EvidenceId) ||
+               request.EvidenceId.Length>80 || !System.Text.RegularExpressions.Regex.IsMatch(request.EvidenceId,"^[A-Za-z0-9._:/-]+$"))
+                return Results.BadRequest(new { message="La evidencia de validacion no es valida." });
+            try
+            {
+                var validation=await repository.ValidateRequirementEvidenceAsync(evaluationId,request.EvidenceId,
+                    userContext.User!.Id,userContext.User.Username,cancellationToken);
+                return Results.Ok(new SchedulingRequirementValidationResponse(validation.Id,validation.EvaluationId,
+                    validation.RuleCode,validation.ScopeHash,validation.EvidenceId,validation.Status,
+                    validation.ValidatorUserId,validation.ValidatorUsername,validation.ValidatedAt));
+            }
+            catch(InvalidOperationException){return Results.Conflict(new { message="La evidencia no corresponde a una evaluacion R06 pendiente del MVP de pruebas." });}
+            catch(PostgresException exception) when(exception.SqlState is PostgresErrorCodes.CheckViolation or PostgresErrorCodes.ForeignKeyViolation or PostgresErrorCodes.UniqueViolation)
+            {return Results.Conflict(new { message="La validacion de requisito entra en conflicto con la evidencia persistida." });}
+            catch(NpgsqlException){return DatabaseUnavailable();}
+        });
+
         return app;
     }
 

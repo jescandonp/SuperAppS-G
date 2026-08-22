@@ -35,6 +35,10 @@ public sealed record CreateScheduleExceptionRequest(
     string ResolutionDate,
     int ExpectedVersion);
 public sealed record ScheduleTransitionRequest(int ExpectedVersion);
+public sealed record ValidateSchedulingRequirementRequest(string EvidenceId);
+public sealed record SchedulingRequirementValidationResponse(
+    long Id, long EvaluationId, string RuleCode, string ScopeHash, string EvidenceId,
+    string Status, long ValidatorUserId, string ValidatorUsername, string ValidatedAt);
 
 public sealed record PersistedSchedulingRuleEvaluationResponse(
     long EvaluationId,

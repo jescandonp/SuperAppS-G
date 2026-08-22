@@ -3125,11 +3125,12 @@ where e.id=@evaluation and e.schedule_version_id=@version for share of e";
             ruleCode=rd.GetString(0);scopeHash=rd.GetString(1);outcome=rd.GetString(2);exceptionAllowed=rd.GetBoolean(3);
             evaluatedAssignment=rd.IsDBNull(4)?null:rd.GetInt64(4);factsJson=rd.GetString(5);catalogJson=rd.GetString(6);
         }
-        if(!string.Equals(ruleCode,request.RuleCode.Trim(),StringComparison.Ordinal) || outcome!="EXCEPTION_REQUIRED" || !exceptionAllowed)
+        if(!string.Equals(ruleCode,request.RuleCode.Trim(),StringComparison.Ordinal) || outcome!="EXCEPTION_REQUIRED" ||
+           (ruleCode!="I9-R06" && !exceptionAllowed))
             throw new InvalidOperationException("La evaluacion no admite la excepcion solicitada.");
         if(request.AssignmentId!=evaluatedAssignment)throw new InvalidOperationException("La excepcion no coincide con la asignacion evaluada.");
         if(!CatalogAllowsMotive(catalogJson,request.MotiveCode.Trim()))throw new InvalidOperationException("El motivo no pertenece al catalogo versionado de la regla.");
-        if(ruleCode=="I9-R06" && !HasCoherentHrValidationSnapshot(factsJson))throw new InvalidOperationException("R06 exige validacion estructurada de Talento Humano ligada a la evidencia.");
+        if(ruleCode=="I9-R06" && !await HasPersistedHrValidationsAsync(cn,tx,request.EvaluationId,factsJson,ct))throw new InvalidOperationException("R06 exige validacion persistida de Talento Humano ligada a cada evidencia.");
         const string insertSql=@"insert into schedule_exceptions(schedule_version_id,assignment_id,exception_type,reason,responsible,evaluation_id,rule_code,scope_hash,motive_code,decision,decided_by,decided_at,decision_detail)
 values(@v,@a,'RULE_EXCEPTION',@r,@p,@evaluation,@rule,@scope,@motive,'APPROVED',@actor,now(),jsonb_build_object('resolutionDate',@date,'source','PERSISTED_MVP_TEST_EVALUATION'))";
         await using (var cmd=new NpgsqlCommand(insertSql,cn,tx))
@@ -3152,11 +3153,12 @@ where exists(select 1 from schedule_versions sv join scheduling_rule_profiles rp
     private static bool CatalogAllowsMotive(string catalogJson,string motiveCode)
     { using var d=JsonDocument.Parse(catalogJson);return d.RootElement.TryGetProperty("approvedMotiveCodes",out var a)&&a.ValueKind==JsonValueKind.Array&&a.EnumerateArray().Any(x=>x.ValueKind==JsonValueKind.String&&string.Equals(x.GetString(),motiveCode,StringComparison.Ordinal)); }
 
-    private static bool HasCoherentHrValidationSnapshot(string factsJson)
+    private static async Task<bool> HasPersistedHrValidationsAsync(NpgsqlConnection connection,NpgsqlTransaction transaction,long evaluationId,string factsJson,CancellationToken cancellationToken)
     {
-        using var d=JsonDocument.Parse(factsJson);if(!d.RootElement.TryGetProperty("requirementEvaluations",out var a)||a.ValueKind!=JsonValueKind.Array||a.GetArrayLength()==0)return false;
-        foreach(var e in a.EnumerateArray())if(!e.TryGetProperty("evidenceId",out var id)||id.ValueKind!=JsonValueKind.String||string.IsNullOrWhiteSpace(id.GetString())||!e.TryGetProperty("hrValidation",out var h)||h.ValueKind!=JsonValueKind.Object||!h.TryGetProperty("validationId",out var v)||v.ValueKind!=JsonValueKind.String||string.IsNullOrWhiteSpace(v.GetString())||!h.TryGetProperty("validatorRoleKey",out var r)||r.ValueKind!=JsonValueKind.String||string.IsNullOrWhiteSpace(r.GetString())||!h.TryGetProperty("validatedAt",out var at)||at.ValueKind!=JsonValueKind.String||!DateTimeOffset.TryParse(at.GetString(),out _)||!h.TryGetProperty("evidenceId",out var linked)||linked.ValueKind!=JsonValueKind.String||!string.Equals(id.GetString(),linked.GetString(),StringComparison.Ordinal))return false;
-        return true;
+        using var document=JsonDocument.Parse(factsJson);if(!document.RootElement.TryGetProperty("requirementEvaluations",out var evaluations)||evaluations.ValueKind!=JsonValueKind.Array||evaluations.GetArrayLength()==0)return false;
+        var evidenceIds=evaluations.EnumerateArray().Select(item=>item.TryGetProperty("evidenceId",out var id)&&id.ValueKind==JsonValueKind.String?id.GetString():null).Where(id=>!string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).ToArray();
+        if(evidenceIds.Length!=evaluations.GetArrayLength())return false;
+        await using var command=new NpgsqlCommand("SELECT count(DISTINCT evidence_id) FROM scheduling_rule_hr_validations WHERE evaluation_id=@evaluation AND rule_code='I9-R06' AND status='VALIDATED' AND evidence_id=ANY(@evidence)",connection,transaction);command.Parameters.AddWithValue("evaluation",evaluationId);command.Parameters.AddWithValue("evidence",evidenceIds!);return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken),System.Globalization.CultureInfo.InvariantCulture)==evidenceIds.Length;
     }
 
     public Task<ScheduleWorkflowResponse> ApproveScheduleAsync(long id,int expected,long actorId,string actor,CancellationToken ct=default)=>TransitionScheduleAsync(id,expected,"PROPUESTA","APROBADA","SCHEDULE_APPROVED",actorId,actor,ct);

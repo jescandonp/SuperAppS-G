@@ -10,6 +10,7 @@ WITH permission_matrix AS (
             ('ADMIN', 'CONFIGURE'),
             ('ADMIN', 'GENERATE'),
             ('ADMIN', 'APPROVE_EXCEPTION'),
+            ('ADMIN', 'VALIDATE_REQUIREMENT'),
             ('ADMIN', 'APPROVE'),
             ('ADMIN', 'PUBLISH'),
             ('ADMIN', 'EXPORT'),
@@ -23,6 +24,7 @@ WITH permission_matrix AS (
             ('OPERACIONES', 'AUDIT'),
             ('TH', 'VIEW'),
             ('TH', 'APPROVE_EXCEPTION'),
+            ('TH', 'VALIDATE_REQUIREMENT'),
             ('GERENCIA', 'VIEW'),
             ('GERENCIA', 'EXPORT')
     ) AS t(role_code, action_code)
@@ -39,12 +41,12 @@ WITH permission_matrix AS (
     FROM (
         VALUES
             ('ADMIN', 'VIEW'), ('ADMIN', 'CONFIGURE'), ('ADMIN', 'GENERATE'),
-            ('ADMIN', 'APPROVE_EXCEPTION'), ('ADMIN', 'APPROVE'), ('ADMIN', 'PUBLISH'),
+            ('ADMIN', 'APPROVE_EXCEPTION'), ('ADMIN', 'VALIDATE_REQUIREMENT'), ('ADMIN', 'APPROVE'), ('ADMIN', 'PUBLISH'),
             ('ADMIN', 'EXPORT'), ('ADMIN', 'AUDIT'),
             ('OPERACIONES', 'VIEW'), ('OPERACIONES', 'GENERATE'),
             ('OPERACIONES', 'APPROVE_EXCEPTION'), ('OPERACIONES', 'APPROVE'),
             ('OPERACIONES', 'PUBLISH'), ('OPERACIONES', 'EXPORT'), ('OPERACIONES', 'AUDIT'),
-            ('TH', 'VIEW'), ('TH', 'APPROVE_EXCEPTION'),
+            ('TH', 'VIEW'), ('TH', 'APPROVE_EXCEPTION'), ('TH', 'VALIDATE_REQUIREMENT'),
             ('GERENCIA', 'VIEW'), ('GERENCIA', 'EXPORT')
     ) AS t(role_code, action_code)
 )

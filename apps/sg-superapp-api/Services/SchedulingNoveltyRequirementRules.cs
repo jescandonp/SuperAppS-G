@@ -247,8 +247,21 @@ public static class SchedulingNoveltyRequirementRules
                 return CatalogState.Invalid;
             parsed.Add(new(sourceSystem, sourceCode, sourceStatus, category, version, effectiveFrom, effectiveTo));
         }
+        if (HasOverlappingNoveltyMappings(parsed)) return CatalogState.Invalid;
         rows = parsed;
         return parsed.Count == 0 ? CatalogState.Missing : CatalogState.Valid;
+    }
+
+    private static bool HasOverlappingNoveltyMappings(IReadOnlyList<NoveltyMapping> rows)
+    {
+        foreach (var group in rows.GroupBy(row => (row.SourceSystem, row.SourceCode, row.SourceStatus)))
+        {
+            var ordered = group.OrderBy(row => row.EffectiveFrom).ToArray();
+            for (var index = 1; index < ordered.Length; index++)
+                if (ordered[index - 1].EffectiveTo is null || ordered[index].EffectiveFrom < ordered[index - 1].EffectiveTo)
+                    return true;
+        }
+        return false;
     }
 
     private static CatalogState ReadRequirementCatalog(JsonElement snapshot, out IReadOnlyList<RequirementMapping> rows)

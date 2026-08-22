@@ -55,7 +55,6 @@ public sealed class SchedulingRuleEvaluator
         "noveltyId", "sourceSystem", "sourceCode", "sourceStatus", "semanticCategory", "mappingVersion",
         "evaluationId", "requirementCode", "category", "catalogVersion", "sourceRequirementCode",
         "evidenceId", "evidenceSource", "evidenceState", "evidenceType", "informativeRemediable",
-        "hrValidation", "validationId", "validatorRoleKey", "validatedAt",
         "remediationOwnerRole", "remediationOwnerKey", "dueDate");
     private static readonly Regex AnonymousCode = new("^[A-Za-z0-9._:/-]{1,80}$", RegexOptions.CultureInvariant);
 
@@ -341,6 +340,9 @@ public sealed class SchedulingRuleEvaluator
     };
 }
 
+public sealed record PersistedRequirementValidation(long Id,long EvaluationId,string RuleCode,string ScopeHash,
+    string EvidenceId,string Status,long ValidatorUserId,string ValidatorUsername,string ValidatedAt);
+
 public sealed class SchedulingRuleHttpRepository
 {
     private readonly string _connectionString;
@@ -525,6 +527,37 @@ JOIN scheduling_rule_profiles p ON p.id=e.rule_profile_id WHERE schedule_version
                 ParseStoredEnum<SchedulingRuleSeverity>(reader.GetString(3)), reader.GetString(4), reader.GetString(5),
                 reader.GetString(6), ReadJson(reader.GetString(7)), ReadJson(reader.GetString(8)), reader.GetBoolean(9)));
         return results;
+    }
+
+    public async Task<PersistedRequirementValidation> ValidateRequirementEvidenceAsync(
+        long evaluationId, string evidenceId, long validatorUserId, string validatorUsername,
+        CancellationToken cancellationToken)
+    {
+        const string sql = @"INSERT INTO scheduling_rule_hr_validations(
+evaluation_id,rule_code,scope_hash,evidence_id,status,validator_user_id,validator_username,audit_detail)
+SELECT e.id,e.rule_code,e.scope_hash,@evidence,'VALIDATED',@user,@username,
+jsonb_build_object('source','TH_AUTHORIZED_ENDPOINT','environment','MVP_TEST')
+FROM scheduling_rule_evaluations e
+JOIN scheduling_rule_profiles p ON p.id=e.rule_profile_id AND p.origin='SIMULATED' AND p.environment_scope='MVP_TEST'
+JOIN schedule_versions sv ON sv.id=e.schedule_version_id AND sv.simulated=true
+WHERE e.id=@evaluation AND e.rule_code='I9-R06' AND e.outcome='EXCEPTION_REQUIRED'
+AND EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(e.facts_snapshot->'requirementEvaluations','[]'::jsonb)) f WHERE f->>'evidenceId'=@evidence)
+ON CONFLICT(evaluation_id,rule_code,scope_hash,evidence_id) DO NOTHING
+RETURNING id,evaluation_id,rule_code,scope_hash,evidence_id,status,validator_user_id,validator_username,validated_at";
+        await using var connection=new NpgsqlConnection(_connectionString);await connection.OpenAsync(cancellationToken);
+        await using var command=new NpgsqlCommand(sql,connection);command.Parameters.AddWithValue("evaluation",evaluationId);command.Parameters.AddWithValue("evidence",evidenceId.Trim());command.Parameters.AddWithValue("user",validatorUserId);command.Parameters.AddWithValue("username",validatorUsername);
+        await using var reader=await command.ExecuteReaderAsync(cancellationToken);
+        if(!await reader.ReadAsync(cancellationToken))throw new InvalidOperationException("La evidencia no pertenece a una evaluacion R06 SIMULATED/MVP_TEST pendiente.");
+        return new(reader.GetInt64(0),reader.GetInt64(1),reader.GetString(2),reader.GetString(3),reader.GetString(4),reader.GetString(5),reader.GetInt64(6),reader.GetString(7),reader.GetFieldValue<DateTime>(8).ToString("O"));
+    }
+
+    public async Task<bool> AuditRequirementValidationDenialAsync(long evaluationId,long actorId,string actor,CancellationToken cancellationToken)
+    {
+        const string sql=@"INSERT INTO audit_log(actor_user_id,actor_username,event_type,entity_type,entity_id,result,detail)
+SELECT @user,@actor,'SCHEDULE_REQUIREMENT_VALIDATION_DENIED','RULE_EVALUATION',@entity,'DENIED',jsonb_build_object('action','VALIDATE_REQUIREMENT','environment','MVP_TEST')
+FROM scheduling_rule_evaluations e JOIN scheduling_rule_profiles p ON p.id=e.rule_profile_id JOIN schedule_versions sv ON sv.id=e.schedule_version_id
+WHERE e.id=@evaluation AND e.rule_code='I9-R06' AND p.origin='SIMULATED' AND p.environment_scope='MVP_TEST' AND sv.simulated=true";
+        await using var connection=new NpgsqlConnection(_connectionString);await connection.OpenAsync(cancellationToken);await using var command=new NpgsqlCommand(sql,connection);command.Parameters.AddWithValue("user",actorId);command.Parameters.AddWithValue("actor",actor);command.Parameters.AddWithValue("entity",evaluationId.ToString(CultureInfo.InvariantCulture));command.Parameters.AddWithValue("evaluation",evaluationId);return await command.ExecuteNonQueryAsync(cancellationToken)==1;
     }
 
     public async Task<IReadOnlyList<SchedulingRuleProfile>> LoadProfilesForEvaluationsAsync(long scheduleVersionId,
