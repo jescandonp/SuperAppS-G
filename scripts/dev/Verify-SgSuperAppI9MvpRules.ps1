@@ -287,9 +287,13 @@ function Invoke-FocusedVerifier {
     [void]$process.Start()
     $stdoutTask = $process.StandardOutput.ReadToEndAsync()
     $stderrTask = $process.StandardError.ReadToEndAsync()
-    if (-not $process.WaitForExit(60000)) {
+    # 600 s, not 60: Verify-SgSuperAppI9R04R06.ps1 alone measures 123 s warm (two .NET builds,
+    # a double migration and three contaminated-schema cases). At 60 s this gate reported a false
+    # FAIL for a verifier that passes standalone, and killing the process skipped its cleanup,
+    # leaking temporary i9_r0406_* schemas into the development database.
+    if (-not $process.WaitForExit(600000)) {
         try { $process.Kill() } catch { }
-        $failures.Add("$Requirement`: '$RelativePath' timed out after 60 seconds")
+        $failures.Add("$Requirement`: '$RelativePath' timed out after 600 seconds")
         return
     }
     $process.WaitForExit()
