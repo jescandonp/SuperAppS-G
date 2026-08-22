@@ -254,9 +254,85 @@ Q(38,passed,"numbered rules scenario count"); Console.WriteLine($"I9 R04 R06 RUL
 '@ | Set-Content -LiteralPath (Join-Path $tempRoot 'Program.cs') -Encoding utf8
     & $dotnet run --project (Join-Path $tempRoot 'Harness.csproj') --configuration Release
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    Write-Output 'I9 R04 R06 WORKFLOW BLOCKED: seed v2 and persisted evaluation/exception binding are not applied'
-    Write-Output 'I9 R04 R06 BLOCKED'
-    exit 2
+
+    $psql = 'C:\Program Files\PostgreSQL\18\bin\psql.exe'
+    $settingsPath = Join-Path $repoRoot 'apps/sg-superapp-api/appsettings.json'
+    if (-not (Test-Path -LiteralPath $psql -PathType Leaf) -or -not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) {
+        Write-Output 'I9 R04 R06 BLOCKED: local PostgreSQL test prerequisites unavailable'; exit 2
+    }
+    $settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+    $parts = @{}
+    foreach ($part in ([string]$settings.ConnectionStrings.Postgres -split ';')) {
+        if ($part -match '^([^=]+)=(.*)$') { $parts[$matches[1].Trim()] = $matches[2] }
+    }
+    if (@('Host','Port','Database','Username','Password') | Where-Object { -not $parts[$_] }) {
+        Write-Output 'I9 R04 R06 BLOCKED: local PostgreSQL configuration incomplete'; exit 2
+    }
+    $env:PGHOST=$parts.Host; $env:PGPORT=$parts.Port; $env:PGDATABASE=$parts.Database
+    $env:PGUSER=$parts.Username; $env:PGPASSWORD=$parts.Password
+    $schema = 'i9_r0406_' + [guid]::NewGuid().ToString('N').Substring(0,12)
+    try {
+        & $psql -X -w -v ON_ERROR_STOP=1 -c "CREATE SCHEMA $schema" | Out-Null
+        if ($LASTEXITCODE -ne 0) { Write-Output 'I9 R04 R06 BLOCKED: cannot create temporal schema'; exit 2 }
+        $env:PGOPTIONS = "--search_path=$schema,public"
+        Get-ChildItem (Join-Path $repoRoot 'db/migrations') -Filter '*.sql' | Sort-Object Name | ForEach-Object {
+            & $psql -X -w -v ON_ERROR_STOP=1 -f $_.FullName | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "migration failed: $($_.Name)" }
+        }
+        1..2 | ForEach-Object {
+            & $psql -X -w -v ON_ERROR_STOP=1 -f (Join-Path $repoRoot 'db/seeds/011_i9_mvp_simulated_rule_profile.sql') | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'seed failed' }
+            & $psql -X -w -v ON_ERROR_STOP=1 -f (Join-Path $repoRoot 'db/tests/008_i9_mvp_rule_profiles_contract.sql') | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'database contract failed' }
+        }
+        $apiProject = [Security.SecurityElement]::Escape((Join-Path $repoRoot 'apps/sg-superapp-api/sg-superapp-api.csproj'))
+@"
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework><LangVersion>preview</LangVersion><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup><ItemGroup><Compile Include="WorkflowProgram.cs"/><ProjectReference Include="$apiProject" /></ItemGroup></Project>
+"@ | Set-Content -LiteralPath (Join-Path $tempRoot 'Workflow.csproj') -Encoding utf8
+        $env:I9_TEMP_CONNECTION = "Host=$($parts.Host);Port=$($parts.Port);Database=$($parts.Database);Username=$($parts.Username);Password=$($parts.Password);Search Path=$schema,public"
+@'
+using System.Text.Json;
+using Microsoft.Extensions.Configuration;
+using Npgsql;
+using Sg.SuperApp.Api.Contracts.Portal;
+using Sg.SuperApp.Api.Domain;
+using Sg.SuperApp.Api.Services;
+
+var connectionString=Environment.GetEnvironmentVariable("I9_TEMP_CONNECTION")??throw new Exception("missing connection");
+var config=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{{"ConnectionStrings:Postgres",connectionString}}).Build();
+var validator=new SchedulingRuleProfileValidator();var profileRepository=new SchedulingRuleProfileRepository(config,validator);var httpRepository=new SchedulingRuleHttpRepository(config);var portalRepository=new PostgresPortalRepository(config);var evaluator=new SchedulingRuleEvaluator();
+static JsonElement J(string value){using var d=JsonDocument.Parse(value);return d.RootElement.Clone();}
+static void Q(bool value,string label){if(!value)throw new Exception(label);Console.WriteLine(label+" PASS");}
+long actorId,versionId;
+await using(var cn=new NpgsqlConnection(connectionString)){await cn.OpenAsync();
+ await using var cmd=new NpgsqlCommand(@"insert into app_users(full_name,username,password_hash) values('I9 Demo Actor','i9.demo.actor','not-a-real-password') returning id;
+insert into clients(code,name,status) values('I9-DEMO-CLIENT','I9 Demo Client','ACTIVO') returning id;",cn);await using var rd=await cmd.ExecuteReaderAsync();await rd.ReadAsync();actorId=rd.GetInt64(0);await rd.NextResultAsync();await rd.ReadAsync();var clientId=rd.GetInt64(0);await rd.CloseAsync();
+ await using var fixture=new NpgsqlCommand(@"with p as (insert into service_projects(client_id,code,name,effective_from,status,created_at,updated_at) values(@client,'PROJECT-A','Project A',date '2026-01-01','ACTIVO',now(),now()) returning id),s as (insert into schedules(project_id,period_start,period_end,created_by) select id,date '2026-08-21',date '2026-08-21','i9.demo.actor' from p returning id) insert into schedule_versions(schedule_id,version_number,status,created_by) select id,1,'PROPUESTA','i9.demo.actor' from s returning id",cn);fixture.Parameters.AddWithValue("client",clientId);versionId=(long)(await fixture.ExecuteScalarAsync()??throw new Exception("fixture"));}
+var profile=await profileRepository.LoadActiveAsync("PROJECT-A",new DateOnly(2026,8,21),SchedulingEnvironmentScope.MVP_TEST,CancellationToken.None);
+var facts=J("""{"dailyHours":8,"weeklyHours":42,"writtenAgreement":false,"previousShiftEnd":"2026-08-20T20:00:00-05:00","proposedShiftStart":"2026-08-21T08:00:00-05:00","proposedShiftEnd":"2026-08-21T20:00:00-05:00","assignmentId":"ASSIGN-1","scheduleVersionId":"SCHEDULE-1","employeeId":"GUARD-1","positionCode":"POSITION-1","shiftId":"SHIFT-1","shiftStart":"2026-08-21T08:00:00-05:00","shiftEnd":"2026-08-21T20:00:00-05:00","noveltyEvaluations":[{"noveltyId":"NOV-1","sourceSystem":"HR-DEMO","sourceCode":"A","sourceStatus":"PENDING","semanticCategory":"ABSENCE_PENDING_CONFIRMATION","mappingVersion":"MAP-V2","validFrom":"2026-08-21T08:00:00-05:00","validTo":"2026-08-21T20:00:00-05:00"}],"requirementEvaluations":[{"evaluationId":"EVAL-COURSE","requirementCode":"COURSE-DEMO","category":"COURSE","catalogVersion":"REQ-V2","sourceSystem":"I3-DEMO","sourceRequirementCode":"SRC-COURSE-DEMO","sourceStatus":"ACTIVE","evidenceId":"EVID-COURSE","evidenceSource":"I3-DEMO","evidenceType":"DEMO_RECORD","evidenceState":"MISSING","validFrom":"2026-08-21T08:00:00-05:00","validTo":"2026-08-21T20:00:00-05:00","hrValidation":{"validationId":"TH-COURSE","validatorRoleKey":"TH-VALIDATOR","validatedAt":"2026-08-20T12:00:00-05:00","evidenceId":"EVID-COURSE"}},{"evaluationId":"EVAL-ACC","requirementCode":"ACCREDITATION-DEMO","category":"ACCREDITATION","catalogVersion":"REQ-V2","sourceSystem":"I3-DEMO","sourceRequirementCode":"SRC-ACCREDITATION-DEMO","sourceStatus":"ACTIVE","evidenceId":"EVID-ACC","evidenceSource":"I3-DEMO","evidenceType":"DEMO_RECORD","evidenceState":"MISSING","validFrom":"2026-08-21T08:00:00-05:00","validTo":"2026-08-21T20:00:00-05:00","hrValidation":{"validationId":"TH-ACC","validatorRoleKey":"TH-VALIDATOR","validatedAt":"2026-08-20T12:00:00-05:00","evidenceId":"EVID-ACC"}}]}""");
+var batch=evaluator.Evaluate(profile,"PROJECT-A",new DateOnly(2026,8,21),facts);var saved=await httpRepository.PersistEvaluationsAsync(versionId,null,"PROJECT-A",batch,"i9.demo.actor",CancellationToken.None);
+var r04=saved.Single(x=>x.Evaluation.RuleCode=="I9-R04");var r06=saved.Single(x=>x.Evaluation.RuleCode=="I9-R06");
+Q(await portalRepository.AuditScheduleExceptionDenialAsync(versionId,actorId,"i9.demo.actor"),"R04-T19");
+await portalRepository.CreateScheduleExceptionAsync(versionId,new(null,r04.Id,"I9-R04","HR_VALIDATED_DEMO","demo","OPS","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");Q(true,"R04-T20");
+try{await portalRepository.CreateScheduleExceptionAsync(versionId+999,new(null,r04.Id,"I9-R04","HR_VALIDATED_DEMO","demo","OPS","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");throw new Exception("reuse accepted");}catch(KeyNotFoundException){}Q(true,"R04-T21");
+Q(r06.Evaluation.ExceptionAllowed,"R06-T12");await portalRepository.CreateScheduleExceptionAsync(versionId,new(null,r06.Id,"I9-R06","HR_VALIDATED_DEMO","demo","TH","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");Q(true,"R06-T13");
+var noHr=J(facts.GetRawText().Replace(",\"hrValidation\":{\"validationId\":\"TH-COURSE\",\"validatorRoleKey\":\"TH-VALIDATOR\",\"validatedAt\":\"2026-08-20T12:00:00-05:00\",\"evidenceId\":\"EVID-COURSE\"}","").Replace(",\"hrValidation\":{\"validationId\":\"TH-ACC\",\"validatorRoleKey\":\"TH-VALIDATOR\",\"validatedAt\":\"2026-08-20T12:00:00-05:00\",\"evidenceId\":\"EVID-ACC\"}",""));var noHrBatch=evaluator.Evaluate(profile,"PROJECT-A",new DateOnly(2026,8,21),noHr);var noHrSaved=await httpRepository.PersistEvaluationsAsync(versionId,null,"PROJECT-A",noHrBatch,"i9.demo.actor",CancellationToken.None);var noHrR06=noHrSaved.Single(x=>x.Evaluation.RuleCode=="I9-R06");try{await portalRepository.CreateScheduleExceptionAsync(versionId,new(null,noHrR06.Id,"I9-R06","HR_VALIDATED_DEMO","demo","TH","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");throw new Exception("no HR accepted");}catch(InvalidOperationException){}Q(true,"R06-T14");
+Q(await portalRepository.AuditScheduleExceptionDenialAsync(versionId,actorId,"i9.demo.actor"),"R06-T15");try{await portalRepository.CreateScheduleExceptionAsync(versionId+999,new(null,r06.Id,"I9-R06","HR_VALIDATED_DEMO","demo","TH","2026-08-22",1),new DateOnly(2026,8,22),actorId,"i9.demo.actor");throw new Exception("wrong version accepted");}catch(KeyNotFoundException){}Q(true,"R06-T16");
+var changed=J(facts.GetRawText().Replace("SHIFT-1","SHIFT-2"));var changedBatch=evaluator.Evaluate(profile,"PROJECT-A",new DateOnly(2026,8,21),changed);var changedSaved=await httpRepository.PersistEvaluationsAsync(versionId,null,"PROJECT-A",changedBatch,"i9.demo.actor",CancellationToken.None);Q(changedSaved.Single(x=>x.Evaluation.RuleCode=="I9-R06").Evaluation.ScopeHash!=r06.Evaluation.ScopeHash,"R06-T17");
+Console.WriteLine("I9 R04 R06 PASS 47");
+'@ | Set-Content -LiteralPath (Join-Path $tempRoot 'WorkflowProgram.cs') -Encoding utf8
+        Move-Item -LiteralPath (Join-Path $tempRoot 'Program.cs') -Destination (Join-Path $tempRoot 'RulesProgram.cs')
+        & $dotnet run --project (Join-Path $tempRoot 'Workflow.csproj') --configuration Release
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
+    catch { Write-Output "I9 R04 R06 FAIL: $($_.Exception.Message)"; exit 1 }
+    finally {
+        $env:I9_TEMP_CONNECTION=$null; $env:PGOPTIONS=$null
+        & $psql -X -w -v ON_ERROR_STOP=1 -c "DROP SCHEMA IF EXISTS $schema CASCADE" | Out-Null
+        $clean = & $psql -X -w -Atqc "select to_regnamespace('$schema') is null"
+        if ($clean -ne 't') { Write-Output 'I9 R04 R06 FAIL: temporal schema cleanup'; exit 1 }
+    }
+    exit 0
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force }

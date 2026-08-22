@@ -3109,11 +3109,54 @@ public sealed class PostgresPortalRepository
     {
         await using var cn=new NpgsqlConnection(_connectionString); await cn.OpenAsync(ct); await using var tx=await cn.BeginTransactionAsync(ct);
         await RequireScheduleStateAsync(cn,tx,versionId,request.ExpectedVersion,"PROPUESTA",ct);
-        await using (var cmd=new NpgsqlCommand("insert into schedule_exceptions(schedule_version_id,assignment_id,exception_type,reason,responsible) values(@v,@a,@t,@r,@p)",cn,tx))
-        { cmd.Parameters.AddWithValue("v",versionId);cmd.Parameters.Add("a",NpgsqlDbType.Bigint).Value=request.AssignmentId.HasValue?request.AssignmentId.Value:DBNull.Value;cmd.Parameters.AddWithValue("t",request.ExceptionType.Trim());cmd.Parameters.AddWithValue("r",request.Reason.Trim());cmd.Parameters.AddWithValue("p",request.Responsible.Trim());await cmd.ExecuteNonQueryAsync(ct); }
+        string ruleCode,scopeHash,outcome; bool exceptionAllowed; long? evaluatedAssignment; string factsJson,catalogJson;
+        const string evaluationSql=@"select e.rule_code,e.scope_hash,e.outcome,e.exception_allowed,e.assignment_id,
+e.facts_snapshot::text,pe.catalog_snapshot::text
+from scheduling_rule_evaluations e
+join scheduling_rule_profiles rp on rp.id=e.rule_profile_id and rp.origin='SIMULATED' and rp.environment_scope='MVP_TEST'
+join scheduling_rule_profile_entries pe on pe.rule_profile_id=e.rule_profile_id and pe.rule_code=e.rule_code
+join schedule_versions sv on sv.id=e.schedule_version_id and sv.simulated=true and sv.rule_profile_id=rp.id
+where e.id=@evaluation and e.schedule_version_id=@version for share of e";
+        await using(var evaluation=new NpgsqlCommand(evaluationSql,cn,tx))
+        {
+            evaluation.Parameters.AddWithValue("evaluation",request.EvaluationId);evaluation.Parameters.AddWithValue("version",versionId);
+            await using var rd=await evaluation.ExecuteReaderAsync(ct);
+            if(!await rd.ReadAsync(ct))throw new KeyNotFoundException("La evaluacion MVP_TEST no pertenece a la propuesta simulada.");
+            ruleCode=rd.GetString(0);scopeHash=rd.GetString(1);outcome=rd.GetString(2);exceptionAllowed=rd.GetBoolean(3);
+            evaluatedAssignment=rd.IsDBNull(4)?null:rd.GetInt64(4);factsJson=rd.GetString(5);catalogJson=rd.GetString(6);
+        }
+        if(!string.Equals(ruleCode,request.RuleCode.Trim(),StringComparison.Ordinal) || outcome!="EXCEPTION_REQUIRED" || !exceptionAllowed)
+            throw new InvalidOperationException("La evaluacion no admite la excepcion solicitada.");
+        if(request.AssignmentId!=evaluatedAssignment)throw new InvalidOperationException("La excepcion no coincide con la asignacion evaluada.");
+        if(!CatalogAllowsMotive(catalogJson,request.MotiveCode.Trim()))throw new InvalidOperationException("El motivo no pertenece al catalogo versionado de la regla.");
+        if(ruleCode=="I9-R06" && !HasCoherentHrValidationSnapshot(factsJson))throw new InvalidOperationException("R06 exige validacion estructurada de Talento Humano ligada a la evidencia.");
+        const string insertSql=@"insert into schedule_exceptions(schedule_version_id,assignment_id,exception_type,reason,responsible,evaluation_id,rule_code,scope_hash,motive_code,decision,decided_by,decided_at,decision_detail)
+values(@v,@a,'RULE_EXCEPTION',@r,@p,@evaluation,@rule,@scope,@motive,'APPROVED',@actor,now(),jsonb_build_object('resolutionDate',@date,'source','PERSISTED_MVP_TEST_EVALUATION'))";
+        await using (var cmd=new NpgsqlCommand(insertSql,cn,tx))
+        { cmd.Parameters.AddWithValue("v",versionId);cmd.Parameters.Add("a",NpgsqlDbType.Bigint).Value=request.AssignmentId.HasValue?request.AssignmentId.Value:DBNull.Value;cmd.Parameters.AddWithValue("r",request.Reason.Trim());cmd.Parameters.AddWithValue("p",request.Responsible.Trim());cmd.Parameters.AddWithValue("evaluation",request.EvaluationId);cmd.Parameters.AddWithValue("rule",ruleCode);cmd.Parameters.AddWithValue("scope",scopeHash);cmd.Parameters.AddWithValue("motive",request.MotiveCode.Trim());cmd.Parameters.AddWithValue("actor",actor);cmd.Parameters.AddWithValue("date",resolutionDate.ToString("yyyy-MM-dd"));await cmd.ExecuteNonQueryAsync(ct); }
         await RefreshScheduleMetricsAsync(cn,tx,versionId,ct);
-        await InsertAuditLogAsync(cn,tx,actorId,actor,"SCHEDULE_EXCEPTION_REGISTERED","SCHEDULE_VERSION",versionId.ToString(),"jsonb_build_object('reason',@reason,'responsible',@responsible,'resolutionDate',@date)",c=>{c.Parameters.AddWithValue("reason",request.Reason.Trim());c.Parameters.AddWithValue("responsible",request.Responsible.Trim());c.Parameters.AddWithValue("date",resolutionDate.ToString("yyyy-MM-dd"));},ct);
+        await InsertAuditLogAsync(cn,tx,actorId,actor,"SCHEDULE_RULE_EXCEPTION_APPROVED","SCHEDULE_VERSION",versionId.ToString(),"jsonb_build_object('evaluationId',@evaluation,'ruleCode',@rule,'scopeHash',@scope,'motiveCode',@motive,'resolutionDate',@date,'environment','MVP_TEST')",c=>{c.Parameters.AddWithValue("evaluation",request.EvaluationId);c.Parameters.AddWithValue("rule",ruleCode);c.Parameters.AddWithValue("scope",scopeHash);c.Parameters.AddWithValue("motive",request.MotiveCode.Trim());c.Parameters.AddWithValue("date",resolutionDate.ToString("yyyy-MM-dd"));},ct);
         await tx.CommitAsync(ct); return (await GetScheduleVersionAsync(versionId,ct))!;
+    }
+
+    public async Task<bool> AuditScheduleExceptionDenialAsync(long versionId,long actorId,string actor,CancellationToken ct=default)
+    {
+        await using var cn=new NpgsqlConnection(_connectionString);await cn.OpenAsync(ct);
+        await using var cmd=new NpgsqlCommand(@"insert into audit_log(actor_user_id,actor_username,event_type,entity_type,entity_id,result,detail)
+select @actorId,@actor,'SCHEDULE_RULE_EXCEPTION_DENIED','SCHEDULE_VERSION',@entity,'DENIED',jsonb_build_object('action','APPROVE_EXCEPTION','environment','MVP_TEST')
+where exists(select 1 from schedule_versions sv join scheduling_rule_profiles rp on rp.id=sv.rule_profile_id where sv.id=@version and sv.simulated=true and rp.origin='SIMULATED' and rp.environment_scope='MVP_TEST')",cn);
+        cmd.Parameters.AddWithValue("actorId",actorId);cmd.Parameters.AddWithValue("actor",actor);cmd.Parameters.AddWithValue("entity",versionId.ToString(System.Globalization.CultureInfo.InvariantCulture));cmd.Parameters.AddWithValue("version",versionId);
+        return await cmd.ExecuteNonQueryAsync(ct)==1;
+    }
+
+    private static bool CatalogAllowsMotive(string catalogJson,string motiveCode)
+    { using var d=JsonDocument.Parse(catalogJson);return d.RootElement.TryGetProperty("approvedMotiveCodes",out var a)&&a.ValueKind==JsonValueKind.Array&&a.EnumerateArray().Any(x=>x.ValueKind==JsonValueKind.String&&string.Equals(x.GetString(),motiveCode,StringComparison.Ordinal)); }
+
+    private static bool HasCoherentHrValidationSnapshot(string factsJson)
+    {
+        using var d=JsonDocument.Parse(factsJson);if(!d.RootElement.TryGetProperty("requirementEvaluations",out var a)||a.ValueKind!=JsonValueKind.Array||a.GetArrayLength()==0)return false;
+        foreach(var e in a.EnumerateArray())if(!e.TryGetProperty("evidenceId",out var id)||id.ValueKind!=JsonValueKind.String||string.IsNullOrWhiteSpace(id.GetString())||!e.TryGetProperty("hrValidation",out var h)||h.ValueKind!=JsonValueKind.Object||!h.TryGetProperty("validationId",out var v)||v.ValueKind!=JsonValueKind.String||string.IsNullOrWhiteSpace(v.GetString())||!h.TryGetProperty("validatorRoleKey",out var r)||r.ValueKind!=JsonValueKind.String||string.IsNullOrWhiteSpace(r.GetString())||!h.TryGetProperty("validatedAt",out var at)||at.ValueKind!=JsonValueKind.String||!DateTimeOffset.TryParse(at.GetString(),out _)||!h.TryGetProperty("evidenceId",out var linked)||linked.ValueKind!=JsonValueKind.String||!string.Equals(id.GetString(),linked.GetString(),StringComparison.Ordinal))return false;
+        return true;
     }
 
     public Task<ScheduleWorkflowResponse> ApproveScheduleAsync(long id,int expected,long actorId,string actor,CancellationToken ct=default)=>TransitionScheduleAsync(id,expected,"PROPUESTA","APROBADA","SCHEDULE_APPROVED",actorId,actor,ct);

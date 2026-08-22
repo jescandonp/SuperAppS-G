@@ -25,8 +25,33 @@ public sealed record PositionRequirementResponse(long Id, long PositionId, long 
 
 public sealed record CreateScheduleProposalRequest(string PeriodStart, string PeriodEnd, bool AcceptedVacancy = false);
 public sealed record UpdateScheduleAssignmentRequest(long? EmployeeId, string Status, IReadOnlyList<string>? Reasons, int ExpectedVersion);
-public sealed record CreateScheduleExceptionRequest(long? AssignmentId, string ExceptionType, string Reason, string Responsible, string ResolutionDate, int ExpectedVersion);
+public sealed record CreateScheduleExceptionRequest(
+    long? AssignmentId,
+    long EvaluationId,
+    string RuleCode,
+    string MotiveCode,
+    string Reason,
+    string Responsible,
+    string ResolutionDate,
+    int ExpectedVersion);
 public sealed record ScheduleTransitionRequest(int ExpectedVersion);
+
+public sealed record PersistedSchedulingRuleEvaluationResponse(
+    long EvaluationId,
+    string RuleCode,
+    string Outcome,
+    string Severity,
+    string MessageCode,
+    string Explanation,
+    string ScopeHash,
+    bool ExceptionAllowed);
+
+public sealed record PersistedSchedulingRuleBatchResponse(
+    long RuleProfileId,
+    int ProfileVersion,
+    bool Simulated,
+    IReadOnlyList<PersistedSchedulingRuleEvaluationResponse> Evaluations,
+    SchedulingRuleSummaryResponse Summary);
 
 public sealed record ScheduleWorkflowResponse(
     long VersionId, long ScheduleId, long ProjectId, int VersionNumber, string Status,

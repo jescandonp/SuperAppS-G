@@ -418,6 +418,95 @@ AND (SELECT count(*) FROM scheduling_rule_profile_entries e WHERE e.rule_profile
         return await command.ExecuteScalarAsync(cancellationToken) is not null;
     }
 
+    public async Task<IReadOnlyList<PersistedRuleEvaluation>> PersistEvaluationsAsync(
+        long scheduleVersionId, long? assignmentId, string projectCode, SchedulingRuleEvaluationBatch batch,
+        string actor, CancellationToken cancellationToken)
+    {
+        if (!batch.Simulated)
+            throw new InvalidOperationException("Solo se permite persistir evaluaciones SIMULATED/MVP_TEST en este MVP.");
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        const string bindSql = @"UPDATE schedule_versions sv
+SET rule_profile_id=@profile,rule_profile_version=@profile_version,simulated=@simulated
+FROM schedules s JOIN service_projects p ON p.id=s.project_id, scheduling_rule_profiles rp
+WHERE sv.id=@version AND s.id=sv.schedule_id AND p.code=@project AND sv.status='PROPUESTA'
+AND rp.id=@profile AND rp.origin='SIMULATED' AND rp.environment_scope='MVP_TEST'
+AND (sv.rule_profile_id IS NULL OR (sv.rule_profile_id=@profile AND sv.rule_profile_version=@profile_version AND sv.simulated=@simulated))
+RETURNING sv.id";
+        await using (var bind = new NpgsqlCommand(bindSql, connection, transaction))
+        {
+            bind.Parameters.AddWithValue("profile", batch.RuleProfileId);
+            bind.Parameters.AddWithValue("profile_version", batch.ProfileVersion);
+            bind.Parameters.AddWithValue("simulated", batch.Simulated);
+            bind.Parameters.AddWithValue("version", scheduleVersionId);
+            bind.Parameters.AddWithValue("project", projectCode.Trim());
+            if (await bind.ExecuteScalarAsync(cancellationToken) is null)
+                throw new InvalidOperationException("La propuesta no acepta esta evaluacion o perfil de reglas.");
+        }
+
+        if (assignmentId.HasValue)
+        {
+            await using var assignment = new NpgsqlCommand(
+                "SELECT EXISTS(SELECT 1 FROM schedule_assignments WHERE id=@assignment AND schedule_version_id=@version)",
+                connection, transaction);
+            assignment.Parameters.AddWithValue("assignment", assignmentId.Value);
+            assignment.Parameters.AddWithValue("version", scheduleVersionId);
+            if (await assignment.ExecuteScalarAsync(cancellationToken) is not true)
+                throw new InvalidOperationException("La asignacion no pertenece a la propuesta evaluada.");
+        }
+
+        var correlationId = Guid.NewGuid().ToString("N");
+        var persisted = new List<PersistedRuleEvaluation>(batch.Evaluations.Count);
+        const string insertSql = @"INSERT INTO scheduling_rule_evaluations(
+schedule_version_id,assignment_id,rule_profile_id,rule_code,outcome,severity,message_code,explanation,
+parameters_snapshot,facts_snapshot,scope_hash,exception_allowed,exception_status,correlation_id,audit_actor)
+VALUES(@version,@assignment,@profile,@rule,@outcome,@severity,@message,@explanation,
+@parameters::jsonb,@facts::jsonb,@scope,@exception_allowed,@exception_status,@correlation,@actor)
+RETURNING id";
+        foreach (var evaluation in batch.Evaluations)
+        {
+            await using var command = new NpgsqlCommand(insertSql, connection, transaction);
+            command.Parameters.AddWithValue("version", scheduleVersionId);
+            command.Parameters.Add("assignment", NpgsqlTypes.NpgsqlDbType.Bigint).Value =
+                assignmentId.HasValue ? assignmentId.Value : DBNull.Value;
+            command.Parameters.AddWithValue("profile", batch.RuleProfileId);
+            command.Parameters.AddWithValue("rule", evaluation.RuleCode);
+            command.Parameters.AddWithValue("outcome", evaluation.Outcome.ToString());
+            command.Parameters.AddWithValue("severity", evaluation.Severity.ToString());
+            command.Parameters.AddWithValue("message", evaluation.MessageCode);
+            command.Parameters.AddWithValue("explanation", evaluation.Explanation);
+            command.Parameters.AddWithValue("parameters", evaluation.ParametersSnapshot.GetRawText());
+            command.Parameters.AddWithValue("facts", evaluation.FactsSnapshot.GetRawText());
+            command.Parameters.AddWithValue("scope", evaluation.ScopeHash);
+            command.Parameters.AddWithValue("exception_allowed", evaluation.ExceptionAllowed);
+            command.Parameters.AddWithValue("exception_status",
+                evaluation.Outcome == SchedulingRuleOutcome.EXCEPTION_REQUIRED && evaluation.ExceptionAllowed
+                    ? "PENDING" : "NOT_REQUIRED");
+            command.Parameters.AddWithValue("correlation", correlationId);
+            command.Parameters.AddWithValue("actor", actor);
+            var id = (long)(await command.ExecuteScalarAsync(cancellationToken)
+                ?? throw new InvalidOperationException("No fue posible persistir la evaluacion de reglas."));
+            persisted.Add(new PersistedRuleEvaluation(id, evaluation));
+        }
+
+        await using (var audit = new NpgsqlCommand(@"INSERT INTO audit_log(
+actor_username,event_type,entity_type,entity_id,result,detail)
+VALUES(@actor,'SCHEDULE_RULES_EVALUATED','SCHEDULE_VERSION',@entity,'SUCCESS',
+jsonb_build_object('correlationId',@correlation,'evaluationCount',@count,'ruleProfileId',@profile))", connection, transaction))
+        {
+            audit.Parameters.AddWithValue("actor", actor);
+            audit.Parameters.AddWithValue("entity", scheduleVersionId.ToString(CultureInfo.InvariantCulture));
+            audit.Parameters.AddWithValue("correlation", correlationId);
+            audit.Parameters.AddWithValue("count", persisted.Count);
+            audit.Parameters.AddWithValue("profile", batch.RuleProfileId);
+            await audit.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+        return persisted;
+    }
+
     public async Task<IReadOnlyList<RuleEvaluation>> LoadEvaluationsAsync(long scheduleVersionId,
         CancellationToken cancellationToken)
     {
@@ -516,3 +605,5 @@ JOIN scheduling_rule_profiles p ON p.id=e.rule_profile_id WHERE schedule_version
             EffectiveFrom, EffectiveTo, Status, Checksum, Entries);
     }
 }
+
+public sealed record PersistedRuleEvaluation(long Id, RuleEvaluation Evaluation);

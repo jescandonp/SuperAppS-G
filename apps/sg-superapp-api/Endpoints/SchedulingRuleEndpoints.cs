@@ -164,8 +164,11 @@ public static class SchedulingRuleEndpoints
         });
 
         app.MapPost("/api/portal/scheduling/rules/evaluate", async (
+            long scheduleVersionId,
+            long? assignmentId,
             PreEvaluateSchedulingRulesRequest request,
             PortalAuthorizationService authorization,
+            RequestUserContext userContext,
             SchedulingRuleProfileValidator validator,
             SchedulingRuleProfileRepository repository,
             SchedulingRuleEvaluator evaluator,
@@ -174,10 +177,12 @@ public static class SchedulingRuleEndpoints
         {
             var denied = await authorization.RequireAsync("SCHEDULING", "GENERATE", cancellationToken);
             if (denied is not null) return denied;
-            if (request.RuleProfileId <= 0 || string.IsNullOrWhiteSpace(request.ProjectCode) ||
+            if (scheduleVersionId <= 0 || assignmentId is <= 0 || request.RuleProfileId <= 0 || string.IsNullOrWhiteSpace(request.ProjectCode) ||
                 request.Facts.ValueKind != JsonValueKind.Object ||
                 !TryParseScope(request.Period, request.EnvironmentScope, out var period, out var environment))
                 return Results.BadRequest(new { message = "Los datos para preevaluar reglas no son validos." });
+            if (environment == SchedulingEnvironmentScope.PRODUCTION)
+                return Results.Conflict(new { message = "La persistencia de evaluaciones productivas no esta habilitada en este MVP." });
             try
             {
                 var profile = await httpRepository.LoadProfileByIdAsync(request.RuleProfileId, cancellationToken);
@@ -188,7 +193,10 @@ public static class SchedulingRuleEndpoints
                 var active = await repository.LoadActiveAsync(request.ProjectCode.Trim(), period, environment, cancellationToken);
                 if (active.Id != profile.Id)
                     return Results.Conflict(new { message = "El perfil no es el activo para el alcance solicitado." });
-                return Results.Ok(ToEvaluationBatchResponse(evaluator.Evaluate(active, request.ProjectCode, period, request.Facts)));
+                var batch = evaluator.Evaluate(active, request.ProjectCode, period, request.Facts);
+                var persisted = await httpRepository.PersistEvaluationsAsync(scheduleVersionId, assignmentId,
+                    request.ProjectCode, batch, userContext.User!.Username, cancellationToken);
+                return Results.Ok(ToPersistedEvaluationBatchResponse(batch, persisted));
             }
             catch (SchedulingRuleContractException) { return ContractProblem(); }
             catch (ArgumentException) { return Results.BadRequest(new { message = "Los datos para preevaluar reglas no son validos." }); }
@@ -274,6 +282,17 @@ public static class SchedulingRuleEndpoints
     private static SchedulingRuleEvaluationBatchResponse ToEvaluationBatchResponse(SchedulingRuleEvaluationBatch batch) => new(
         batch.RuleProfileId, batch.ProfileCode, batch.ProfileVersion, batch.Simulated,
         batch.Evaluations.Select(ToEvaluationResponse).ToArray(),
+        new SchedulingRuleSummaryResponse(batch.Summary.Total, batch.Summary.Compliant, batch.Summary.Blocked,
+            batch.Summary.ExceptionRequired, batch.Summary.Warning, batch.Summary.NotApplicable,
+            batch.Summary.CanApproveOrPublish));
+
+    private static PersistedSchedulingRuleBatchResponse ToPersistedEvaluationBatchResponse(
+        SchedulingRuleEvaluationBatch batch, IReadOnlyList<PersistedRuleEvaluation> persisted) => new(
+        batch.RuleProfileId, batch.ProfileVersion, batch.Simulated,
+        persisted.Select(item => new PersistedSchedulingRuleEvaluationResponse(
+            item.Id, item.Evaluation.RuleCode, item.Evaluation.Outcome.ToString(),
+            item.Evaluation.Severity.ToString(), item.Evaluation.MessageCode, item.Evaluation.Explanation,
+            item.Evaluation.ScopeHash, item.Evaluation.ExceptionAllowed)).ToArray(),
         new SchedulingRuleSummaryResponse(batch.Summary.Total, batch.Summary.Compliant, batch.Summary.Blocked,
             batch.Summary.ExceptionRequired, batch.Summary.Warning, batch.Summary.NotApplicable,
             batch.Summary.CanApproveOrPublish));

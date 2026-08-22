@@ -23,7 +23,7 @@ WITH desired(rule_code,parameters,catalog_snapshot) AS (VALUES
  ('I9-R03','{"intervalSemantics":"HALF_OPEN","adjacentIntervalsOverlap":false,"precedenceOver":["I9-R05"]}'::jsonb,
   '{"classification":"SIMULATED_DEMO_NOT_INSTITUTIONAL","sources":["CURRENT_DRAFTS","APPROVED_SCHEDULES"]}'::jsonb),
  ('I9-R04','{"unknownOutcome":"UNVERIFIED","unknownApprovalBlocked":true}'::jsonb,
-  '{"classification":"SIMULATED_DEMO_NOT_INSTITUTIONAL","mappingDemo":[
+  '{"classification":"SIMULATED_DEMO_NOT_INSTITUTIONAL","approvedMotiveCodes":["HR_VALIDATED_DEMO","OPERATIONAL_CONTINUITY_DEMO"],"mappingDemo":[
     {"sourceSystem":"HR-DEMO","sourceCode":"INC","sourceStatus":"ACTIVE","semanticCategory":"INCAPACITY_ACTIVE","mappingVersion":"MAP-V2","effectiveFrom":"2026-01-01T00:00:00Z","effectiveTo":null,"mappedBy":"TH-DEMO-ROLE","approvedBy":"OPS-DEMO-ROLE"},
     {"sourceSystem":"HR-DEMO","sourceCode":"V","sourceStatus":"APPROVED","semanticCategory":"VACATION_APPROVED_ACTIVE","mappingVersion":"MAP-V2","effectiveFrom":"2026-01-01T00:00:00Z","effectiveTo":null,"mappedBy":"TH-DEMO-ROLE","approvedBy":"OPS-DEMO-ROLE"},
     {"sourceSystem":"HR-DEMO","sourceCode":"A","sourceStatus":"CONFIRMED","semanticCategory":"ABSENCE_CONFIRMED","mappingVersion":"MAP-V2","effectiveFrom":"2026-01-01T00:00:00Z","effectiveTo":null,"mappedBy":"TH-DEMO-ROLE","approvedBy":"OPS-DEMO-ROLE"},
@@ -33,7 +33,7 @@ WITH desired(rule_code,parameters,catalog_snapshot) AS (VALUES
  ('I9-R05','{"missingRelationOutcome":"EXCEPTION_REQUIRED","neverAssumeZero":true,"directional":true}'::jsonb,
   '{"classification":"SIMULATED_DEMO_NOT_INSTITUTIONAL","matrixDemo":[{"from":"PROJECT-A/POSITION-1","to":"PROJECT-B/POSITION-2","minutes":45,"prohibited":false},{"from":"PROJECT-B/POSITION-2","to":"PROJECT-A/POSITION-1","minutes":60,"prohibited":false},{"from":"PROJECT-A/POSITION-1","to":"PROJECT-C/POSITION-3","minutes":null,"prohibited":true}]}'::jsonb),
  ('I9-R06','{"validForEntireShift":true,"unverifiedOutcome":"EXCEPTION_REQUIRED","informativeRequiresOwnerAndDueDate":true}'::jsonb,
-  '{"classification":"SIMULATED_DEMO_NOT_INSTITUTIONAL","requirementsDemo":[
+  '{"classification":"SIMULATED_DEMO_NOT_INSTITUTIONAL","approvedMotiveCodes":["HR_VALIDATED_DEMO"],"requirementsDemo":[
     {"projectCode":"PROJECT-A","positionCode":"POSITION-1","requirementCode":"COURSE-DEMO","category":"COURSE","catalogVersion":"REQ-V2","sourceSystem":"I3-DEMO","sourceRequirementCode":"SRC-COURSE-DEMO","sourceStatus":"ACTIVE","evidenceType":"DEMO_RECORD","evidenceSource":"I3-DEMO","effectiveFrom":"2026-01-01T00:00:00Z","effectiveTo":null,"informativeRemediable":true},
     {"projectCode":"PROJECT-A","positionCode":"POSITION-1","requirementCode":"ACCREDITATION-DEMO","category":"ACCREDITATION","catalogVersion":"REQ-V2","sourceSystem":"I3-DEMO","sourceRequirementCode":"SRC-ACCREDITATION-DEMO","sourceStatus":"ACTIVE","evidenceType":"DEMO_RECORD","evidenceSource":"I3-DEMO","effectiveFrom":"2026-01-01T00:00:00Z","effectiveTo":null,"informativeRemediable":false}
   ]}'::jsonb),

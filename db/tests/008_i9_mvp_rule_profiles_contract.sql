@@ -206,7 +206,7 @@ BEGIN
         effective_from, status, checksum, created_by,
         activated_by, activated_at, approval_evidence
     ) SELECT
-        profile_code, 2, origin, environment_scope, scope_code,
+        profile_code, 3, origin, environment_scope, scope_code,
         retirement_date + 1, 'ACTIVE', repeat('c', 64), 'contract.i9',
         'contract.i9', clock_timestamp(), '{}'::jsonb
     FROM scheduling_rule_profiles WHERE id = profile_id;
@@ -218,7 +218,7 @@ BEGIN
           ON replacement.profile_code = retired.profile_code
          AND replacement.scope_code = retired.scope_code
          AND replacement.environment_scope = retired.environment_scope
-         AND replacement.version = 2
+         AND replacement.version = 3
         WHERE retired.id = profile_id
           AND daterange(retired.effective_from, retired.effective_to + 1, '[)')
               && daterange(replacement.effective_from,
