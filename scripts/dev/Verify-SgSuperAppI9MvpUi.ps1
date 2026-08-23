@@ -54,7 +54,10 @@ Q ($styles -match '\.schedule-badge\.is-simulated') 'UI-T02 the simulated badge 
 # simulated only once a profile has said so.
 Q ($page -match 'DATOS SIMULADOS - MVP') 'UI-T02 the page states the simulated origin outside the panel'
 Q ($page -match 'ORIGEN DE REGLAS SIN CONFIRMAR') 'UI-T02 an unconfirmed origin is not presented as simulated'
-Q ($page -match 'const simulatedOrigin = demoMode \|\| \(ruleProfile\.status === "READY" && ruleProfile\.profile\.simulated\)') 'UI-T02 the origin comes from the profile the server returned'
+# demoMode used to stand in for a profile here, which made the hero claim the data was simulated
+# while the panel two files over said the origin was unconfirmed - the same contradiction, inverted.
+Q ($page -match 'const simulatedOrigin = ruleProfile\.status === "READY" && ruleProfile\.profile\.simulated') 'UI-T02 the origin comes from the profile the server returned'
+Q ($page -notmatch 'simulatedOrigin = demoMode') 'UI-T02 demo mode is not evidence of a simulated origin'
 
 # --- each outcome says what it is and what to do about it ---------------------------------------
 foreach ($outcome in @('BLOCKED', 'EXCEPTION_REQUIRED', 'WARNING', 'COMPLIANT', 'NOT_APPLICABLE')) {
@@ -82,6 +85,13 @@ Q ($panel -notmatch 'canApproveOrPublish\s*(=|\?)') 'UI-T05 the panel never assi
 Q ($page -match 'function actionState') 'UI-T05 the disabled state is derived from permission, version state and work in flight'
 $actionBlock = ([regex]::Match($page, '(?s)function actionState.*?\n\}')).Value
 Q ($actionBlock -notmatch 'BLOCKED|EXCEPTION_REQUIRED|WARNING|evaluations') 'UI-T05 no rule outcome takes part in disabling a button'
+# Guarding the inside of actionState was not enough: a reviewer moved the same rule check one line
+# above it and both gates stayed green, while actionState then blamed its first branch and told a
+# user with the permission that they lacked it. So the prop must come from these two values alone,
+# and the page must not mention a rule outcome anywhere - the outcomes belong to the panel.
+Q ($page -match 'disabled=\{approveAction\.disabled\}') 'UI-T05 the approve button is disabled only by actionState'
+Q ($page -match 'disabled=\{publishAction\.disabled\}') 'UI-T05 the publish button is disabled only by actionState'
+Q ($page -notmatch 'BLOCKED|EXCEPTION_REQUIRED|NOT_APPLICABLE') 'UI-T05 the page never names a rule outcome'
 Q ($page -match 'setGateProblem\(toProblem\(caught\)\)') 'UI-T05 a refusal is taken from the server, not predicted'
 Q (([regex]::Matches($page, 'setGateProblem\(toProblem\(caught\)\)')).Count -eq 2) 'UI-T05 both approve and publish surrender the decision to the server'
 
@@ -122,6 +132,16 @@ Q ($styles -match '(?s)\.shell > \*,\s*\.content > \* \{\s*min-width: 0;') 'UI-T
 Q ($styles -match '(?s)\.scheduling-workspace > \* \{\s*min-width: 0;') 'UI-T12 the workspace sections can shrink below their content'
 Q ($styles -match '\.scheduling-table-scroll \{ max-width: 100%; overflow-x: auto;') 'UI-T12 wide content scrolls inside the matrix, not the page'
 
+# --- the verifier defends its own assertions -----------------------------------------------------
+# A reviewer weakened the negative probe's three per-case matches to a generic "error TS" and the
+# suite stayed green: the count guard notices a deleted assertion, never a softened one. The probe
+# names are pinned here so that softening them is itself a failure.
+$feVerifier = Text 'scripts/dev/Verify-SgSuperAppI9MvpFrontendApi.ps1'
+foreach ($probe in @('reject-gate-code', 'reject-outcome', 'reject-approval-as-text')) {
+    Q ($feVerifier -match "$probe\\.ts'\) 'FE-T10") "UI-T13 the $probe probe is still matched by name"
+}
+Q ($feVerifier -notmatch "negativeText -match 'error TS'") 'UI-T13 the negative probe is not matched by a generic compiler error'
+
 # --- the page compiles ---------------------------------------------------------------------------
 if (-not (Test-Path -LiteralPath $node -PathType Leaf) -or -not (Test-Path -LiteralPath $tsc -PathType Leaf)) {
     $failures.Add('UI-T10 BLOCKED: the web toolchain is not installed; run npm install in apps/sg-superapp-web')
@@ -138,8 +158,8 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 
-if ($passed -ne 52) {
-    Write-Output "I9 MVP UI FAIL: expected 52 assertions, ran $passed"
+if ($passed -ne 60) {
+    Write-Output "I9 MVP UI FAIL: expected 60 assertions, ran $passed"
     exit 1
 }
 

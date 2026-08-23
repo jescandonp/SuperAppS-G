@@ -62,6 +62,9 @@ $schema = 'i9_mvpint_' + [guid]::NewGuid().ToString('N').Substring(0,12)
 $apiProcess = $null
 $fixtureFile = Join-Path ([System.IO.Path]::GetTempPath()) ($schema + '.sql')
 $exportFile = Join-Path ([System.IO.Path]::GetTempPath()) ($schema + '.xlsx')
+# Declared here rather than beside its use, so the finally block below can remove it even when
+# an assertion fails between writing it and the cleanup that used to live inside the try.
+$pdfFile = Join-Path ([System.IO.Path]::GetTempPath()) ($schema + '.pdf')
 try {
     & $dotnet build $project --configuration Release | Out-Null
     if ($LASTEXITCODE -ne 0) { Write-Output 'I9 MVP INTEGRATION FAIL: API build failed'; exit 1 }
@@ -165,10 +168,18 @@ INSERT INTO schedule_assignments(schedule_version_id,required_shift_id,employee_
     Q ($batch.profileVersion -gt 0) 'MI-T02 the batch declares the profile version it came from'
     Q (@($batch.evaluations | Where-Object { $_.scopeHash -notmatch '^[0-9a-f]{64}$' }).Count -eq 0) 'MI-T02 every verdict carries a well formed scope'
     Q ([int](Scalar "select count(*) from scheduling_rule_evaluations where schedule_version_id=$evaluatedVersion") -eq 7) 'MI-T02 the seven verdicts are persisted'
+    # Counting rows let every rule silently degrade to its unavailable-evaluator fallback while the
+    # suite still read as covering seven rules. Under fail-closed that is the one state to shout
+    # about: it means nothing was actually decided.
+    Q (@($batch.evaluations | Where-Object { $_.messageCode -match 'EVALUATOR_UNAVAILABLE' }).Count -eq 0) 'MI-T02 no rule fell back to an unavailable evaluator'
 
-    # PRODUCTION is refused outright: this MVP never asserts institutional policy.
+    # PRODUCTION is refused outright: this MVP never asserts institutional policy. The status code
+    # alone proved nothing - with the guard deleted a 409 still arrived, from the profile lookup
+    # failing to find an ACTIVE PRODUCTION profile. That is an accident of the fixture, not a
+    # policy, and it would evaporate the day someone seeds one. The refusal must be the guard's.
     $production = Call 'Post' $evaluateUri $headers (@{ ruleProfileId = [long]$profileId; projectCode = 'PROJECT-A'; period = '2026-08-21'; environmentScope = 'PRODUCTION'; facts = $facts })
     Q ($production.Status -eq 409) 'MI-T03 a PRODUCTION scope is rejected'
+    Q ($production.Content -match 'persistencia de evaluaciones productivas no esta habilitada') 'MI-T03 the refusal is the production policy, not a missing profile'
     Q ([int](Scalar "select count(*) from scheduling_rule_evaluations where schedule_version_id=$evaluatedVersion") -eq 7) 'MI-T03 the rejected PRODUCTION request persists nothing'
 
     # Double execution: the history is append-only, so a second run adds rows rather than replacing
@@ -181,6 +192,16 @@ INSERT INTO schedule_assignments(schedule_version_id,required_shift_id,employee_
     $secondScopes = ($secondBatch.evaluations | Sort-Object ruleCode | ForEach-Object { "$($_.ruleCode)=$($_.scopeHash)" }) -join ','
     Q ($firstScopes -eq $secondScopes) 'MI-T04 the second execution derives the same scope for every rule'
     Q ([int](Scalar "select count(*) from scheduling_rule_evaluations where schedule_version_id=$evaluatedVersion") -eq 14) 'MI-T04 the double execution appends rather than replaces'
+    # Stability alone is satisfied by a constant, and a constant scope would let one approved
+    # exception silently vouch for every other scenario. The snapshot must also MOVE when the facts
+    # move, so the same rule is evaluated against changed facts and its scope compared.
+    $movedFacts = $facts.Clone()
+    $movedFacts.dailyHours = 11
+    $moved = Call 'Post' $evaluateUri $headers (@{ ruleProfileId = [long]$profileId; projectCode = 'PROJECT-A'; period = '2026-08-21'; environmentScope = 'MVP_TEST'; facts = $movedFacts })
+    Q ($moved.Status -eq 200) 'MI-T04 changed facts are evaluated'
+    $movedR01 = (($moved.Content | ConvertFrom-Json).evaluations | Where-Object ruleCode -eq 'I9-R01').scopeHash
+    $firstR01 = ($batch.evaluations | Where-Object ruleCode -eq 'I9-R01').scopeHash
+    Q ($movedR01 -ne $firstR01) 'MI-T04 a change in the facts a rule reads moves its scope'
 
     # Precedence: a blocked rule decides, whatever the others say.
     $blockedFacts = $facts.Clone()
@@ -221,14 +242,23 @@ INSERT INTO schedule_assignments(schedule_version_id,required_shift_id,employee_
 
     # The audit trail is not enough: once an export leaves the application it is read on its own.
     # A simulated roster that does not say so on its face is indistinguishable from a real one.
-    $pdfFile = [System.IO.Path]::ChangeExtension($exportFile, '.pdf')
     Invoke-WebRequest -UseBasicParsing -Uri "$base/portal/scheduling/versions/$exportVersion/export.pdf" -Headers $headers -OutFile $pdfFile | Out-Null
     $pdfText = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($pdfFile))
     Q ($pdfText -match 'DATOS SIMULADOS') 'MI-T09 the exported document states the simulated origin on its face'
     Q ($pdfText -match 'perfil') 'MI-T09 the exported document names the rule profile behind it'
+    # The spreadsheet is the copy people forward and edit, so it is the one that most needs to say
+    # what it is. Only the PDF was checked, and dropping the header from BuildXlsx survived.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = [System.IO.Compression.ZipFile]::OpenRead($exportFile)
+    try {
+        $sheet = $archive.Entries | Where-Object { $_.FullName -like '*sheet1.xml' }
+        $reader = New-Object System.IO.StreamReader($sheet.Open())
+        $sheetXml = $reader.ReadToEnd(); $reader.Dispose()
+    } finally { $archive.Dispose() }
+    Q ($sheetXml -match 'DATOS SIMULADOS') 'MI-T09 the spreadsheet states the simulated origin too'
     if (Test-Path -LiteralPath $pdfFile) { Remove-Item -LiteralPath $pdfFile -Force }
 
-    Q ($passed -eq 33) 'numbered integration assertion count'
+    Q ($passed -eq 38) 'numbered integration assertion count'
     Write-Output "I9 MVP INTEGRATION PASS $passed"
     exit 0
 }
@@ -239,7 +269,7 @@ finally {
         $apiProcess.WaitForExit(10000) | Out-Null
     }
     $env:ConnectionStrings__Postgres=$null; $env:ASPNETCORE_URLS=$null; $env:ASPNETCORE_ENVIRONMENT=$null
-    foreach ($path in @($fixtureFile, $exportFile)) { if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force } }
+    foreach ($path in @($fixtureFile, $exportFile, $pdfFile)) { if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force } }
     $env:PGOPTIONS=$null
     & $psql -X -w -v ON_ERROR_STOP=1 -c "DROP SCHEMA IF EXISTS $schema CASCADE" | Out-Null
     $clean = & $psql -X -w -Atqc "select to_regnamespace('$schema') is null"

@@ -371,6 +371,34 @@ INSERT INTO schedule_exceptions(schedule_version_id,assignment_id,exception_type
     Q ($audit.Content -match 'SCHEDULE_PUBLISHED') 'WF-T10 the publication is audited'
     Q ($audit.Content -match 'ruleProfileId' -and $audit.Content -match 'simulated' -and $audit.Content -match 'decidedExceptions') 'WF-T10 the audit records the profile, the simulated mark and what was decided'
 
+    # The two listing routes the scheduling screen cannot open without. They had no coverage at all
+    # when they were added, which is the same gap that let them be missing in the first place: a
+    # verifier asserted the client declared the functions, never that the routes answered. Deleting
+    # either route, or its permission check, left the whole gate green.
+    foreach ($route in @('projects', 'shift-templates')) {
+        $granted = Call 'Get' "$base/portal/scheduling/$route" $headers $null
+        Q ($granted.Status -eq 200) "WF-T14 $route answers a caller holding SCHEDULING/VIEW"
+
+        $anonymous = Call 'Get' "$base/portal/scheduling/$route" $null $null
+        Q ($anonymous.Status -eq 401) "WF-T14 $route refuses an unauthenticated caller"
+    }
+    Q ((Call 'Get' "$base/portal/scheduling/projects" $headers $null).Content -match 'PROJECT-A') 'WF-T14 the project listing carries the seeded project'
+    Q ((Call 'Get' "$base/portal/scheduling/shift-templates" $headers $null).Content -match '"steps"') 'WF-T14 the template listing carries its steps'
+
+    # Permission, not authentication: a signed-in user whose role lost SCHEDULING/VIEW is refused.
+    & $psql -X -w -v ON_ERROR_STOP=1 -c "delete from role_permissions rp using roles r where rp.role_id=r.id and r.code='TH' and rp.module_code='SCHEDULING' and rp.action_code='VIEW'" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'could not revoke SCHEDULING/VIEW from TH' }
+    $thLogin = Call 'Post' "$base/auth/login" $null @{ username='th.sg'; password='Th123456' }
+    if ($thLogin.Status -eq 200) {
+        $thHeaders = @{ Authorization = "Bearer $(($thLogin.Content | ConvertFrom-Json).sessionToken)" }
+        foreach ($route in @('projects', 'shift-templates')) {
+            $denied = Call 'Get' "$base/portal/scheduling/$route" $thHeaders $null
+            Q ($denied.Status -eq 403) "WF-T14 $route refuses a signed-in caller without SCHEDULING/VIEW"
+        }
+    } else {
+        throw "could not sign in as th.sg to test the denial path (HTTP $($thLogin.Status))"
+    }
+
     # The eligibility verifier could never run without an API. It has one now, so it runs here
     # instead of being declared blocked, and its failure is this verifier's failure.
     $eligibility = & powershell -NoProfile -ExecutionPolicy Bypass `
@@ -476,7 +504,7 @@ INSERT INTO schedule_exceptions(schedule_version_id,assignment_id,exception_type
     $hrApprove = Call 'Post' "$base/portal/scheduling/proposals/$hrVersion/approve" $headers @{ expectedVersion=1 }
     Q ($hrApprove.Status -eq 200) 'WF-T21 an approved R06 decision is not a dead end'
 
-    Q ($passed -eq 56) 'numbered workflow assertion count'
+    Q ($passed -eq 64) 'numbered workflow assertion count'
     Write-Output "I9 MVP WORKFLOW PASS $passed"
     exit 0
 }

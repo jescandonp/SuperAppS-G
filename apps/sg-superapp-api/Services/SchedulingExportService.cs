@@ -22,5 +22,18 @@ public sealed class SchedulingExportService : ISchedulingExportService
     // One header feeds both the PDF and the spreadsheet, so the origin appears on either face.
     // A version with no versioned profile says so rather than staying silent, because silence on
     // an exported document reads as an ordinary roster.
-    private static IEnumerable<string> Header(ScheduleExportModel m)=>new[]{$"Cliente: {m.Client}",$"Proyecto: {m.Project}",$"Periodo: {m.Period}",$"Version: {m.VersionNumber}",$"Estado: {m.Status}",$"Generado: {m.GeneratedAt}",$"Responsable: {m.Responsible}",m.Simulated?$"Origen: DATOS SIMULADOS - MVP (perfil {m.RuleProfileId} version {m.RuleProfileVersion})":"Origen: sin perfil de reglas versionado"};
+    // Two independent facts, and the first version of this conflated them: it branched on Simulated
+    // and its false arm asserted something about the profile, so a version carrying a versioned
+    // profile without the simulated mark - a shape the schema permits - printed "sin perfil de
+    // reglas versionado", which is false. Each clause now speaks only for itself.
+    private static string Origin(ScheduleExportModel m)
+    {
+        var origin = m.Simulated ? "DATOS SIMULADOS - MVP" : "origen no marcado como simulado";
+        var profile = m.RuleProfileId > 0
+            ? $"perfil {m.RuleProfileId} version {m.RuleProfileVersion}"
+            : "sin perfil de reglas versionado";
+        return $"Origen: {origin} ({profile})";
+    }
+
+    private static IEnumerable<string> Header(ScheduleExportModel m)=>new[]{$"Cliente: {m.Client}",$"Proyecto: {m.Project}",$"Periodo: {m.Period}",$"Version: {m.VersionNumber}",$"Estado: {m.Status}",$"Generado: {m.GeneratedAt}",$"Responsable: {m.Responsible}",Origin(m)};
 }

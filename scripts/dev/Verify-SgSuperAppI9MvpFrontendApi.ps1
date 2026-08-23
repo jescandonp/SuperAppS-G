@@ -30,6 +30,10 @@ function Text([string]$relativePath) {
 $types = Text 'apps/sg-superapp-web/src/types/portal.ts'
 $api = Text 'apps/sg-superapp-web/src/services/portalApi.ts'
 $hook = Text 'apps/sg-superapp-web/src/hooks/usePortalShell.ts'
+# The scheduling page holds the live rule state. The shell used to carry a copy that nothing
+# consumed, and three assertions below were aimed at it - satisfied by code that never ran
+# while the path that does run went unchecked.
+$page = Text 'apps/sg-superapp-web/src/features/scheduling/SchedulingPage.tsx'
 $endpoints = Text 'apps/sg-superapp-api/Endpoints/PortalEndpoints.cs'
 $endpointsRules = Text 'apps/sg-superapp-api/Endpoints/SchedulingRuleEndpoints.cs'
 
@@ -66,7 +70,7 @@ foreach ($outcome in @('COMPLIANT', 'BLOCKED', 'EXCEPTION_REQUIRED', 'WARNING', 
 # --- nothing is inferred on the client ----------------------------------------------------------
 # canApproveOrPublish is the server's decision. The client may read it; it must never compute it.
 Q ($types -match '(?m)canApproveOrPublish:\s*boolean;') 'FE-T04 the summary carries the server decision'
-Q ($api -notmatch 'canApproveOrPublish\s*=' -and $hook -notmatch 'canApproveOrPublish\s*=') 'FE-T04 the client never assigns its own approval decision'
+Q ($api -notmatch 'canApproveOrPublish\s*=' -and $hook -notmatch 'canApproveOrPublish\s*=' -and $page -notmatch 'canApproveOrPublish') 'FE-T04 the client never assigns or reads its own approval decision'
 Q ($hook -notmatch 'role\s*===\s*"(ADMIN|OPERACIONES|TH)"') 'FE-T04 the shell never infers a permission from a role'
 
 # --- errors, loading and incomplete configuration are typed -------------------------------------
@@ -87,14 +91,16 @@ Q ($helperMatch.Success -and $helpers -notmatch 'throw new Error\(') 'FE-T05 nei
 foreach ($state in @('LOADING', 'READY', 'UNCONFIGURED', 'FAILED')) {
     Q ($types -match "status: `"$state`"") "FE-T06 $state is a declared state, not an absent value"
 }
-Q ($hook -match 'status: "UNCONFIGURED"') 'FE-T06 the shell distinguishes an unconfigured scope from a clean one'
+Q ($page -match 'status: "UNCONFIGURED"') 'FE-T06 the page distinguishes an unconfigured scope from a clean one'
+Q ($page -match 'filter\(\(item\) => item\.status === "ACTIVE"\)') 'FE-T06 only an ACTIVE profile is read as governing'
+Q ($page -match 'active\.length === 1') 'FE-T06 exactly one active profile is required before one is used'
 
 # --- the simulated mark travels with the data it qualifies ---------------------------------------
 # It is what separates an MVP_TEST scenario from a real one. If the client drops it, the UI cannot
 # label the screen and a simulated schedule becomes indistinguishable from an institutional one.
 Q ($types -match '(?s)interface SchedulingRuleProfile \{.*?simulated: boolean;.*?\}') 'FE-T12 the rule profile carries the simulated mark'
 Q ($types -match '(?s)interface PersistedSchedulingRuleBatch \{.*?simulated: boolean;.*?\}') 'FE-T12 the re-evaluation batch carries the simulated mark'
-Q ($hook -match 'ruleProfile') 'FE-T12 the shell exposes the rule profile it loaded'
+Q ($page -match 'ruleProfile') 'FE-T12 the page holds the rule profile it loaded'
 
 # --- each route is modelled with the shape it really returns -------------------------------------
 # Typing a list route as a single object is how UNCONFIGURED became unreachable, and typing a bare
@@ -113,7 +119,7 @@ Q ($types -notmatch 'READY"; batch: SchedulingRuleEvaluationBatch') 'FE-T13 the 
 Q ($api -match 'rule-profiles') 'FE-T07 the client reads rule-profiles'
 Q ($api -match 'rules/evaluate') 'FE-T07 the client can request a re-evaluation'
 Q ($api -match 'rules/evaluations') 'FE-T07 the client reads persisted evaluations'
-Q ($hook -match 'revalidateRules') 'FE-T07 the shell exposes revalidation after an edit'
+Q ($page -match 'reloadProfileFor') 'FE-T07 the page reloads the profile when the scope changes'
 
 # --- existing I9 routes still compile against the same client -----------------------------------
 foreach ($name in @('fetchSchedulingCapabilities', 'generateScheduleProposal', 'updateScheduleAssignment',
@@ -212,8 +218,8 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 
-if ($passed -ne 49) {
-    Write-Output "I9 MVP FRONTEND API FAIL: expected 49 assertions, ran $passed"
+if ($passed -ne 51) {
+    Write-Output "I9 MVP FRONTEND API FAIL: expected 51 assertions, ran $passed"
     exit 1
 }
 

@@ -75,7 +75,14 @@ rechazo del servidor se probó pulsando **Aprobar** con `I9-R03 BLOCKED` en pant
 6. **Sin cobertura propia**: el binding `rule_code`/`scope_hash` de la excepción lo garantiza una
    clave foránea compuesta, no un test; y `exception_allowed` en el predicado de pendientes tampoco
    tiene aserción.
-7. **Los fixtures de `-VerificationSchema` del verificador de replanificación no corren** al
+7. **La interfaz infiere permisos fuera del módulo I9.** Cinco pantallas —certificados, cursos,
+   empleados, importaciones y puestos— deciden qué controles existen con `user.role === "TH"` o
+   `"ADMIN"`. Programación es el único módulo que se lo pregunta al servidor. Es previo a este MVP y
+   fuera de su alcance, pero contradice el principio en el resto del portal.
+8. **El modo demostrativo sigue fabricando el resultado de aprobar y publicar** localmente, con el
+   mismo mensaje de éxito que la ruta real. Cualquier usuario autenticado puede activarlo desde la
+   barra de direcciones.
+9. **Los fixtures de `-VerificationSchema` del verificador de replanificación no corren** al
    plegarse en el arnés, de modo que su aserción de deduplicación de notificaciones queda sin
    ejecutar.
 

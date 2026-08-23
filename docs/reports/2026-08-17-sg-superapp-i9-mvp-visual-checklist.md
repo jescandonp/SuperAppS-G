@@ -16,16 +16,32 @@ perfil `I9-MVP-SIMULATED` versión 2, entorno `MVP_TEST`.
 
 ## Resultado por viewport
 
-| Viewport | Presentación de la matriz | `scrollWidth` vs `clientWidth` | Resultado |
-|---|---|---|---|
-| 320 × 720 | lista accesible (`display: grid`), tabla oculta | 337 / 337 | Sin overflow de página |
-| 768 × 900 | lista accesible, tabla oculta | 753 / 768 | Sin overflow de página |
-| 1024 × 900 | tabla (`display: block`), lista oculta | 1009 / 1009 | Sin overflow **tras corregir** |
-| 1440 × 900 | tabla, lista oculta | 1425 / 1425 | Sin overflow de página |
+Medido con `document.documentElement.scrollWidth` contra `clientWidth` en la pantalla de
+programación, tras iniciar sesión contra la API real. La primera versión de esta tabla registraba
+`320 × 720 → 337 / 337`, que no era una medición a 320 px sino a un ancho de cliente de 337, y
+afirmaba que ningún viewport desbordaba. Una revisión independiente lo falsificó: a 320 px la página
+desbordaba 162 px y a 961 px, 50 px — dentro de la banda que la corrección decía haber cerrado.
+Ambos casos quedaron corregidos y vueltos a medir; la banda 961–1024 se mide ahora explícitamente.
 
-El corte está en 899 px: por debajo se usa la lista, por encima la matriz. El contenido ancho
-—la matriz de turnos— desplaza dentro de su propio contenedor (`.scheduling-table-scroll`), que es
-donde el desplazamiento pertenece; la página no se desplaza en horizontal en ningún viewport.
+| Viewport | `clientWidth` | `scrollWidth` | Overflow de página |
+|---|---|---|---|
+| 320 | 320 | 320 | No |
+| 768 | 753 | 753 | No |
+| 961 | 946 | 946 | No |
+| 1000 | 985 | 985 | No |
+| 1024 | 1009 | 1009 | No |
+| 1440 | 1425 | 1425 | No |
+
+El corte de presentación está en 899 px: por debajo se usa la lista accesible y la tabla queda en
+`display: none`; por encima, al revés. El contenido ancho —la matriz de turnos— desplaza dentro de
+`.scheduling-table-scroll`, que es donde el desplazamiento pertenece.
+
+Dos correcciones intermedias que vale la pena registrar, porque la primera fue peor que el defecto.
+Aplicar `min-width: 0` a todos los hijos de la barra de control aplastó el botón *"Generar
+propuesta"* a 27 px con su texto desbordando: se cambió una barra de desplazamiento por un control
+ilegible. Ahora encogen los campos y no el botón, y por debajo de 1100 px la barra se apila. La
+regla de apilado va al final de la hoja porque la declaración base de `.scheduling-control-bar`
+vive más abajo en el archivo y una regla igual de específica escrita antes simplemente pierde.
 
 ## Resultado por estado
 

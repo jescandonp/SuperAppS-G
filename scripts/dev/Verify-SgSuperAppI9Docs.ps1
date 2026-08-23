@@ -1169,9 +1169,29 @@ if (-not (Test-Path -LiteralPath $closurePath)) {
             $failures.Add("MVP closure report no longer $($required.Label)")
         }
     }
-    # The gate row for the user's authorisation may not be ticked by a document.
-    if ($closure -match '(?m)^\|\s*El usuario autoriza expl(i|í)citamente el cierre\s*\|\s*S(i|í)') {
-        $failures.Add('MVP closure report marks the user authorisation as granted; only the user can do that')
+    # The gate row for the user's authorisation may not be ticked by a document. The first version
+    # of this looked for 'Sí' straight after the pipe, which the table's own house style defeats -
+    # every other verdict in it is bolded, so '**Sí**' sailed through. It now requires the value to
+    # be Pendiente, with or without emphasis, which no edit can satisfy while claiming otherwise.
+    $authorisationRow = [regex]::Match($closure, '(?m)^\|\s*El usuario autoriza expl(i|í)citamente el cierre\s*\|([^|]*)\|')
+    if (-not $authorisationRow.Success) {
+        $failures.Add('MVP closure report no longer carries the user authorisation row')
+    } elseif ($authorisationRow.Groups[2].Value -notmatch '^\s*\*{0,2}Pendiente\*{0,2}\s*$') {
+        $failures.Add('MVP closure report does not leave the user authorisation Pendiente; only the user can grant it')
+    }
+
+    # Keeping the heading while emptying the section passed too, so the items are counted. Seven is
+    # what the report carried when this was written; fewer means points were removed rather than
+    # resolved, and resolving one is a change to the report AND to this number, deliberately.
+    $openSection = [regex]::Match($closure, '(?s)## 4\. Puntos abiertos.*?(?=\n## )')
+    $openItems = if ($openSection.Success) { ([regex]::Matches($openSection.Value, '(?m)^\d+\.\s')).Count } else { 0 }
+    if ($openItems -lt 7) {
+        $failures.Add("MVP closure report lists $openItems open points; it must still carry the seven it opened with")
+    }
+
+    # A document may not declare the closure it exists to withhold.
+    if ($closure -match '(?i)(el MVP queda cerrado|MVP cerrado y autorizado|autorizaci(o|ó)n del usuario fue otorgada)') {
+        $failures.Add('MVP closure report declares the MVP closed; that is the user decision, not the document')
     }
 }
 

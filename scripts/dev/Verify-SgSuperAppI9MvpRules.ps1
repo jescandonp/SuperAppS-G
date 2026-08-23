@@ -662,7 +662,12 @@ Assert-FileContains 'Frontend rule types' 'apps/sg-superapp-web/src/types/portal
 Assert-FileContains 'Frontend API' 'apps/sg-superapp-web/src/services/portalApi.ts' @(
     (Pattern 'rule-profiles' '(?i)rule-profiles'), (Pattern 'rules/evaluate' '(?i)rules/evaluate')
 )
-Assert-FileContains 'Frontend rule state' 'apps/sg-superapp-web/src/hooks/usePortalShell.ts' @(
+# The plan named usePortalShell for this state, and it was put there - but nothing consumed it.
+# App.tsx destructures eight members and none are these, while SchedulingPage independently holds
+# the state that actually drives the screen. An independent review showed three assertions were
+# being satisfied by that inert copy while the live path went unchecked, so the dead copy was
+# removed and this assertion now points at the file that runs.
+Assert-FileContains 'Frontend rule state' 'apps/sg-superapp-web/src/features/scheduling/SchedulingPage.tsx' @(
     (Pattern 'ruleProfile' '(?i)ruleProfile'), (Pattern 'rule results' '(?i)rule(Evaluation|Summary|Results)'),
     (Pattern 'revalidation' '(?i)(revalid|evaluateRules|ruleEvaluation)')
 )
@@ -688,12 +693,12 @@ $focused = @(
     @{ R='MVP generation verifier'; P='scripts/dev/Verify-SgSuperAppI9MvpGeneration.ps1'; Pass='I9 MVP GENERATION PASS 13' },
     # Stands the API up against its own schema, so it also carries the eligibility, replanning and
     # pre-MVP workflow verifiers, none of which can run without one.
-    @{ R='MVP workflow verifier'; P='scripts/dev/Verify-SgSuperAppI9MvpWorkflow.ps1'; Pass='I9 MVP WORKFLOW PASS 57' },
+    @{ R='MVP workflow verifier'; P='scripts/dev/Verify-SgSuperAppI9MvpWorkflow.ps1'; Pass='I9 MVP WORKFLOW PASS 65' },
     # Type-checks the client against the API vocabulary, including a probe that must fail to compile.
-    @{ R='MVP frontend API verifier'; P='scripts/dev/Verify-SgSuperAppI9MvpFrontendApi.ps1'; Pass='I9 MVP FRONTEND API PASS 49' },
-    @{ R='MVP UI verifier'; P='scripts/dev/Verify-SgSuperAppI9MvpUi.ps1'; Pass='I9 MVP UI PASS 52' },
+    @{ R='MVP frontend API verifier'; P='scripts/dev/Verify-SgSuperAppI9MvpFrontendApi.ps1'; Pass='I9 MVP FRONTEND API PASS 51' },
+    @{ R='MVP UI verifier'; P='scripts/dev/Verify-SgSuperAppI9MvpUi.ps1'; Pass='I9 MVP UI PASS 60' },
     # The only runtime coverage of POST /rules/evaluate: every other fixture is seeded with psql.
-    @{ R='MVP integration suite'; P='scripts/dev/Verify-SgSuperAppI9MvpIntegration.ps1'; Pass='I9 MVP INTEGRATION PASS 34' }
+    @{ R='MVP integration suite'; P='scripts/dev/Verify-SgSuperAppI9MvpIntegration.ps1'; Pass='I9 MVP INTEGRATION PASS 39' }
 )
 foreach ($verifier in $focused) { Invoke-FocusedVerifier $verifier.R $verifier.P $verifier.Pass }
 
