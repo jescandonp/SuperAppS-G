@@ -1,5 +1,6 @@
 using Npgsql;
 using NpgsqlTypes;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Sg.SuperApp.Api.Configuration;
@@ -49,6 +50,32 @@ public sealed class PostgresPortalRepository
                 calculatedAt);
         }
     }
+
+    private sealed record TrainingAlertCandidate(
+        long RecordId,
+        long EmployeeId,
+        string FullName,
+        string IdentificationNumber,
+        string RequirementTypeName,
+        string Category,
+        DateOnly ExpiresAt,
+        string ComplianceStatus,
+        int DaysUntilExpiry);
+
+    private sealed record ImportAlertCandidate(
+        long BatchId,
+        string FileName,
+        int TotalRecords,
+        int IncompleteRecords,
+        int DuplicateRecords,
+        int InvalidRecords);
+
+    private sealed record CertificateAlertCandidate(
+        long CertificateId,
+        string CertificateNumber,
+        string Status,
+        string CertificateType,
+        string Purpose);
 
     private static readonly IReadOnlyDictionary<string, (string Label, string Description, string Status)> ModuleCatalog =
         new Dictionary<string, (string Label, string Description, string Status)>(StringComparer.OrdinalIgnoreCase)
@@ -275,10 +302,249 @@ public sealed class PostgresPortalRepository
         return modules;
     }
 
+    public async Task<DashboardResponse> GetDashboardAsync(UserProfileResponse user, CancellationToken cancellationToken = default)
+    {
+        var generatedAt = DateTimeOffset.UtcNow;
+        var role = user.Role.ToUpperInvariant();
+        var widgets = new List<DashboardWidgetResponse>();
+
+        var activeUsers = await CountScalarAsync("select count(*) from app_users where is_active = true;", cancellationToken);
+        var importsWithErrors = await CountScalarAsync("select count(*) from import_batches where status = 'CON_ERRORES' or incomplete_records > 0 or duplicate_records > 0 or invalid_records > 0;", cancellationToken);
+        var generatedCertificates = await CountScalarAsync("select count(*) from labor_certificates where status in ('GENERADA', 'APROBADA');", cancellationToken);
+        var criticalTraining = await CountScalarAsync("select count(*) from employee_training_records where status = 'ACTIVO' and expires_at <= current_date + interval '15 days';", cancellationToken);
+        var expiredTraining = await CountScalarAsync("select count(*) from employee_training_records where status = 'ACTIVO' and expires_at < current_date;", cancellationToken);
+        var currentAssignments = await CountScalarAsync("select count(*) from employee_position_assignments where status = 'VIGENTE';", cancellationToken);
+        var unreadNotifications = await CountScalarAsync(
+            @"select count(*)
+              from notification_items
+              where status = 'UNREAD'
+                and ((target_type = 'USER' and target_key = @username)
+                     or (target_type = 'ROLE' and target_key = @role));",
+            cancellationToken,
+            command =>
+            {
+                command.Parameters.AddWithValue("username", user.Username);
+                command.Parameters.AddWithValue("role", role);
+            });
+
+        widgets.Add(new DashboardWidgetResponse(
+            "notifications-unread",
+            "Notificaciones sin leer",
+            "SYSTEM",
+            unreadNotifications.ToString(CultureInfo.InvariantCulture),
+            "Bandeja personal y de rol",
+            unreadNotifications > 0 ? "WARNING" : "SUCCESS",
+            "/portal/notificaciones"));
+
+        if (role is "ADMIN")
+        {
+            widgets.Add(new DashboardWidgetResponse(
+                "platform-users-active",
+                "Usuarios activos",
+                "ADMIN",
+                activeUsers.ToString(CultureInfo.InvariantCulture),
+                "Salud de acceso al piloto",
+                "INFO",
+                "/portal/configuracion"));
+            widgets.Add(new DashboardWidgetResponse(
+                "platform-imports-errors",
+                "Cargas con errores",
+                "ADMIN",
+                importsWithErrors.ToString(CultureInfo.InvariantCulture),
+                "Calidad de datos iniciales",
+                importsWithErrors > 0 ? "WARNING" : "SUCCESS",
+                "/portal/imports"));
+        }
+
+        if (role is "TH" or "ADMIN")
+        {
+            widgets.Add(new DashboardWidgetResponse(
+                "certificates-generated",
+                "Certificaciones generadas",
+                role == "TH" ? "TH" : "ADMIN",
+                generatedCertificates.ToString(CultureInfo.InvariantCulture),
+                "Actividad documental del piloto",
+                "INFO",
+                "/portal/certificates"));
+            widgets.Add(new DashboardWidgetResponse(
+                "training-critical",
+                "Cursos criticos o vencidos",
+                role == "TH" ? "TH" : "ADMIN",
+                criticalTraining.ToString(CultureInfo.InvariantCulture),
+                "Requisitos con accion prioritaria",
+                criticalTraining > 0 ? "CRITICAL" : "SUCCESS",
+                "/portal/cursos"));
+            widgets.Add(new DashboardWidgetResponse(
+                "imports-data-quality",
+                "Cargas con hallazgos",
+                role == "TH" ? "TH" : "ADMIN",
+                importsWithErrors.ToString(CultureInfo.InvariantCulture),
+                "Incompletos, duplicados o erroneos",
+                importsWithErrors > 0 ? "WARNING" : "SUCCESS",
+                "/portal/imports"));
+        }
+
+        if (role is "GERENCIA")
+        {
+            widgets.Add(new DashboardWidgetResponse(
+                "executive-pilot-value",
+                "Capacidades del piloto",
+                "EXECUTIVE",
+                "I1-I6",
+                "Base lista para cierre ejecutivo",
+                "SUCCESS",
+                null));
+            widgets.Add(new DashboardWidgetResponse(
+                "certificates-generated",
+                "Certificaciones generadas",
+                "EXECUTIVE",
+                generatedCertificates.ToString(CultureInfo.InvariantCulture),
+                "Quick win TH trazable",
+                "INFO",
+                "/portal/certificates"));
+        }
+
+        if (role is "OPERACIONES")
+        {
+            widgets.Add(new DashboardWidgetResponse(
+                "operations-service-enablement",
+                "Guardas no habilitados",
+                "OPERATIONS",
+                expiredTraining.ToString(CultureInfo.InvariantCulture),
+                "Indicador visible sin bloqueo automatico",
+                expiredTraining > 0 ? "CRITICAL" : "SUCCESS",
+                "/portal/cursos"));
+            widgets.Add(new DashboardWidgetResponse(
+                "operations-current-assignments",
+                "Asignaciones vigentes",
+                "OPERATIONS",
+                currentAssignments.ToString(CultureInfo.InvariantCulture),
+                "Puestos de servicio activos",
+                "INFO",
+                "/portal/positions"));
+        }
+
+        return new DashboardResponse(role, generatedAt, widgets);
+    }
+
+    public async Task<IReadOnlyList<AuditEventResponse>> GetAuditEventsAsync(
+        UserProfileResponse user,
+        string? module,
+        string? actor,
+        DateTimeOffset? from,
+        DateTimeOffset? to,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = @"
+            with audit_events as (
+                select
+                    al.id,
+                    al.created_at,
+                    coalesce(al.actor_username, 'system') as actor_username,
+                    r.code as actor_role,
+                    al.event_type,
+                    al.entity_type,
+                    al.entity_id,
+                    coalesce(al.detail, '{}'::jsonb) as detail,
+                    coalesce(al.detail ->> 'summary', concat(al.event_type, ' ', al.entity_type)) as summary,
+                    case
+                        when al.entity_type in ('EMPLOYEE_TRAINING_RECORD', 'TRAINING_TYPE')
+                            or al.event_type like 'TRAINING_%' then 'TRAINING'
+                        when al.entity_type in ('LABOR_CERTIFICATE', 'CERTIFICATE_SIGNER')
+                            or al.event_type like '%CERTIFICATE%' then 'CERTIFICATES'
+                        when al.entity_type in ('IMPORT_BATCH', 'IMPORT_ROW')
+                            or al.event_type like 'IMPORT_%' then 'IMPORTS'
+                        when al.entity_type in ('POSITION_ASSIGNMENT', 'SERVICE_POSITION')
+                            or al.event_type like '%POSITION%' then 'POSITIONS'
+                        when al.entity_type in ('APP_USER', 'USER', 'ROLE', 'PERMISSION')
+                            or al.event_type like 'USER_%' then 'SYSTEM'
+                        when al.entity_type in ('NOTIFICATION', 'NOTIFICATION_ITEM')
+                            or al.event_type like 'NOTIFICATION_%' then 'NOTIFICATIONS'
+                        else 'SYSTEM'
+                    end as module
+                from audit_log al
+                left join app_users u on u.username = al.actor_username
+                left join user_roles ur on ur.user_id = u.id
+                left join roles r on r.id = ur.role_id
+                where (@actor is null or lower(al.actor_username) = lower(@actor))
+                    and (@fromDate is null or al.created_at >= @fromDate)
+                    and (@toDate is null or al.created_at < @toDate)
+            )
+            select id, created_at, actor_username, actor_role, module, event_type, entity_type, entity_id, summary, detail::text
+            from audit_events
+            where (@module is null or module = @module)
+                and (
+                    @role = 'ADMIN'
+                    or (@role = 'TH' and module in ('TRAINING', 'CERTIFICATES', 'IMPORTS', 'NOTIFICATIONS'))
+                    or (@role = 'OPERACIONES' and module in ('POSITIONS', 'TRAINING', 'NOTIFICATIONS'))
+                    or (@role = 'GERENCIA' and module in ('TRAINING', 'CERTIFICATES', 'IMPORTS', 'POSITIONS', 'NOTIFICATIONS'))
+                )
+            order by created_at desc, id desc
+            limit 200;";
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.Add("module", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(module) ? DBNull.Value : module.Trim().ToUpperInvariant();
+        command.Parameters.Add("actor", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(actor) ? DBNull.Value : actor.Trim();
+        command.Parameters.Add("fromDate", NpgsqlDbType.TimestampTz).Value = from.HasValue ? from.Value.UtcDateTime : DBNull.Value;
+        command.Parameters.Add("toDate", NpgsqlDbType.TimestampTz).Value = to.HasValue ? to.Value.UtcDateTime : DBNull.Value;
+        command.Parameters.Add("role", NpgsqlDbType.Text).Value = user.Role.ToUpperInvariant();
+
+        var events = new List<AuditEventResponse>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var detail = JsonSerializer.Deserialize<Dictionary<string, object?>>(reader.GetString(9))
+                ?? new Dictionary<string, object?>();
+
+            events.Add(new AuditEventResponse(
+                reader.GetInt64(0),
+                new DateTimeOffset(reader.GetFieldValue<DateTime>(1)),
+                reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.GetString(4),
+                reader.GetString(5),
+                reader.GetString(6),
+                reader.IsDBNull(7) ? null : reader.GetString(7),
+                reader.GetString(8),
+                detail));
+        }
+
+        return events;
+    }
+
+    private async Task<long> CountScalarAsync(string sql, CancellationToken cancellationToken, Action<NpgsqlCommand>? configure = null)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = new NpgsqlCommand(sql, connection);
+        configure?.Invoke(command);
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        return Convert.ToInt64(result, CultureInfo.InvariantCulture);
+    }
+
     public async Task<IReadOnlyList<NotificationResponse>> GetNotificationsAsync(string username, CancellationToken cancellationToken = default)
     {
         const string sql = @"
-            select id, target_type, target_key, title, body, status, created_at
+            select
+                id,
+                target_type,
+                target_key,
+                title,
+                body,
+                status,
+                source_module,
+                severity,
+                source_type,
+                source_id,
+                action_url,
+                created_at,
+                read_at,
+                archived_at,
+                managed_at,
+                managed_by
             from notification_items
             where lower(target_key) = lower(@username)
                or upper(target_key) = 'ADMIN'
@@ -293,17 +559,519 @@ public sealed class PostgresPortalRepository
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            items.Add(new NotificationResponse(
-                reader.GetInt64(reader.GetOrdinal("id")),
-                reader.GetString(reader.GetOrdinal("target_type")),
-                reader.GetString(reader.GetOrdinal("target_key")),
-                reader.GetString(reader.GetOrdinal("title")),
-                reader.GetString(reader.GetOrdinal("body")),
-                reader.GetString(reader.GetOrdinal("status")),
-                new DateTimeOffset(reader.GetFieldValue<DateTime>(reader.GetOrdinal("created_at")))));
+            items.Add(ReadNotification(reader));
         }
 
         return items;
+    }
+
+    public async Task<IReadOnlyList<NotificationResponse>> GetNotificationsAsync(
+        string username,
+        string roleCode,
+        string? status,
+        string? severity,
+        string? sourceModule,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = @"
+            select
+                id,
+                target_type,
+                target_key,
+                title,
+                body,
+                status,
+                source_module,
+                severity,
+                source_type,
+                source_id,
+                action_url,
+                created_at,
+                read_at,
+                archived_at,
+                managed_at,
+                managed_by
+            from notification_items
+            where (
+                    (target_type = 'USER' and lower(target_key) = lower(@username))
+                 or (target_type = 'ROLE' and upper(target_key) = upper(@roleCode))
+            )
+              and (@status is null or status = @status)
+              and (@severity is null or severity = @severity)
+              and (@sourceModule is null or source_module = @sourceModule)
+            order by created_at desc, id desc;";
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("username", username);
+        command.Parameters.AddWithValue("roleCode", roleCode);
+        AddNullableTextParameter(command, "status", status);
+        AddNullableTextParameter(command, "severity", severity);
+        AddNullableTextParameter(command, "sourceModule", sourceModule);
+
+        var items = new List<NotificationResponse>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            items.Add(ReadNotification(reader));
+        }
+
+        return items;
+    }
+
+    public async Task<int> GetUnreadNotificationCountAsync(string username, string roleCode, CancellationToken cancellationToken = default)
+    {
+        const string sql = @"
+            select count(*)::int
+            from notification_items
+            where status = 'UNREAD'
+              and (
+                    (target_type = 'USER' and lower(target_key) = lower(@username))
+                 or (target_type = 'ROLE' and upper(target_key) = upper(@roleCode))
+              );";
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("username", username);
+        command.Parameters.AddWithValue("roleCode", roleCode);
+        return (int)(await command.ExecuteScalarAsync(cancellationToken) ?? 0);
+    }
+
+    public async Task<IReadOnlyList<NotificationResponse>> ExportNotificationsAsync(
+        string username,
+        string roleCode,
+        string? status,
+        string? severity,
+        string? sourceModule,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        var notifications = await GetVisibleNotificationsAsync(connection, transaction, username, roleCode, status, severity, sourceModule, cancellationToken);
+        foreach (var notification in notifications)
+        {
+            var detail = JsonSerializer.Serialize(new
+            {
+                action = "export_notification_summary",
+                status,
+                severity,
+                sourceModule
+            });
+            await InsertNotificationEventAsync(connection, transaction, notification.Id, username, "EXPORTED", detail, cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return notifications;
+    }
+
+    public async Task<NotificationEmailSummaryResponse> AttemptNotificationEmailSummaryAsync(
+        string username,
+        string roleCode,
+        string? status,
+        string? severity,
+        string? sourceModule,
+        string? recipient,
+        bool smtpAvailable,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        var notifications = await GetVisibleNotificationsAsync(connection, transaction, username, roleCode, status, severity, sourceModule, cancellationToken);
+        var finalEventType = smtpAvailable ? "EMAIL_SENT" : "EMAIL_FAILED";
+        foreach (var notification in notifications)
+        {
+            var detail = JsonSerializer.Serialize(new
+            {
+                action = "email_notification_summary",
+                recipient = string.IsNullOrWhiteSpace(recipient) ? "talento.humano" : recipient.Trim(),
+                status,
+                severity,
+                sourceModule,
+                smtpAvailable
+            });
+            await InsertNotificationEventAsync(connection, transaction, notification.Id, username, "EMAIL_ATTEMPTED", detail, cancellationToken);
+            await InsertNotificationEventAsync(connection, transaction, notification.Id, username, finalEventType, detail, cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return new NotificationEmailSummaryResponse(
+            EmailAttempted: true,
+            SmtpAvailable: smtpAvailable,
+            FallbackAvailable: true,
+            MatchedNotifications: notifications.Count,
+            Status: smtpAvailable ? "SENT" : "FALLBACK_AVAILABLE",
+            Message: smtpAvailable
+                ? "Resumen de notificaciones enviado."
+                : "SMTP no disponible; use la exportacion fallback.");
+    }
+
+    public Task<NotificationResponse?> MarkNotificationAsReadAsync(long notificationId, string username, string roleCode, CancellationToken cancellationToken = default)
+    {
+        const string updateSql = @"
+            update notification_items
+            set status = 'READ',
+                read_at = coalesce(read_at, NOW())
+            where id = @notificationId
+              and (
+                    (target_type = 'USER' and lower(target_key) = lower(@username))
+                 or (target_type = 'ROLE' and upper(target_key) = upper(@roleCode))
+              )
+            returning
+                id,
+                target_type,
+                target_key,
+                title,
+                body,
+                status,
+                source_module,
+                severity,
+                source_type,
+                source_id,
+                action_url,
+                created_at,
+                read_at,
+                archived_at,
+                managed_at,
+                managed_by;";
+
+        return UpdateNotificationWithEventAsync(
+            updateSql,
+            notificationId,
+            username,
+            roleCode,
+            "READ",
+            @"{""action"":""read""}",
+            cancellationToken);
+    }
+
+    public Task<NotificationResponse?> ArchiveNotificationAsync(long notificationId, string username, string roleCode, CancellationToken cancellationToken = default)
+    {
+        const string updateSql = @"
+            update notification_items
+            set status = 'ARCHIVED',
+                archived_at = coalesce(archived_at, NOW()),
+                managed_at = coalesce(managed_at, NOW()),
+                managed_by = @username
+            where id = @notificationId
+              and (
+                    (target_type = 'USER' and lower(target_key) = lower(@username))
+                 or (target_type = 'ROLE' and upper(target_key) = upper(@roleCode))
+              )
+            returning
+                id,
+                target_type,
+                target_key,
+                title,
+                body,
+                status,
+                source_module,
+                severity,
+                source_type,
+                source_id,
+                action_url,
+                created_at,
+                read_at,
+                archived_at,
+                managed_at,
+                managed_by;";
+
+        return UpdateNotificationWithEventAsync(
+            updateSql,
+            notificationId,
+            username,
+            roleCode,
+            "ARCHIVED",
+            @"{""action"":""archive""}",
+            cancellationToken);
+    }
+
+    public async Task<TrainingAlertGenerationResponse> GenerateTrainingExpiryAlertsAsync(string actorUsername, CancellationToken cancellationToken = default)
+    {
+        const string candidatesSql = @"
+            select
+                etr.id as record_id,
+                e.id as employee_id,
+                e.full_name,
+                e.identification_number,
+                trt.name as requirement_type_name,
+                trt.category,
+                etr.expires_at
+            from employee_training_records etr
+            join employees e on e.id = etr.employee_id
+            join training_requirement_types trt on trt.id = etr.requirement_type_id
+            where etr.status = 'ACTIVO'
+              and e.employment_status = 'ACTIVO'
+              and trt.status = 'ACTIVO'
+            order by etr.expires_at, etr.id;";
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var candidatesCommand = new NpgsqlCommand(candidatesSql, connection, transaction);
+
+        var candidates = new List<TrainingAlertCandidate>();
+        await using (var reader = await candidatesCommand.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var expiresAt = DateOnly.FromDateTime(reader.GetDateTime(reader.GetOrdinal("expires_at")));
+                var compliance = TrainingComplianceStatusCalculator.Calculate(expiresAt, DateOnly.FromDateTime(DateTime.Today));
+                candidates.Add(new TrainingAlertCandidate(
+                    reader.GetInt64(reader.GetOrdinal("record_id")),
+                    reader.GetInt64(reader.GetOrdinal("employee_id")),
+                    reader.GetString(reader.GetOrdinal("full_name")),
+                    reader.GetString(reader.GetOrdinal("identification_number")),
+                    reader.GetString(reader.GetOrdinal("requirement_type_name")),
+                    reader.GetString(reader.GetOrdinal("category")),
+                    expiresAt,
+                    compliance.Status,
+                    compliance.DaysUntilExpiry));
+            }
+        }
+
+        var generatedCount = 0;
+        var activeAlertsCount = 0;
+        var skippedCurrentCount = 0;
+        foreach (var candidate in candidates)
+        {
+            if (candidate.ComplianceStatus == "AL_DIA")
+            {
+                skippedCurrentCount++;
+                continue;
+            }
+
+            var severity = GetTrainingAlertSeverity(candidate.ComplianceStatus);
+            var dedupeKey = $"TRAINING_EXPIRY:{candidate.RecordId}:{candidate.ComplianceStatus}:ROLE:TH";
+            var title = $"Vencimiento de {candidate.Category.ToLowerInvariant()} - {candidate.ComplianceStatus}";
+            var body = BuildTrainingAlertBody(candidate);
+            var actionUrl = $"/portal/courses?employeeId={candidate.EmployeeId}";
+
+            var notificationId = await FindActiveNotificationByDedupeKeyAsync(connection, transaction, dedupeKey, cancellationToken);
+            if (notificationId.HasValue)
+            {
+                await UpdateGeneratedTrainingNotificationAsync(
+                    connection,
+                    transaction,
+                    notificationId.Value,
+                    title,
+                    body,
+                    severity,
+                    actionUrl,
+                    cancellationToken);
+                activeAlertsCount++;
+                continue;
+            }
+
+            notificationId = await InsertGeneratedTrainingNotificationAsync(
+                connection,
+                transaction,
+                dedupeKey,
+                title,
+                body,
+                severity,
+                candidate.RecordId,
+                actionUrl,
+                cancellationToken);
+
+            var detail = JsonSerializer.Serialize(new
+            {
+                action = "generate_training_expiry_alert",
+                recordId = candidate.RecordId,
+                status = candidate.ComplianceStatus,
+                severity,
+                daysUntilExpiry = candidate.DaysUntilExpiry
+            });
+            await InsertNotificationEventAsync(connection, transaction, notificationId.Value, actorUsername, "CREATED", detail, cancellationToken);
+            generatedCount++;
+            activeAlertsCount++;
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return new TrainingAlertGenerationResponse(generatedCount, activeAlertsCount, skippedCurrentCount);
+    }
+
+    public async Task<TrainingAlertGenerationResponse> GenerateImportErrorAlertsAsync(string actorUsername, CancellationToken cancellationToken = default)
+    {
+        const string candidatesSql = @"
+            select
+                id,
+                file_name,
+                total_records,
+                incomplete_records,
+                duplicate_records,
+                invalid_records
+            from import_batches
+            where status = 'CON_ERRORES'
+            order by created_at desc, id;";
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var candidatesCommand = new NpgsqlCommand(candidatesSql, connection, transaction);
+
+        var candidates = new List<ImportAlertCandidate>();
+        await using (var reader = await candidatesCommand.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                candidates.Add(new ImportAlertCandidate(
+                    reader.GetInt64(reader.GetOrdinal("id")),
+                    reader.GetString(reader.GetOrdinal("file_name")),
+                    reader.GetInt32(reader.GetOrdinal("total_records")),
+                    reader.GetInt32(reader.GetOrdinal("incomplete_records")),
+                    reader.GetInt32(reader.GetOrdinal("duplicate_records")),
+                    reader.GetInt32(reader.GetOrdinal("invalid_records"))));
+            }
+        }
+
+        var generatedCount = 0;
+        var activeAlertsCount = 0;
+        foreach (var candidate in candidates)
+        {
+            var dedupeKey = $"IMPORT_ALERT:{candidate.BatchId}:ROLE:TH";
+            var title = $"Importacion con errores - {candidate.FileName}";
+            var body = $"Lote {candidate.FileName} contiene errores INCOMPLETO: {candidate.IncompleteRecords}, DUPLICADO: {candidate.DuplicateRecords}, ERRONEO: {candidate.InvalidRecords}. Total registros: {candidate.TotalRecords}.";
+            var actionUrl = $"/portal/imports/{candidate.BatchId}/errors";
+
+            var notificationId = await FindActiveNotificationByDedupeKeyAsync(connection, transaction, dedupeKey, cancellationToken);
+            if (notificationId.HasValue)
+            {
+                await UpdateGeneratedTrainingNotificationAsync(
+                    connection,
+                    transaction,
+                    notificationId.Value,
+                    title,
+                    body,
+                    "CRITICAL",
+                    actionUrl,
+                    cancellationToken);
+                activeAlertsCount++;
+                continue;
+            }
+
+            notificationId = await InsertGeneratedNotificationAsync(
+                connection,
+                transaction,
+                "ROLE",
+                "TH",
+                dedupeKey,
+                title,
+                body,
+                "CRITICAL",
+                "IMPORTS",
+                "IMPORT_BATCH",
+                candidate.BatchId.ToString(),
+                actionUrl,
+                cancellationToken);
+
+            var detail = JsonSerializer.Serialize(new
+            {
+                action = "generate_import_error_alert",
+                batchId = candidate.BatchId,
+                incompleteRecords = candidate.IncompleteRecords,
+                duplicateRecords = candidate.DuplicateRecords,
+                invalidRecords = candidate.InvalidRecords
+            });
+            await InsertNotificationEventAsync(connection, transaction, notificationId.Value, actorUsername, "CREATED", detail, cancellationToken);
+            generatedCount++;
+            activeAlertsCount++;
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return new TrainingAlertGenerationResponse(generatedCount, activeAlertsCount, 0);
+    }
+
+    public async Task<TrainingAlertGenerationResponse> GenerateCertificateAlertsAsync(string actorUsername, CancellationToken cancellationToken = default)
+    {
+        const string candidatesSql = @"
+            select
+                id,
+                certificate_number,
+                status,
+                certificate_type,
+                purpose
+            from labor_certificates
+            where status in ('GENERADA', 'APROBADA', 'ANULADA')
+            order by updated_at desc, id;";
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var candidatesCommand = new NpgsqlCommand(candidatesSql, connection, transaction);
+
+        var candidates = new List<CertificateAlertCandidate>();
+        await using (var reader = await candidatesCommand.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                candidates.Add(new CertificateAlertCandidate(
+                    reader.GetInt64(reader.GetOrdinal("id")),
+                    reader.GetString(reader.GetOrdinal("certificate_number")),
+                    reader.GetString(reader.GetOrdinal("status")),
+                    reader.GetString(reader.GetOrdinal("certificate_type")),
+                    reader.GetString(reader.GetOrdinal("purpose"))));
+            }
+        }
+
+        var generatedCount = 0;
+        var activeAlertsCount = 0;
+        foreach (var candidate in candidates)
+        {
+            var dedupeKey = $"CERTIFICATE_ALERT:{candidate.CertificateId}:{candidate.Status}:ROLE:TH";
+            var title = $"Certificado laboral {candidate.Status.ToLowerInvariant()} - {candidate.CertificateNumber}";
+            var body = $"Certificado {candidate.CertificateNumber} para {candidate.Purpose} esta en estado {candidate.Status}. Tipo: {candidate.CertificateType}.";
+            var actionUrl = $"/portal/certificates/{candidate.CertificateId}";
+
+            var notificationId = await FindActiveNotificationByDedupeKeyAsync(connection, transaction, dedupeKey, cancellationToken);
+            if (notificationId.HasValue)
+            {
+                await UpdateGeneratedTrainingNotificationAsync(
+                    connection,
+                    transaction,
+                    notificationId.Value,
+                    title,
+                    body,
+                    "INFO",
+                    actionUrl,
+                    cancellationToken);
+                activeAlertsCount++;
+                continue;
+            }
+
+            notificationId = await InsertGeneratedNotificationAsync(
+                connection,
+                transaction,
+                "ROLE",
+                "TH",
+                dedupeKey,
+                title,
+                body,
+                "INFO",
+                "CERTIFICATES",
+                "LABOR_CERTIFICATE",
+                candidate.CertificateId.ToString(),
+                actionUrl,
+                cancellationToken);
+
+            var detail = JsonSerializer.Serialize(new
+            {
+                action = "generate_certificate_alert",
+                certificateId = candidate.CertificateId,
+                status = candidate.Status
+            });
+            await InsertNotificationEventAsync(connection, transaction, notificationId.Value, actorUsername, "CREATED", detail, cancellationToken);
+            generatedCount++;
+            activeAlertsCount++;
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return new TrainingAlertGenerationResponse(generatedCount, activeAlertsCount, 0);
     }
 
     public async Task<IReadOnlyList<EmployeeSummaryResponse>> GetEmployeesAsync(string? search, string? status, string? jobTitle, string? completeness, bool includeSalary, CancellationToken cancellationToken = default)
@@ -2928,6 +3696,134 @@ public sealed class PostgresPortalRepository
             new DateTimeOffset(reader.GetFieldValue<DateTime>(reader.GetOrdinal("updated_at"))));
     }
 
+    private async Task<NotificationResponse?> UpdateNotificationWithEventAsync(
+        string updateSql,
+        long notificationId,
+        string username,
+        string roleCode,
+        string eventType,
+        string detailJson,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var updateCommand = new NpgsqlCommand(updateSql, connection, transaction);
+        updateCommand.Parameters.AddWithValue("notificationId", notificationId);
+        updateCommand.Parameters.AddWithValue("username", username);
+        updateCommand.Parameters.AddWithValue("roleCode", roleCode);
+
+        NotificationResponse? notification = null;
+        await using (var reader = await updateCommand.ExecuteReaderAsync(cancellationToken))
+        {
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                notification = ReadNotification(reader);
+            }
+        }
+
+        if (notification is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
+        const string eventSql = @"
+            insert into notification_events (notification_id, actor_username, event_type, detail)
+            values (@notificationId, @username, @eventType, @detail::jsonb);";
+
+        await using var eventCommand = new NpgsqlCommand(eventSql, connection, transaction);
+        eventCommand.Parameters.AddWithValue("notificationId", notificationId);
+        eventCommand.Parameters.AddWithValue("username", username);
+        eventCommand.Parameters.AddWithValue("eventType", eventType);
+        eventCommand.Parameters.Add("detail", NpgsqlDbType.Jsonb).Value = detailJson;
+        await eventCommand.ExecuteNonQueryAsync(cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+        return notification;
+    }
+
+    private static async Task<IReadOnlyList<NotificationResponse>> GetVisibleNotificationsAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string username,
+        string roleCode,
+        string? status,
+        string? severity,
+        string? sourceModule,
+        CancellationToken cancellationToken)
+    {
+        const string sql = @"
+            select
+                id,
+                target_type,
+                target_key,
+                title,
+                body,
+                status,
+                source_module,
+                severity,
+                source_type,
+                source_id,
+                action_url,
+                created_at,
+                read_at,
+                archived_at,
+                managed_at,
+                managed_by
+            from notification_items
+            where (
+                    (target_type = 'USER' and lower(target_key) = lower(@username))
+                 or (target_type = 'ROLE' and upper(target_key) = upper(@roleCode))
+              )
+              and (@status is null or status = @status)
+              and (@severity is null or severity = @severity)
+              and (@sourceModule is null or source_module = @sourceModule)
+            order by created_at desc, id desc;";
+
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("username", username);
+        command.Parameters.AddWithValue("roleCode", roleCode);
+        AddNullableTextParameter(command, "status", status);
+        AddNullableTextParameter(command, "severity", severity);
+        AddNullableTextParameter(command, "sourceModule", sourceModule);
+
+        var items = new List<NotificationResponse>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            items.Add(ReadNotification(reader));
+        }
+
+        return items;
+    }
+
+    private static NotificationResponse ReadNotification(NpgsqlDataReader reader)
+    {
+        return new NotificationResponse(
+            reader.GetInt64(reader.GetOrdinal("id")),
+            reader.GetString(reader.GetOrdinal("target_type")),
+            reader.GetString(reader.GetOrdinal("target_key")),
+            reader.GetString(reader.GetOrdinal("title")),
+            reader.GetString(reader.GetOrdinal("body")),
+            reader.GetString(reader.GetOrdinal("status")),
+            reader.GetString(reader.GetOrdinal("source_module")),
+            reader.GetString(reader.GetOrdinal("severity")),
+            reader.GetString(reader.GetOrdinal("source_type")),
+            reader.IsDBNull(reader.GetOrdinal("source_id")) ? null : reader.GetString(reader.GetOrdinal("source_id")),
+            reader.IsDBNull(reader.GetOrdinal("action_url")) ? null : reader.GetString(reader.GetOrdinal("action_url")),
+            new DateTimeOffset(reader.GetFieldValue<DateTime>(reader.GetOrdinal("created_at"))),
+            reader.IsDBNull(reader.GetOrdinal("read_at")) ? null : new DateTimeOffset(reader.GetFieldValue<DateTime>(reader.GetOrdinal("read_at"))),
+            reader.IsDBNull(reader.GetOrdinal("archived_at")) ? null : new DateTimeOffset(reader.GetFieldValue<DateTime>(reader.GetOrdinal("archived_at"))),
+            reader.IsDBNull(reader.GetOrdinal("managed_at")) ? null : new DateTimeOffset(reader.GetFieldValue<DateTime>(reader.GetOrdinal("managed_at"))),
+            reader.IsDBNull(reader.GetOrdinal("managed_by")) ? null : reader.GetString(reader.GetOrdinal("managed_by")));
+    }
+
+    private static void AddNullableTextParameter(NpgsqlCommand command, string name, string? value)
+    {
+        command.Parameters.Add(name, NpgsqlDbType.Text).Value = value is null ? DBNull.Value : value;
+    }
+
     private static TrainingRecordResponse ReadTrainingRecord(NpgsqlDataReader reader)
     {
         var expiresAt = DateOnly.FromDateTime(reader.GetDateTime(reader.GetOrdinal("expires_at")));
@@ -2962,6 +3858,195 @@ public sealed class PostgresPortalRepository
             "AL_DIA" => 1,
             _ => 0
         };
+    }
+
+    private static string GetTrainingAlertSeverity(string status)
+    {
+        return status switch
+        {
+            "VENCIDO" or "CRITICO" => "CRITICAL",
+            "PREVENTIVO" => "WARNING",
+            "INFORMATIVO" => "INFO",
+            _ => "INFO"
+        };
+    }
+
+    private static string BuildTrainingAlertBody(TrainingAlertCandidate candidate)
+    {
+        return candidate.DaysUntilExpiry < 0
+            ? $"{candidate.RequirementTypeName} vencio hace {Math.Abs(candidate.DaysUntilExpiry)} dias para {candidate.FullName} ({candidate.IdentificationNumber})."
+            : $"{candidate.RequirementTypeName} vence en {candidate.DaysUntilExpiry} dias para {candidate.FullName} ({candidate.IdentificationNumber}).";
+    }
+
+    private static async Task<long?> FindActiveNotificationByDedupeKeyAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string dedupeKey, CancellationToken cancellationToken)
+    {
+        const string sql = @"
+            select id
+            from notification_items
+            where dedupe_key = @dedupeKey
+              and status in ('UNREAD', 'READ')
+            limit 1;";
+
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("dedupeKey", dedupeKey);
+        var value = await command.ExecuteScalarAsync(cancellationToken);
+        return value is null ? null : (long)value;
+    }
+
+    private static async Task UpdateGeneratedTrainingNotificationAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        long notificationId,
+        string title,
+        string body,
+        string severity,
+        string actionUrl,
+        CancellationToken cancellationToken)
+    {
+        const string sql = @"
+            update notification_items
+            set title = @title,
+                body = @body,
+                severity = @severity,
+                action_url = @actionUrl
+            where id = @notificationId;";
+
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("notificationId", notificationId);
+        command.Parameters.AddWithValue("title", title);
+        command.Parameters.AddWithValue("body", body);
+        command.Parameters.AddWithValue("severity", severity);
+        command.Parameters.AddWithValue("actionUrl", actionUrl);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task<long> InsertGeneratedTrainingNotificationAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string dedupeKey,
+        string title,
+        string body,
+        string severity,
+        long recordId,
+        string actionUrl,
+        CancellationToken cancellationToken)
+    {
+        const string sql = @"
+            insert into notification_items (
+                target_type,
+                target_key,
+                title,
+                body,
+                status,
+                source_module,
+                severity,
+                source_type,
+                source_id,
+                action_url,
+                dedupe_key
+            )
+            values (
+                'ROLE',
+                'TH',
+                @title,
+                @body,
+                'UNREAD',
+                'TRAINING',
+                @severity,
+                'TRAINING_EXPIRY',
+                @sourceId,
+                @actionUrl,
+                @dedupeKey
+            )
+            returning id;";
+
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("title", title);
+        command.Parameters.AddWithValue("body", body);
+        command.Parameters.AddWithValue("severity", severity);
+        command.Parameters.AddWithValue("sourceId", recordId.ToString());
+        command.Parameters.AddWithValue("actionUrl", actionUrl);
+        command.Parameters.AddWithValue("dedupeKey", dedupeKey);
+        return (long)(await command.ExecuteScalarAsync(cancellationToken) ?? 0L);
+    }
+
+    private static async Task<long> InsertGeneratedNotificationAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string targetType,
+        string targetKey,
+        string dedupeKey,
+        string title,
+        string body,
+        string severity,
+        string sourceModule,
+        string sourceType,
+        string sourceId,
+        string actionUrl,
+        CancellationToken cancellationToken)
+    {
+        const string sql = @"
+            insert into notification_items (
+                target_type,
+                target_key,
+                title,
+                body,
+                status,
+                source_module,
+                severity,
+                source_type,
+                source_id,
+                action_url,
+                dedupe_key
+            )
+            values (
+                @targetType,
+                @targetKey,
+                @title,
+                @body,
+                'UNREAD',
+                @sourceModule,
+                @severity,
+                @sourceType,
+                @sourceId,
+                @actionUrl,
+                @dedupeKey
+            )
+            returning id;";
+
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("targetType", targetType);
+        command.Parameters.AddWithValue("targetKey", targetKey);
+        command.Parameters.AddWithValue("title", title);
+        command.Parameters.AddWithValue("body", body);
+        command.Parameters.AddWithValue("severity", severity);
+        command.Parameters.AddWithValue("sourceModule", sourceModule);
+        command.Parameters.AddWithValue("sourceType", sourceType);
+        command.Parameters.AddWithValue("sourceId", sourceId);
+        command.Parameters.AddWithValue("actionUrl", actionUrl);
+        command.Parameters.AddWithValue("dedupeKey", dedupeKey);
+        return (long)(await command.ExecuteScalarAsync(cancellationToken) ?? 0L);
+    }
+
+    private static async Task InsertNotificationEventAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        long notificationId,
+        string username,
+        string eventType,
+        string detailJson,
+        CancellationToken cancellationToken)
+    {
+        const string sql = @"
+            insert into notification_events (notification_id, actor_username, event_type, detail)
+            values (@notificationId, @username, @eventType, @detail::jsonb);";
+
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("notificationId", notificationId);
+        command.Parameters.AddWithValue("username", username);
+        command.Parameters.AddWithValue("eventType", eventType);
+        command.Parameters.Add("detail", NpgsqlDbType.Jsonb).Value = detailJson;
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static CertificatePreviewResponse BuildCertificatePreviewError(string code)

@@ -24,6 +24,233 @@ public static class PortalEndpoints
             return Results.Ok(modules);
         });
 
+        app.MapGet("/api/portal/dashboard", async (PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("DASHBOARD", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!await repository.CanConnectAsync(cancellationToken))
+            {
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+
+            var dashboard = await repository.GetDashboardAsync(userContext.User!, cancellationToken);
+            return Results.Ok(dashboard);
+        });
+
+        app.MapGet("/api/portal/audit", async (string? module, string? actor, string? from, string? to, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("DASHBOARD", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!TryParseOptionalAuditDate(from, includeFullDay: false, out var fromDate)
+                || !TryParseOptionalAuditDate(to, includeFullDay: true, out var toDate))
+            {
+                return Results.BadRequest(new { message = "Rango de fechas de auditoria no valido." });
+            }
+
+            if (!await repository.CanConnectAsync(cancellationToken))
+            {
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+
+            var auditEvents = await repository.GetAuditEventsAsync(userContext.User!, module, actor, fromDate, toDate, cancellationToken);
+            return Results.Ok(new AuditEventsResponse(auditEvents));
+        });
+
+        app.MapGet("/api/portal/notifications", async (string? status, string? severity, string? sourceModule, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("NOTIFICATIONS", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!await repository.CanConnectAsync(cancellationToken))
+            {
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+
+            if (!TryNormalizeNotificationFilters(status, severity, sourceModule, out var normalizedStatus, out var normalizedSeverity, out var normalizedSourceModule))
+            {
+                return Results.BadRequest(new { message = "Filtros de notificaciones no validos." });
+            }
+
+            var user = userContext.User!;
+            var notifications = await repository.GetNotificationsAsync(user.Username, user.Role, normalizedStatus, normalizedSeverity, normalizedSourceModule, cancellationToken);
+            return Results.Ok(notifications);
+        });
+
+        app.MapGet("/api/portal/notifications/unread-count", async (PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("NOTIFICATIONS", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!await repository.CanConnectAsync(cancellationToken))
+            {
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+
+            var user = userContext.User!;
+            var unreadCount = await repository.GetUnreadNotificationCountAsync(user.Username, user.Role, cancellationToken);
+            return Results.Ok(new NotificationUnreadCountResponse(unreadCount));
+        });
+
+        app.MapGet("/api/portal/notifications-summary/export", async (string? status, string? severity, string? sourceModule, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("NOTIFICATIONS", "EXPORT", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!TryNormalizeNotificationFilters(status, severity, sourceModule, out var normalizedStatus, out var normalizedSeverity, out var normalizedSourceModule))
+            {
+                return Results.BadRequest(new { message = "Filtros de exportacion no validos." });
+            }
+
+            if (!await repository.CanConnectAsync(cancellationToken))
+            {
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+
+            var user = userContext.User!;
+            var notifications = await repository.ExportNotificationsAsync(user.Username, user.Role, normalizedStatus, normalizedSeverity, normalizedSourceModule, cancellationToken);
+            var csv = BuildNotificationSummaryCsv(notifications);
+            return Results.File(
+                new UTF8Encoding(encoderShouldEmitUTF8Identifier: true).GetBytes(csv),
+                "text/csv; charset=utf-8",
+                "notification-summary.csv");
+        });
+
+        app.MapPost("/api/portal/notifications-summary/email", async (NotificationEmailSummaryRequest request, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("NOTIFICATIONS", "CONFIGURE_EMAIL", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!TryNormalizeNotificationFilters(request.Status, request.Severity, request.SourceModule, out var normalizedStatus, out var normalizedSeverity, out var normalizedSourceModule))
+            {
+                return Results.BadRequest(new { message = "Filtros de correo no validos." });
+            }
+
+            if (!await repository.CanConnectAsync(cancellationToken))
+            {
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+
+            var user = userContext.User!;
+            var result = await repository.AttemptNotificationEmailSummaryAsync(
+                user.Username,
+                user.Role,
+                normalizedStatus,
+                normalizedSeverity,
+                normalizedSourceModule,
+                request.Recipient,
+                smtpAvailable: false,
+                cancellationToken);
+
+            return Results.Ok(result);
+        });
+
+        app.MapPost("/api/portal/notifications/{notificationId:long}/read", async (long notificationId, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("NOTIFICATIONS", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!await repository.CanConnectAsync(cancellationToken))
+            {
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+
+            var user = userContext.User!;
+            var notification = await repository.MarkNotificationAsReadAsync(notificationId, user.Username, user.Role, cancellationToken);
+            return notification is null ? Results.NotFound() : Results.Ok(notification);
+        });
+
+        app.MapPost("/api/portal/notifications/{notificationId:long}/archive", async (long notificationId, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("NOTIFICATIONS", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!await repository.CanConnectAsync(cancellationToken))
+            {
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+
+            var user = userContext.User!;
+            var notification = await repository.ArchiveNotificationAsync(notificationId, user.Username, user.Role, cancellationToken);
+            return notification is null ? Results.NotFound() : Results.Ok(notification);
+        });
+
+        app.MapPost("/api/portal/alerts/training/generate", async (PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("NOTIFICATIONS", "GENERATE_ALERTS", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!await repository.CanConnectAsync(cancellationToken))
+            {
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+
+            var result = await repository.GenerateTrainingExpiryAlertsAsync(userContext.User!.Username, cancellationToken);
+            return Results.Ok(result);
+        });
+
+        app.MapPost("/api/portal/alerts/imports/generate", async (PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("NOTIFICATIONS", "GENERATE_ALERTS", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!await repository.CanConnectAsync(cancellationToken))
+            {
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+
+            var result = await repository.GenerateImportErrorAlertsAsync(userContext.User!.Username, cancellationToken);
+            return Results.Ok(result);
+        });
+
+        app.MapPost("/api/portal/alerts/certificates/generate", async (PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await authorization.RequireAsync("NOTIFICATIONS", "GENERATE_ALERTS", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (!await repository.CanConnectAsync(cancellationToken))
+            {
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+
+            var result = await repository.GenerateCertificateAlertsAsync(userContext.User!.Username, cancellationToken);
+            return Results.Ok(result);
+        });
+
         app.MapGet("/api/portal/notifications/{username}", async (string username, MockPortalQueryService portalService, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
         {
             var notifications = await repository.CanConnectAsync(cancellationToken)
@@ -860,6 +1087,26 @@ public static class PortalEndpoints
             : text;
     }
 
+    private static string BuildNotificationSummaryCsv(IReadOnlyList<NotificationResponse> notifications)
+    {
+        var csv = new StringBuilder("id,estado,severidad,modulo,tipo_fuente,origen,titulo,detalle,fecha_creacion\r\n");
+        foreach (var notification in notifications)
+        {
+            csv.Append(notification.Id).Append(',')
+                .Append(EscapeCsv(notification.Status)).Append(',')
+                .Append(EscapeCsv(notification.Severity)).Append(',')
+                .Append(EscapeCsv(notification.SourceModule)).Append(',')
+                .Append(EscapeCsv(notification.SourceType)).Append(',')
+                .Append(EscapeCsv(notification.SourceId)).Append(',')
+                .Append(EscapeCsv(notification.Title)).Append(',')
+                .Append(EscapeCsv(notification.Body)).Append(',')
+                .Append(EscapeCsv(notification.CreatedAt.ToString("O")))
+                .Append("\r\n");
+        }
+
+        return csv.ToString();
+    }
+
     private static bool IsValidSignerRequest(UpsertCertificateSignerRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.FullName)
@@ -883,6 +1130,51 @@ public static class PortalEndpoints
         return !string.IsNullOrWhiteSpace(request.Name)
             && request.Category.Trim().ToUpperInvariant() is ("CURSO" or "ACREDITACION")
             && (!request.ValidityDays.HasValue || request.ValidityDays > 0);
+    }
+
+    private static bool TryNormalizeNotificationFilters(
+        string? status,
+        string? severity,
+        string? sourceModule,
+        out string? normalizedStatus,
+        out string? normalizedSeverity,
+        out string? normalizedSourceModule)
+    {
+        normalizedStatus = NormalizeOptionalFilter(status);
+        normalizedSeverity = NormalizeOptionalFilter(severity);
+        normalizedSourceModule = NormalizeOptionalFilter(sourceModule);
+
+        return (normalizedStatus is null or "UNREAD" or "READ" or "ARCHIVED" or "DISMISSED")
+            && (normalizedSeverity is null or "INFO" or "WARNING" or "CRITICAL")
+            && (normalizedSourceModule is null or "IMPORTS" or "CERTIFICATES" or "TRAINING" or "SYSTEM");
+    }
+
+    private static string? NormalizeOptionalFilter(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
+    }
+
+    private static bool TryParseOptionalAuditDate(string? value, bool includeFullDay, out DateTimeOffset? parsed)
+    {
+        parsed = null;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        if (!DateOnly.TryParse(value, out var date))
+        {
+            return false;
+        }
+
+        var dateTime = date.ToDateTime(TimeOnly.MinValue);
+        if (includeFullDay)
+        {
+            dateTime = dateTime.AddDays(1);
+        }
+
+        parsed = new DateTimeOffset(dateTime, TimeSpan.Zero);
+        return true;
     }
 
     private static bool IsValidCertificatePreviewRequest(CertificatePreviewRequest request)

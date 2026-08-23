@@ -6,7 +6,7 @@
 **Metodo:** SDD - Spec-Driven Development, nivel Spec-Anchored  
 **Estado del plan:** Revisado y aprobado  
 **Fecha de aprobacion:** 2026-06-05  
-**Gate actual:** Task 9 cerrada; implementacion autorizada desde Task 10  
+**Gate actual:** I5 cerrado tecnicamente; retake autorizado en I6 Gate 0  
 
 ## 1. Objetivo
 
@@ -56,12 +56,12 @@ SPECs relacionadas:
 
 ### Gate De Cierre I5
 
-- [ ] Criterios de aceptacion 1-20 cubiertos.
-- [ ] Suite funcional I5 ejecutada.
-- [ ] Backend build limpio.
-- [ ] Frontend build limpio.
-- [ ] Riesgos residuales documentados.
-- [ ] Retake point I6 definido.
+- [x] Criterios de aceptacion 1-20 cubiertos.
+- [x] Suite funcional I5 ejecutada.
+- [x] Backend build limpio.
+- [x] Frontend build limpio.
+- [x] Riesgos residuales documentados.
+- [x] Retake point I6 definido.
 
 ## 4. Alcance
 
@@ -340,19 +340,19 @@ Modulo `TRAINING`:
 
 **Aceptacion:**
 
-- [ ] Suite `Verify-SgSuperAppI5*.ps1` completa pasa.
-- [ ] Backend build pasa.
-- [ ] Frontend build pasa.
-- [ ] Matriz final 1-20 queda registrada.
-- [ ] Riesgos residuales quedan documentados.
-- [ ] Retake point I6 queda definido.
+- [x] Suite `Verify-SgSuperAppI5*.ps1` completa pasa.
+- [x] Backend build pasa.
+- [x] Frontend build pasa.
+- [x] Matriz final 1-20 queda registrada.
+- [x] Riesgos residuales quedan documentados.
+- [x] Retake point I6 queda definido.
 
 **Verificacion:**
 
-- [ ] `dotnet build apps/sg-superapp-api/sg-superapp-api.csproj`
-- [ ] `npm run build` en `apps/sg-superapp-web`
-- [ ] `scripts/dev/Verify-SgSuperAppI5*.ps1`
-- [ ] `graphify update .` cuando la herramienta este disponible.
+- [x] `dotnet build apps/sg-superapp-api/sg-superapp-api.csproj`
+- [x] `npm run build` en `apps/sg-superapp-web`
+- [x] `scripts/dev/Verify-SgSuperAppI5*.ps1`
+- [x] `graphify update .` intentado; herramienta no disponible en PATH.
 
 ## 7. Checkpoints
 
@@ -380,9 +380,9 @@ Despues de Tasks 7-10:
 
 - [x] UI operativa por rol;
 - [x] UI de gestion TH/ADMIN;
-- [ ] suite completa I5 pasa;
-- [ ] matriz 1-20 registrada;
-- [ ] retake I6 definido.
+- [x] suite completa I5 pasa;
+- [x] matriz 1-20 registrada;
+- [x] retake I6 definido.
 
 ## 8. Matriz De Trazabilidad
 
@@ -409,6 +409,31 @@ Despues de Tasks 7-10:
 | 19. UI respeta DESIGN | 8, 9, 10 |
 | 20. Reglas listas para I6 | 4, 10 |
 
+### Matriz Final De Aceptacion I5 - 2026-06-09
+
+| Criterio SPEC I5 | Estado | Evidencia |
+|------------------|--------|-----------|
+| 1. Tipos parametrizables | Cubierto | `Verify-SgSuperAppI5Types.ps1`, cliente API y UI |
+| 2. ADMIN/TH gestionan tipos | Cubierto | `Verify-SgSuperAppI5Types.ps1`, `Verify-SgSuperAppI5ManagementUi.ps1` |
+| 3. GERENCIA/OPERACIONES no editan tipos | Cubierto | `Verify-SgSuperAppI5Security.ps1`, UI por rol |
+| 4. TH registra renovaciones | Cubierto | `Verify-SgSuperAppI5Renewals.ps1`, UI de renovaciones |
+| 5. Historico de renovaciones | Cubierto | `Verify-SgSuperAppI5Renewals.ps1`, `Verify-SgSuperAppI5Queries.ps1` |
+| 6. Calcula vencimiento por vigencia | Cubierto | `Verify-SgSuperAppI5Renewals.ps1` |
+| 7. Exige vencimiento manual si no calcula | Cubierto | `Verify-SgSuperAppI5Renewals.ps1` |
+| 8. Rechaza fechas invalidas | Cubierto | `Verify-SgSuperAppI5Renewals.ps1` |
+| 9. Estados calculados | Cubierto | `Verify-SgSuperAppI5StatusRules.ps1` |
+| 10. Obligatorio vencido no habilita | Cubierto | `Verify-SgSuperAppI5ServiceEnablement.ps1` |
+| 11. Sin obligatorio vencido habilita | Cubierto | `Verify-SgSuperAppI5ServiceEnablement.ps1` |
+| 12. Operaciones consulta | Cubierto | `Verify-SgSuperAppI5Security.ps1`, `Verify-SgSuperAppI5Queries.ps1` |
+| 13. Gerencia consulta | Cubierto | `Verify-SgSuperAppI5Security.ps1`, `Verify-SgSuperAppI5Queries.ps1` |
+| 14. Listado filtra | Cubierto | `Verify-SgSuperAppI5Queries.ps1`, UI de cumplimiento |
+| 15. Detalle actuales e historico | Cubierto | `Verify-SgSuperAppI5Queries.ps1`, UI de detalle |
+| 16. Soporte opcional modelado | Cubierto | `Verify-SgSuperAppI5Persistence*.ps1`, `Verify-SgSuperAppI5Renewals.ps1` |
+| 17. Auditoria | Cubierto | `Verify-SgSuperAppI5Audit.ps1` |
+| 18. Seguridad backend | Cubierto | `Verify-SgSuperAppI5Security.ps1` |
+| 19. UI respeta DESIGN | Cubierto | `npm run build`, UI dark/gold administrativa |
+| 20. Reglas listas para I6 | Cubierto | `TrainingComplianceStatusCalculator`, `Verify-SgSuperAppI5StatusRules.ps1` |
+
 ## 9. Riesgos Y Mitigaciones
 
 | Riesgo | Impacto | Mitigacion |
@@ -419,6 +444,16 @@ Despues de Tasks 7-10:
 | Expectativa de alertas automaticas | Medio | Documentar que I6 implementa alertas/notificaciones |
 | Soportes sin ruta aprobada | Medio | Guardar referencia opcional y diferir binarios |
 | `graphify` no disponible | Bajo | Intentar `graphify update .` y documentar fallo hasta instalar herramienta |
+
+### Riesgos Residuales De Cierre I5 - 2026-06-09
+
+| Riesgo residual | Estado | Tratamiento |
+|-----------------|--------|-------------|
+| Alertas automaticas aun no existen | Esperado | Pasa a I6; I5 deja reglas centralizadas y datos consultables |
+| SMTP/correo no validado | Esperado | I6 debe decidir SMTP o fallback exportable segun infraestructura |
+| Soportes documentales solo son referencia textual | Aceptado | Carga binaria/ruta institucional queda fuera de I5 |
+| `NO_HABILITADO` puede confundirse con bloqueo de turnos | Aceptado | UI y SPEC lo tratan como indicador, no bloqueo automatico |
+| `graphify` no disponible en PATH | Operativo | Se intento actualizacion y se documenta limitacion |
 
 ## 10. Open Questions
 
@@ -568,3 +603,25 @@ Decisiones tecnicas de Gate 0:
 - GREEN: con API temporal en `http://localhost:5080`, `scripts/dev/Verify-SgSuperAppI5Renewals.ps1` correcto.
 - `graphify update .` intentado y fallido porque `graphify` no esta disponible en PATH.
 - Retake point: Task 10, verificacion integral y cierre I5.
+
+### 2026-06-09 - Task 10 verificacion integral y cierre I5
+
+- Suite completa I5 ejecutada con API temporal en `http://localhost:5080`:
+  - `Verify-SgSuperAppI5Audit.ps1`
+  - `Verify-SgSuperAppI5ManagementUi.ps1`
+  - `Verify-SgSuperAppI5Persistence.ps1`
+  - `Verify-SgSuperAppI5PersistenceClean.ps1`
+  - `Verify-SgSuperAppI5Queries.ps1`
+  - `Verify-SgSuperAppI5Renewals.ps1`
+  - `Verify-SgSuperAppI5Security.ps1`
+  - `Verify-SgSuperAppI5ServiceEnablement.ps1`
+  - `Verify-SgSuperAppI5StatusRules.ps1`
+  - `Verify-SgSuperAppI5Types.ps1`
+- Resultado: suite completa correcta.
+- Frontend build: `npm run build` en `apps/sg-superapp-web` correcto.
+- Backend build: primer intento fallo por binario bloqueado por proceso local `sg-superapp-api` PID 8876; se detuvo el proceso y se repitio `C:\tmp\dotnet6\dotnet.exe build apps\sg-superapp-api\sg-superapp-api.csproj` con 0 advertencias y 0 errores.
+- Se registro matriz final de aceptacion 1-20.
+- Se registraron riesgos residuales.
+- `graphify update .` intentado y fallido porque `graphify` no esta disponible en PATH.
+- I5 queda cerrado tecnicamente.
+- Retake point: I6 Gate 0, crear SPEC I6 y plan I6 de Alertas y Notificaciones antes de codificar.

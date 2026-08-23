@@ -17,14 +17,101 @@ export interface AppModule {
   status: "Disponible" | "Pendiente";
 }
 
+export type DashboardWidgetScope = "EXECUTIVE" | "TH" | "OPERATIONS" | "ADMIN" | "SYSTEM";
+export type DashboardWidgetSeverity = "INFO" | "WARNING" | "CRITICAL" | "SUCCESS";
+
+export interface DashboardWidget {
+  id: string;
+  title: string;
+  scope: DashboardWidgetScope;
+  metric: string;
+  trend: string | null;
+  severity: DashboardWidgetSeverity;
+  actionUrl: string | null;
+}
+
+export interface DashboardResponse {
+  role: RoleCode;
+  generatedAt: string;
+  widgets: DashboardWidget[];
+}
+
+export type AuditModule = "IMPORTS" | "CERTIFICATES" | "TRAINING" | "NOTIFICATIONS" | "POSITIONS" | "EMPLOYEES" | "SYSTEM";
+
+export interface AuditFilters {
+  module?: AuditModule;
+  actor?: string;
+  from?: string;
+  to?: string;
+}
+
+export interface AuditEvent {
+  id: number;
+  occurredAt: string;
+  actorUsername: string;
+  actorRole: RoleCode | "SYSTEM" | null;
+  module: AuditModule;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  summary: string;
+  detail: Record<string, unknown>;
+}
+
+export interface AuditEventsResponse {
+  events: AuditEvent[];
+}
+
+export type NotificationStatus = "UNREAD" | "READ" | "ARCHIVED" | "DISMISSED";
+export type NotificationSeverity = "INFO" | "WARNING" | "CRITICAL";
+export type NotificationSourceModule = "IMPORTS" | "CERTIFICATES" | "TRAINING" | "SYSTEM";
+
+export interface NotificationFilters {
+  status?: NotificationStatus;
+  severity?: NotificationSeverity;
+  sourceModule?: NotificationSourceModule;
+}
+
 export interface NotificationItem {
   id: number;
   targetType: "USER" | "ROLE";
   targetKey: string;
   title: string;
   body: string;
-  status: "UNREAD" | "READ" | "ARCHIVED";
+  status: NotificationStatus;
+  sourceModule: NotificationSourceModule;
+  severity: NotificationSeverity;
+  sourceType: string;
+  sourceId: string | null;
+  actionUrl: string | null;
   createdAt: string;
+  readAt: string | null;
+  archivedAt: string | null;
+  managedAt: string | null;
+  managedBy: string | null;
+}
+
+export interface NotificationUnreadCountResponse {
+  unreadCount: number;
+}
+
+export interface NotificationGenerationResponse {
+  generatedCount: number;
+  activeAlertsCount: number;
+  skippedCurrentCount: number;
+}
+
+export interface NotificationEmailSummaryRequest extends NotificationFilters {
+  recipient: string | null;
+}
+
+export interface NotificationEmailSummaryResponse {
+  emailAttempted: boolean;
+  smtpAvailable: boolean;
+  fallbackAvailable: boolean;
+  matchedNotifications: number;
+  status: "SENT" | "FALLBACK_AVAILABLE";
+  message: string;
 }
 
 export interface LoginRequest {

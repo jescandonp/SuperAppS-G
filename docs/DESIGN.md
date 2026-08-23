@@ -20,6 +20,21 @@ La identidad base del piloto es **S&G dark/gold**:
 
 La interfaz no debe sentirse como landing page comercial. Debe sentirse como una herramienta interna para trabajo repetido, consulta rapida y control operativo.
 
+### 2.1 Variante Enterprise Sentinel
+
+Para pantallas administrativas densas del ecosistema digital unificado se aprueba la variante **Sentinel Enterprise**, basada en `Prototipos/stitch_ecosistema_digital_unificado/sentinel_enterprise/DESIGN.md`.
+
+Esta variante conserva el caracter S&G mediante azul corporativo profundo y dorado como acento de accion, pero permite superficies claras, capas tonales y tablas de alta legibilidad cuando el objetivo sea operacion diaria, consulta ejecutiva o auditoria.
+
+Reglas de uso:
+
+- usar `#003366` como color institucional principal en navegacion, encabezados funcionales y acciones secundarias;
+- usar `#FFC700` solo para accion primaria, foco operativo o indicadores que requieren atencion;
+- usar superficies `#F8F9FA`, `#FFFFFF` y bordes `#E1E4E8` para reducir fatiga visual en pantallas de consulta repetida;
+- mantener radios sobrios de 4px a 8px;
+- priorizar Montserrat o una alternativa sans de titulares para jerarquia y Arial/Inter-compatible para datos;
+- no convertir el portal en landing page ni introducir decoracion sin valor operativo.
+
 ## 3. Principios UX/UI
 
 - Priorizar claridad sobre decoracion.
