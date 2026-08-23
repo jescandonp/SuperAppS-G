@@ -1,6 +1,7 @@
 import { API_BASE_URL } from "../config";
 import type { AnnulCertificateRequest, AppModule, CertificatePreview, CertificatePreviewRequest, CertificateSigner, CertificateSignerRequest, CertificateSignerStatus, CertificateStatus, CertificateType, CreatePositionAssignmentRequest, CreateTrainingRecordRequest, CurrentUser, EmployeeDetail, EmployeeSummary, FinalizePositionAssignmentRequest, ImportBatchError, ImportBatchRow, ImportBatchSummary, ImportColumnMapping, ImportPrevalidationResponse, ImportRowClassification, LaborCertificate, LaborCertificateHistoryItem, LoginRequest, LoginResponse, NotificationItem, PositionAssignment, RoleCode, ServicePosition, ServicePositionRequest, ServicePositionStatus, TrainingComplianceDetail, TrainingComplianceStatus, TrainingComplianceSummary, TrainingRecord, TrainingRequirementCategory, TrainingRequirementStatus, TrainingRequirementType, TrainingServiceEnablement, TrainingServiceEnablementStatus, UpsertTrainingRequirementTypeRequest } from "../types/portal";
 import type { ScheduleComparison, ScheduleProposal, SchedulingCapabilities, SchedulingProject, ShiftTemplate } from "../types/portal";
+import type { PreEvaluateSchedulingRulesRequest, SchedulingRuleEvaluationBatch, SchedulingRuleGateCode, SchedulingRuleProblem, SchedulingRuleProfile } from "../types/portal";
 
 const SESSION_TOKEN_KEY = "sg.superapp.sessionToken";
 
@@ -9,21 +10,65 @@ function getSessionHeaders(): HeadersInit {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+const RULE_GATE_CODES: readonly SchedulingRuleGateCode[] = [
+  "RULE_BLOCKED",
+  "RULE_UNVERIFIED",
+  "RULE_EXCEPTION_REQUIRED",
+  "RULE_EVALUATION_MISSING",
+  "RULE_EVALUATION_SUPERSEDED",
+  "RULE_ASSIGNMENT_UNEVALUATED"
+];
+
+function isRuleGateCode(value: unknown): value is SchedulingRuleGateCode {
+  return typeof value === "string" && RULE_GATE_CODES.includes(value as SchedulingRuleGateCode);
+}
+
+// A refused transition arrives as application/problem+json carrying a stable `code`. Flattening it
+// to a message would discard the one field that says which state the schedule is in, leaving the UI
+// to guess from Spanish prose. The code travels with the error instead.
+export class PortalApiError extends Error {
+  readonly status: number;
+  readonly code: SchedulingRuleGateCode | null;
+  readonly title: string | null;
+
+  constructor(problem: SchedulingRuleProblem) {
+    super(problem.message);
+    this.name = "PortalApiError";
+    this.status = problem.status;
+    this.code = problem.code;
+    this.title = problem.title;
+  }
+
+  get problem(): SchedulingRuleProblem {
+    return { status: this.status, code: this.code, title: this.title, message: this.message };
+  }
+}
+
+async function readProblem(response: Response): Promise<SchedulingRuleProblem> {
+  let code: SchedulingRuleGateCode | null = null;
+  let title: string | null = null;
+  let message: string | undefined;
+
+  try {
+    const data = (await response.json()) as { message?: string; detail?: string; title?: string; code?: unknown };
+    message = data.message ?? data.detail;
+    title = typeof data.title === "string" ? data.title : null;
+    // A code the client does not know is not passed through as if it were understood.
+    code = isRuleGateCode(data.code) ? data.code : null;
+  } catch {
+    message = undefined;
+  }
+
+  return { status: response.status, code, title, message: message || `API request failed: ${response.status}` };
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: getSessionHeaders()
   });
 
   if (!response.ok) {
-    let message: string | undefined;
-    try {
-      const data = (await response.json()) as { message?: string };
-      message = data.message;
-    } catch {
-      message = undefined;
-    }
-
-    throw new Error(message || `API request failed: ${response.status}`);
+    throw new PortalApiError(await readProblem(response));
   }
 
   return response.json() as Promise<T>;
@@ -40,15 +85,7 @@ async function sendJson<T>(path: string, method: "POST" | "PUT", body?: unknown)
   });
 
   if (!response.ok) {
-    let message: string | undefined;
-    try {
-      const data = (await response.json()) as { message?: string };
-      message = data.message;
-    } catch {
-      message = undefined;
-    }
-
-    throw new Error(message || `API request failed: ${response.status}`);
+    throw new PortalApiError(await readProblem(response));
   }
 
   return response.json() as Promise<T>;
@@ -460,4 +497,55 @@ export async function prevalidateEmployeeCsv(file: File, uploadedBy: string): Pr
   }
 
   return data;
+}
+
+
+// --- I9 MVP versioned rules ------------------------------------------------------------------
+// These read the server's verdicts; none of them derives one. `fetchActiveSchedulingRuleProfile`
+// returns null when the scope has no active profile, which the caller must render as incomplete
+// configuration rather than as "no rules apply".
+
+export async function fetchActiveSchedulingRuleProfile(
+  projectCode: string,
+  period: string,
+  environmentScope: string
+): Promise<SchedulingRuleProfile | null> {
+  const query = new URLSearchParams({ projectCode, period, environmentScope });
+  try {
+    return await getJson<SchedulingRuleProfile>(`/portal/scheduling/rule-profiles?${query.toString()}`);
+  } catch (error) {
+    if (error instanceof PortalApiError && error.status === 404) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+export async function fetchSchedulingRuleProfile(id: number): Promise<SchedulingRuleProfile> {
+  return getJson<SchedulingRuleProfile>(`/portal/scheduling/rule-profiles/${id}`);
+}
+
+export async function fetchSchedulingRuleEvaluations(
+  scheduleVersionId: number
+): Promise<SchedulingRuleEvaluationBatch> {
+  const query = new URLSearchParams({ scheduleVersionId: String(scheduleVersionId) });
+  return getJson<SchedulingRuleEvaluationBatch>(`/portal/scheduling/rules/evaluations?${query.toString()}`);
+}
+
+export async function evaluateSchedulingRules(
+  scheduleVersionId: number,
+  assignmentId: number | null,
+  request: PreEvaluateSchedulingRulesRequest
+): Promise<SchedulingRuleEvaluationBatch> {
+  const query = new URLSearchParams({ scheduleVersionId: String(scheduleVersionId) });
+  if (assignmentId !== null) {
+    query.set("assignmentId", String(assignmentId));
+  }
+
+  return sendJson<SchedulingRuleEvaluationBatch>(
+    `/portal/scheduling/rules/evaluate?${query.toString()}`,
+    "POST",
+    request
+  );
 }

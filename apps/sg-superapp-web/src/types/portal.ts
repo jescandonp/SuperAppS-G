@@ -466,3 +466,124 @@ export interface TrainingComplianceDetail {
   currentRequirements: TrainingRecord[];
   trainingHistory: TrainingRecord[];
 }
+
+// --- I9 MVP versioned rule contracts ---------------------------------------------------------
+// Every verdict below is the server's. The frontend never decides whether a rule is satisfied nor
+// whether a schedule may be approved: it renders what the versioned evaluation already said. The
+// unions mirror the API and are exhaustive on purpose, so a state the backend can emit and the UI
+// has not handled is a compile error rather than a blank panel.
+
+export type SchedulingRuleCode = "I9-R01" | "I9-R02" | "I9-R03" | "I9-R04" | "I9-R05" | "I9-R06" | "I9-R07";
+
+export type SchedulingRuleOutcome =
+  | "COMPLIANT"
+  | "BLOCKED"
+  | "EXCEPTION_REQUIRED"
+  | "WARNING"
+  | "NOT_APPLICABLE";
+
+export type SchedulingRuleSeverity = "INFO" | "WARNING" | "ERROR" | "BLOCKING";
+
+export type SchedulingRuleOrigin = "SIMULATED" | "INSTITUTIONAL";
+
+export type SchedulingEnvironmentScope = "MVP_TEST" | "PRODUCTION";
+
+export type SchedulingRuleProfileStatus = "DRAFT" | "ACTIVE" | "RETIRED";
+
+// The states an approval or a publication can be refused on, as the API states them. Mirrors
+// RuleGateCodes in apps/sg-superapp-api/Endpoints/PortalEndpoints.cs, which is the source of truth.
+export type SchedulingRuleGateCode =
+  | "RULE_BLOCKED"
+  | "RULE_UNVERIFIED"
+  | "RULE_EXCEPTION_REQUIRED"
+  | "RULE_EVALUATION_MISSING"
+  | "RULE_EVALUATION_SUPERSEDED"
+  | "RULE_ASSIGNMENT_UNEVALUATED";
+
+export interface SchedulingRuleProfileEntry {
+  ruleCode: SchedulingRuleCode;
+  parameters: unknown;
+  catalogSnapshot: unknown;
+  enabled: boolean;
+}
+
+export interface SchedulingRuleProfile {
+  id: number;
+  profileCode: string;
+  version: number;
+  origin: SchedulingRuleOrigin;
+  environmentScope: SchedulingEnvironmentScope;
+  scopeCode: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  status: SchedulingRuleProfileStatus;
+  checksum: string;
+  simulated: boolean;
+  entries: SchedulingRuleProfileEntry[];
+}
+
+export interface SchedulingRuleEvaluation {
+  ruleCode: SchedulingRuleCode;
+  profileVersion: number;
+  outcome: SchedulingRuleOutcome;
+  severity: SchedulingRuleSeverity;
+  messageCode: string;
+  explanation: string;
+  scopeHash: string;
+  parametersSnapshot: unknown;
+  factsSnapshot: unknown;
+  exceptionAllowed: boolean;
+}
+
+export interface SchedulingRuleSummary {
+  total: number;
+  compliant: number;
+  blocked: number;
+  exceptionRequired: number;
+  warning: number;
+  notApplicable: number;
+  // Decided by the server. The UI must not recompute it from the counts above.
+  canApproveOrPublish: boolean;
+}
+
+export interface SchedulingRuleEvaluationBatch {
+  ruleProfileId: number;
+  profileCode: string;
+  profileVersion: number;
+  simulated: boolean;
+  evaluations: SchedulingRuleEvaluation[];
+  summary: SchedulingRuleSummary;
+}
+
+// A refusal the API stated, carried whole rather than flattened to a sentence. `code` is null for
+// anything that is not a rule gate, so a caller cannot mistake an ordinary conflict for one.
+export interface SchedulingRuleProblem {
+  status: number;
+  code: SchedulingRuleGateCode | null;
+  title: string | null;
+  message: string;
+}
+
+// Loading, failure and incomplete configuration are states, not an absent value: the panel has to
+// tell "no active profile for this scope" from "the request failed" from "still loading", and
+// showing an empty rule list for any of them would read as "nothing to worry about".
+export type SchedulingRuleProfileState =
+  | { status: "IDLE" }
+  | { status: "LOADING" }
+  | { status: "READY"; profile: SchedulingRuleProfile }
+  | { status: "UNCONFIGURED"; message: string }
+  | { status: "FAILED"; problem: SchedulingRuleProblem };
+
+export type SchedulingRuleEvaluationState =
+  | { status: "IDLE" }
+  | { status: "LOADING" }
+  | { status: "READY"; batch: SchedulingRuleEvaluationBatch }
+  | { status: "FAILED"; problem: SchedulingRuleProblem };
+
+export interface PreEvaluateSchedulingRulesRequest {
+  ruleProfileId: number;
+  projectCode: string;
+  period: string;
+  environmentScope: SchedulingEnvironmentScope;
+  facts: unknown;
+}

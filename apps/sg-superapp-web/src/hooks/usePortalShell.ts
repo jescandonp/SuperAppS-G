@@ -1,7 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchCurrentUser, fetchModules, fetchNotifications, login } from "../services/portalApi";
+import {
+  PortalApiError,
+  evaluateSchedulingRules,
+  fetchActiveSchedulingRuleProfile,
+  fetchCurrentUser,
+  fetchModules,
+  fetchNotifications,
+  fetchSchedulingRuleEvaluations,
+  login
+} from "../services/portalApi";
 import { mockCurrentUser, mockNotifications, modulesByRole } from "../mock/session";
 import type { AppModule, CurrentUser, LoginRequest, NotificationItem } from "../types/portal";
+import type {
+  PreEvaluateSchedulingRulesRequest,
+  SchedulingRuleEvaluationState,
+  SchedulingRuleProblem,
+  SchedulingRuleProfileState
+} from "../types/portal";
 
 const SESSION_USER_KEY = "sg.superapp.currentUser";
 const SESSION_TOKEN_KEY = "sg.superapp.sessionToken";
@@ -15,6 +30,32 @@ interface PortalShellState {
   errorMessage: string | null;
   loginWithCredentials: (request: LoginRequest) => Promise<void>;
   logout: () => void;
+  // The versioned rule state is exposed as it came from the server. Nothing here is derived: the
+  // shell does not decide whether a schedule may be approved, nor infer a permission from a role.
+  ruleProfile: SchedulingRuleProfileState;
+  ruleEvaluation: SchedulingRuleEvaluationState;
+  loadRuleProfile: (projectCode: string, period: string, environmentScope: string) => Promise<void>;
+  loadRuleEvaluations: (scheduleVersionId: number) => Promise<void>;
+  revalidateRules: (
+    scheduleVersionId: number,
+    assignmentId: number | null,
+    request: PreEvaluateSchedulingRulesRequest
+  ) => Promise<void>;
+}
+
+// An unexpected failure is still a stated failure: it is carried in the same shape so a caller
+// never has to tell a typed problem from a loose exception.
+function toProblem(error: unknown): SchedulingRuleProblem {
+  if (error instanceof PortalApiError) {
+    return error.problem;
+  }
+
+  return {
+    status: 0,
+    code: null,
+    title: null,
+    message: error instanceof Error ? error.message : "No fue posible consultar las reglas versionadas."
+  };
 }
 
 function readStoredUser(): CurrentUser | null {
@@ -39,6 +80,8 @@ export function usePortalShell(): PortalShellState {
   const [source, setSource] = useState<"api" | "mock">("mock");
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [ruleProfile, setRuleProfile] = useState<SchedulingRuleProfileState>({ status: "IDLE" });
+  const [ruleEvaluation, setRuleEvaluation] = useState<SchedulingRuleEvaluationState>({ status: "IDLE" });
 
   const logout = useCallback(() => {
     sessionStorage.removeItem(SESSION_USER_KEY);
@@ -106,6 +149,56 @@ export function usePortalShell(): PortalShellState {
     }
   }, []);
 
+  const loadRuleProfile = useCallback(
+    async (projectCode: string, period: string, environmentScope: string) => {
+      setRuleProfile({ status: "LOADING" });
+      try {
+        const profile = await fetchActiveSchedulingRuleProfile(projectCode, period, environmentScope);
+        // No active profile is not an empty rule set. Saying so plainly keeps the panel from
+        // rendering a clean schedule for a scope nobody has configured.
+        setRuleProfile(
+          profile
+            ? { status: "READY", profile }
+            : {
+                status: "UNCONFIGURED",
+                message: "No hay un perfil de reglas vigente para este proyecto y periodo."
+              }
+        );
+      } catch (error) {
+        setRuleProfile({ status: "FAILED", problem: toProblem(error) });
+      }
+    },
+    []
+  );
+
+  const loadRuleEvaluations = useCallback(async (scheduleVersionId: number) => {
+    setRuleEvaluation({ status: "LOADING" });
+    try {
+      setRuleEvaluation({ status: "READY", batch: await fetchSchedulingRuleEvaluations(scheduleVersionId) });
+    } catch (error) {
+      setRuleEvaluation({ status: "FAILED", problem: toProblem(error) });
+    }
+  }, []);
+
+  // After an edit the previous verdicts no longer describe the schedule, so the panel must be put
+  // back into LOADING rather than keep showing what was true before the change.
+  const revalidateRules = useCallback(
+    async (
+      scheduleVersionId: number,
+      assignmentId: number | null,
+      request: PreEvaluateSchedulingRulesRequest
+    ) => {
+      setRuleEvaluation({ status: "LOADING" });
+      try {
+        const batch = await evaluateSchedulingRules(scheduleVersionId, assignmentId, request);
+        setRuleEvaluation({ status: "READY", batch });
+      } catch (error) {
+        setRuleEvaluation({ status: "FAILED", problem: toProblem(error) });
+      }
+    },
+    []
+  );
+
   return useMemo(
     () => ({
       user,
@@ -115,8 +208,27 @@ export function usePortalShell(): PortalShellState {
       loading,
       errorMessage,
       loginWithCredentials,
-      logout
+      logout,
+      ruleProfile,
+      ruleEvaluation,
+      loadRuleProfile,
+      loadRuleEvaluations,
+      revalidateRules
     }),
-    [user, modules, notifications, source, loading, errorMessage, loginWithCredentials, logout]
+    [
+      user,
+      modules,
+      notifications,
+      source,
+      loading,
+      errorMessage,
+      loginWithCredentials,
+      logout,
+      ruleProfile,
+      ruleEvaluation,
+      loadRuleProfile,
+      loadRuleEvaluations,
+      revalidateRules
+    ]
   );
 }
