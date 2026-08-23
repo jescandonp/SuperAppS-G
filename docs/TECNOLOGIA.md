@@ -157,3 +157,16 @@ Cambios de tecnologia deben actualizar, en este orden:
 3. `docs/TECNOLOGIA.md`.
 4. SPECs afectadas.
 5. Planes afectados.
+
+## 12. Decision Tecnologica I9
+
+El MVP de programacion asistida usa un **motor heuristico deterministico interno
+en .NET 6**, integrado en el backend existente. Recibe snapshots versionados,
+aplica reglas ordenadas y produce el mismo resultado para la misma entrada,
+parametros y version de reglas. Cada resultado debe conservar razones, puntajes,
+vacantes y excepciones para revision humana.
+
+I9 no incorpora optimizador comercial, solver remoto, IA generativa ni servicio
+cloud: opera **sin dependencia externa en el MVP**. Una evolucion a otro motor
+requiere evidencia del piloto, actualizacion de arquitectura/tecnologia, nueva
+SPEC aprobada y preservacion del contrato deterministico y auditable.

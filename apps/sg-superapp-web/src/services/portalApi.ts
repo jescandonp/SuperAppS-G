@@ -1,5 +1,7 @@
 import { API_BASE_URL } from "../config";
 import type { AnnulCertificateRequest, AppModule, CertificatePreview, CertificatePreviewRequest, CertificateSigner, CertificateSignerRequest, CertificateSignerStatus, CertificateStatus, CertificateType, CreatePositionAssignmentRequest, CreateTrainingRecordRequest, CurrentUser, EmployeeDetail, EmployeeSummary, FinalizePositionAssignmentRequest, ImportBatchError, ImportBatchRow, ImportBatchSummary, ImportColumnMapping, ImportPrevalidationResponse, ImportRowClassification, LaborCertificate, LaborCertificateHistoryItem, LoginRequest, LoginResponse, NotificationItem, PositionAssignment, RoleCode, ServicePosition, ServicePositionRequest, ServicePositionStatus, TrainingComplianceDetail, TrainingComplianceStatus, TrainingComplianceSummary, TrainingRecord, TrainingRequirementCategory, TrainingRequirementStatus, TrainingRequirementType, TrainingServiceEnablement, TrainingServiceEnablementStatus, UpsertTrainingRequirementTypeRequest } from "../types/portal";
+import type { ScheduleComparison, ScheduleProposal, SchedulingCapabilities, SchedulingProject, ShiftTemplate } from "../types/portal";
+import type { PersistedSchedulingRuleBatch, PreEvaluateSchedulingRulesRequest, SchedulingEnvironmentScope, SchedulingRuleEvaluation, SchedulingRuleGateCode, SchedulingRuleProblem, SchedulingRuleProfile } from "../types/portal";
 
 const SESSION_TOKEN_KEY = "sg.superapp.sessionToken";
 
@@ -8,21 +10,65 @@ function getSessionHeaders(): HeadersInit {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+const RULE_GATE_CODES: readonly SchedulingRuleGateCode[] = [
+  "RULE_BLOCKED",
+  "RULE_UNVERIFIED",
+  "RULE_EXCEPTION_REQUIRED",
+  "RULE_EVALUATION_MISSING",
+  "RULE_EVALUATION_SUPERSEDED",
+  "RULE_ASSIGNMENT_UNEVALUATED"
+];
+
+function isRuleGateCode(value: unknown): value is SchedulingRuleGateCode {
+  return typeof value === "string" && RULE_GATE_CODES.includes(value as SchedulingRuleGateCode);
+}
+
+// A refused transition arrives as application/problem+json carrying a stable `code`. Flattening it
+// to a message would discard the one field that says which state the schedule is in, leaving the UI
+// to guess from Spanish prose. The code travels with the error instead.
+export class PortalApiError extends Error {
+  readonly status: number;
+  readonly code: SchedulingRuleGateCode | null;
+  readonly title: string | null;
+
+  constructor(problem: SchedulingRuleProblem) {
+    super(problem.message);
+    this.name = "PortalApiError";
+    this.status = problem.status;
+    this.code = problem.code;
+    this.title = problem.title;
+  }
+
+  get problem(): SchedulingRuleProblem {
+    return { status: this.status, code: this.code, title: this.title, message: this.message };
+  }
+}
+
+async function readProblem(response: Response): Promise<SchedulingRuleProblem> {
+  let code: SchedulingRuleGateCode | null = null;
+  let title: string | null = null;
+  let message: string | undefined;
+
+  try {
+    const data = (await response.json()) as { message?: string; detail?: string; title?: string; code?: unknown };
+    message = data.message ?? data.detail;
+    title = typeof data.title === "string" ? data.title : null;
+    // A code the client does not know is not passed through as if it were understood.
+    code = isRuleGateCode(data.code) ? data.code : null;
+  } catch {
+    message = undefined;
+  }
+
+  return { status: response.status, code, title, message: message || `API request failed: ${response.status}` };
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: getSessionHeaders()
   });
 
   if (!response.ok) {
-    let message: string | undefined;
-    try {
-      const data = (await response.json()) as { message?: string };
-      message = data.message;
-    } catch {
-      message = undefined;
-    }
-
-    throw new Error(message || `API request failed: ${response.status}`);
+    throw new PortalApiError(await readProblem(response));
   }
 
   return response.json() as Promise<T>;
@@ -39,6 +85,15 @@ async function sendJson<T>(path: string, method: "POST" | "PUT", body?: unknown)
   });
 
   if (!response.ok) {
+    throw new PortalApiError(await readProblem(response));
+  }
+
+  return response.json() as Promise<T>;
+}
+
+async function downloadSchedulingExport(path: string, fileName: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}${path}`, { headers: getSessionHeaders() });
+  if (!response.ok) {
     let message: string | undefined;
     try {
       const data = (await response.json()) as { message?: string };
@@ -46,11 +101,64 @@ async function sendJson<T>(path: string, method: "POST" | "PUT", body?: unknown)
     } catch {
       message = undefined;
     }
-
     throw new Error(message || `API request failed: ${response.status}`);
   }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
-  return response.json() as Promise<T>;
+export async function fetchSchedulingCapabilities(): Promise<SchedulingCapabilities> {
+  return getJson<SchedulingCapabilities>("/portal/scheduling/capabilities");
+}
+
+export async function fetchSchedulingProjects(): Promise<SchedulingProject[]> {
+  return getJson<SchedulingProject[]>("/portal/scheduling/projects");
+}
+
+export async function fetchShiftTemplates(): Promise<ShiftTemplate[]> {
+  return getJson<ShiftTemplate[]>("/portal/scheduling/shift-templates");
+}
+
+export async function generateScheduleProposal(projectId: number, request: { periodStart: string; periodEnd: string; acceptedVacancy?: boolean }): Promise<ScheduleProposal> {
+  return sendJson<ScheduleProposal>(`/portal/scheduling/projects/${projectId}/proposals`, "POST", request);
+}
+
+export async function fetchScheduleProposal(versionId: number): Promise<ScheduleProposal> {
+  return getJson<ScheduleProposal>(`/portal/scheduling/proposals/${versionId}`);
+}
+
+export async function updateScheduleAssignment(versionId: number, assignmentId: number, request: { employeeId?: number; status: "ASIGNADA" | "VACANTE"; reasons?: string[]; expectedVersion: number }): Promise<ScheduleProposal> {
+  return sendJson<ScheduleProposal>(`/portal/scheduling/proposals/${versionId}/assignments/${assignmentId}`, "PUT", request);
+}
+
+export async function approveScheduleException(versionId: number, request: { assignmentId?: number; exceptionType: string; reason: string; responsible: string; resolutionDate: string; expectedVersion: number }): Promise<ScheduleProposal> {
+  return sendJson<ScheduleProposal>(`/portal/scheduling/proposals/${versionId}/exceptions`, "POST", request);
+}
+
+export async function approveSchedule(versionId: number, expectedVersion: number): Promise<ScheduleProposal> {
+  return sendJson<ScheduleProposal>(`/portal/scheduling/proposals/${versionId}/approve`, "POST", { expectedVersion });
+}
+
+export async function publishSchedule(versionId: number, expectedVersion: number): Promise<ScheduleProposal> {
+  return sendJson<ScheduleProposal>(`/portal/scheduling/proposals/${versionId}/publish`, "POST", { expectedVersion });
+}
+
+export async function replanSchedule(versionId: number, request: { triggerType: string; triggerId: string; modes: Array<"MINIMUM_IMPACT" | "GLOBAL"> }): Promise<{ versionId: number; triggerType: string; triggerId: string; scenarios: ScheduleComparison[] }> {
+  return sendJson(`/portal/scheduling/versions/${versionId}/replan`, "POST", request);
+}
+
+export async function downloadSchedulePdf(versionId: number, filters: { positionId?: number; employeeId?: number } = {}): Promise<void> {
+  const query = new URLSearchParams(Object.entries(filters).filter((entry) => entry[1] !== undefined).map(([key, value]) => [key, String(value)]));
+  return downloadSchedulingExport(`/portal/scheduling/versions/${versionId}/export.pdf${query.size ? `?${query}` : ""}`, `programacion-v${versionId}.pdf`);
+}
+
+export async function downloadScheduleXlsx(versionId: number, filters: { positionId?: number; employeeId?: number } = {}): Promise<void> {
+  const query = new URLSearchParams(Object.entries(filters).filter((entry) => entry[1] !== undefined).map(([key, value]) => [key, String(value)]));
+  return downloadSchedulingExport(`/portal/scheduling/versions/${versionId}/export.xlsx${query.size ? `?${query}` : ""}`, `programacion-v${versionId}.xlsx`);
 }
 
 export async function fetchCurrentUser(): Promise<CurrentUser> {
@@ -389,4 +497,52 @@ export async function prevalidateEmployeeCsv(file: File, uploadedBy: string): Pr
   }
 
   return data;
+}
+
+
+// --- I9 MVP versioned rules ------------------------------------------------------------------
+// Each function returns the shape its route actually returns. None of them derives an approval
+// decision: whether a transition will succeed is the server's answer to the transition itself.
+
+// The route answers 200 with a list and never 404s, so "no active profile for this scope" is an
+// empty result, not an error. The list is unfiltered by status, so the caller must select.
+export async function fetchSchedulingRuleProfiles(
+  projectCode: string,
+  period: string,
+  environmentScope: SchedulingEnvironmentScope
+): Promise<SchedulingRuleProfile[]> {
+  const query = new URLSearchParams({ projectCode, period, environmentScope });
+  return getJson<SchedulingRuleProfile[]>(`/portal/scheduling/rule-profiles?${query.toString()}`);
+}
+
+export async function fetchSchedulingRuleProfile(id: number): Promise<SchedulingRuleProfile> {
+  return getJson<SchedulingRuleProfile>(`/portal/scheduling/rule-profiles/${id}`);
+}
+
+// Persisted verdicts, with no summary: this route has none. Reading an approval decision from here
+// is what threw before, and the UI does not need one.
+export async function fetchSchedulingRuleEvaluations(
+  scheduleVersionId: number
+): Promise<SchedulingRuleEvaluation[]> {
+  const query = new URLSearchParams({ scheduleVersionId: String(scheduleVersionId) });
+  return getJson<SchedulingRuleEvaluation[]>(`/portal/scheduling/rules/evaluations?${query.toString()}`);
+}
+
+// The only response that carries the server's summary, because it is the only one that evaluated
+// anything. It also writes, so it belongs to an explicit revalidation, never to a page load.
+export async function evaluateSchedulingRules(
+  scheduleVersionId: number,
+  assignmentId: number | null,
+  request: PreEvaluateSchedulingRulesRequest
+): Promise<PersistedSchedulingRuleBatch> {
+  const query = new URLSearchParams({ scheduleVersionId: String(scheduleVersionId) });
+  if (assignmentId !== null) {
+    query.set("assignmentId", String(assignmentId));
+  }
+
+  return sendJson<PersistedSchedulingRuleBatch>(
+    `/portal/scheduling/rules/evaluate?${query.toString()}`,
+    "POST",
+    request
+  );
 }

@@ -1,5 +1,97 @@
 export type RoleCode = "ADMIN" | "TH" | "GERENCIA" | "OPERACIONES";
 
+export type ScheduleStatus = "BORRADOR" | "PROPUESTA" | "APROBADA" | "PUBLICADA" | "REEMPLAZADA" | "CANCELADA";
+export type ShiftCode = "D" | "N" | "X";
+export type RequirementSeverity = "BLOQUEANTE" | "SUBSANABLE" | "INFORMATIVA";
+
+export interface ShiftTemplate {
+  id: number;
+  code: string;
+  name: string;
+  version: number;
+  mandatoryByDefault: boolean;
+  status: "ACTIVO" | "INACTIVO";
+  steps: Array<{ order: number; shiftCode: ShiftCode }>;
+}
+
+export interface SchedulingProject {
+  id: number;
+  clientId: number;
+  code: string;
+  name: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  status: "ACTIVO" | "INACTIVO";
+}
+
+export interface ScheduleAssignment {
+  id: number;
+  date: string;
+  startsAt: string;
+  endsAt: string;
+  positionId: number;
+  employeeId?: number;
+  shiftCode: ShiftCode;
+  status: "ASIGNADA" | "VACANTE";
+  score?: number;
+  reasons: Array<{ code: string; severity: string; message: string }>;
+}
+
+export interface ScheduleException {
+  id: number;
+  assignmentId?: number;
+  exceptionType: string;
+  reason: string;
+  responsible: string;
+  resolutionDate: string;
+  status: "REGISTRADA" | "APROBADA" | "RECHAZADA" | "CANCELADA";
+  // A decision binds to the rule and the exact snapshot it was taken on. Optional because rows
+  // predating the versioned regime carry none, and a decision with no scope must be shown as such
+  // rather than rendered as though it covered anything.
+  ruleCode?: string;
+  scopeHash?: string;
+  motiveCode?: string;
+  decision?: "APPROVED" | "REJECTED" | "CANCELLED";
+}
+
+export interface ScheduleProposal {
+  versionId: number;
+  scheduleId: number;
+  projectId: number;
+  versionNumber: number;
+  status: ScheduleStatus;
+  periodStart: string;
+  periodEnd: string;
+  coveragePercent: number;
+  vacancyCount: number;
+  exceptionCount: number;
+  acceptedVacancy: boolean;
+  createdBy: string;
+  approvedBy: string | null;
+  publishedBy: string | null;
+  selfManaged: boolean;
+  assignments?: ScheduleAssignment[];
+  exceptions?: ScheduleException[];
+}
+
+export interface ScheduleComparison {
+  mode: "MINIMUM_IMPACT" | "GLOBAL";
+  changedAssignments: number;
+  additionalHours: number;
+  vacancies: number;
+  exceptions: number;
+}
+
+export interface SchedulingCapabilities {
+  view: boolean;
+  configure: boolean;
+  generate: boolean;
+  approveException: boolean;
+  approve: boolean;
+  publish: boolean;
+  export: boolean;
+}
+
 export interface CurrentUser {
   id: number;
   fullName: string;
@@ -380,4 +472,149 @@ export interface TrainingComplianceDetail {
   serviceEnablement: TrainingServiceEnablement;
   currentRequirements: TrainingRecord[];
   trainingHistory: TrainingRecord[];
+}
+
+// --- I9 MVP versioned rule contracts ---------------------------------------------------------
+// Every verdict below is the server's. The frontend never decides whether a rule is satisfied nor
+// whether a schedule may be approved: it renders what the versioned evaluation already said. The
+// unions mirror the API and are exhaustive on purpose, so a state the backend can emit and the UI
+// has not handled is a compile error rather than a blank panel.
+
+export type SchedulingRuleCode = "I9-R01" | "I9-R02" | "I9-R03" | "I9-R04" | "I9-R05" | "I9-R06" | "I9-R07";
+
+export type SchedulingRuleOutcome =
+  | "COMPLIANT"
+  | "BLOCKED"
+  | "EXCEPTION_REQUIRED"
+  | "WARNING"
+  | "NOT_APPLICABLE";
+
+export type SchedulingRuleSeverity = "INFO" | "WARNING" | "ERROR" | "BLOCKING";
+
+export type SchedulingRuleOrigin = "SIMULATED" | "INSTITUTIONAL";
+
+export type SchedulingEnvironmentScope = "MVP_TEST" | "PRODUCTION";
+
+export type SchedulingRuleProfileStatus = "DRAFT" | "ACTIVE" | "RETIRED";
+
+// The states an approval or a publication can be refused on, as the API states them. Mirrors
+// RuleGateCodes in apps/sg-superapp-api/Endpoints/PortalEndpoints.cs, which is the source of truth.
+export type SchedulingRuleGateCode =
+  | "RULE_BLOCKED"
+  | "RULE_UNVERIFIED"
+  | "RULE_EXCEPTION_REQUIRED"
+  | "RULE_EVALUATION_MISSING"
+  | "RULE_EVALUATION_SUPERSEDED"
+  | "RULE_ASSIGNMENT_UNEVALUATED";
+
+export interface SchedulingRuleProfileEntry {
+  ruleCode: SchedulingRuleCode;
+  parameters: unknown;
+  catalogSnapshot: unknown;
+  enabled: boolean;
+}
+
+export interface SchedulingRuleProfile {
+  id: number;
+  profileCode: string;
+  version: number;
+  origin: SchedulingRuleOrigin;
+  environmentScope: SchedulingEnvironmentScope;
+  scopeCode: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  status: SchedulingRuleProfileStatus;
+  checksum: string;
+  simulated: boolean;
+  entries: SchedulingRuleProfileEntry[];
+}
+
+export interface SchedulingRuleEvaluation {
+  ruleCode: SchedulingRuleCode;
+  profileVersion: number;
+  outcome: SchedulingRuleOutcome;
+  severity: SchedulingRuleSeverity;
+  messageCode: string;
+  explanation: string;
+  scopeHash: string;
+  parametersSnapshot: unknown;
+  factsSnapshot: unknown;
+  exceptionAllowed: boolean;
+}
+
+export interface SchedulingRuleSummary {
+  total: number;
+  compliant: number;
+  blocked: number;
+  exceptionRequired: number;
+  warning: number;
+  notApplicable: number;
+  // Decided by the server. The UI must not recompute it from the counts above.
+  canApproveOrPublish: boolean;
+}
+
+// The API answers with three different shapes and the client models all three, because modelling
+// one of them everywhere is how UNCONFIGURED became dead code and how reading a summary from the
+// wrong route threw. GET /rule-profiles returns a LIST, and never 404s. GET /rules/evaluations
+// returns a LIST of verdicts with no summary. Only POST /rules/evaluate returns a batch, and its
+// rows carry an evaluationId instead of the snapshots the persisted rows have.
+export interface PersistedSchedulingRuleEvaluation {
+  evaluationId: number;
+  ruleCode: SchedulingRuleCode;
+  outcome: SchedulingRuleOutcome;
+  severity: SchedulingRuleSeverity;
+  messageCode: string;
+  explanation: string;
+  scopeHash: string;
+  exceptionAllowed: boolean;
+}
+
+export interface PersistedSchedulingRuleBatch {
+  ruleProfileId: number;
+  profileVersion: number;
+  simulated: boolean;
+  evaluations: PersistedSchedulingRuleEvaluation[];
+  summary: SchedulingRuleSummary;
+}
+
+// A refusal the API stated, carried whole rather than flattened to a sentence. `code` is null for
+// anything that is not a rule gate, so a caller cannot mistake an ordinary conflict for one.
+export interface SchedulingRuleProblem {
+  status: number;
+  code: SchedulingRuleGateCode | null;
+  title: string | null;
+  message: string;
+}
+
+// Loading, failure and incomplete configuration are states, not an absent value: the panel has to
+// tell "no active profile for this scope" from "the request failed" from "still loading", and
+// showing an empty rule list for any of them would read as "nothing to worry about".
+export type SchedulingRuleProfileState =
+  | { status: "IDLE" }
+  | { status: "LOADING" }
+  | { status: "READY"; profile: SchedulingRuleProfile }
+  | { status: "UNCONFIGURED"; message: string }
+  | { status: "FAILED"; problem: SchedulingRuleProblem };
+
+// Reading what is persisted gives verdicts and nothing else. There is no approval decision here,
+// and the UI must not manufacture one: it renders these and lets the server refuse the transition.
+export type SchedulingRuleEvaluationState =
+  | { status: "IDLE" }
+  | { status: "LOADING" }
+  | { status: "READY"; evaluations: SchedulingRuleEvaluation[] }
+  | { status: "FAILED"; problem: SchedulingRuleProblem };
+
+// A re-evaluation is the only response that carries the server's summary.
+export type SchedulingRuleRevalidationState =
+  | { status: "IDLE" }
+  | { status: "LOADING" }
+  | { status: "READY"; batch: PersistedSchedulingRuleBatch }
+  | { status: "FAILED"; problem: SchedulingRuleProblem };
+
+export interface PreEvaluateSchedulingRulesRequest {
+  ruleProfileId: number;
+  projectCode: string;
+  period: string;
+  environmentScope: SchedulingEnvironmentScope;
+  facts: unknown;
 }

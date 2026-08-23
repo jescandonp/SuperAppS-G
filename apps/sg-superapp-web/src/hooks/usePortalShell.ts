@@ -17,6 +17,7 @@ interface PortalShellState {
   logout: () => void;
 }
 
+
 function readStoredUser(): CurrentUser | null {
   const raw = sessionStorage.getItem(SESSION_USER_KEY);
   if (!raw) {
@@ -106,6 +107,9 @@ export function usePortalShell(): PortalShellState {
     }
   }, []);
 
+
+
+
   return useMemo(
     () => ({
       user,
@@ -117,6 +121,15 @@ export function usePortalShell(): PortalShellState {
       loginWithCredentials,
       logout
     }),
-    [user, modules, notifications, source, loading, errorMessage, loginWithCredentials, logout]
+    [
+      user,
+      modules,
+      notifications,
+      source,
+      loading,
+      errorMessage,
+      loginWithCredentials,
+      logout
+    ]
   );
 }

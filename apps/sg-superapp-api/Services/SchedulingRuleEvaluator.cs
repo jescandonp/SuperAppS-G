@@ -1,0 +1,675 @@
+using System.Globalization;
+using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using Npgsql;
+using Sg.SuperApp.Api.Domain;
+
+namespace Sg.SuperApp.Api.Services;
+
+public sealed record SchedulingRuleEvaluationBatch(
+    long RuleProfileId,
+    string ProfileCode,
+    int ProfileVersion,
+    bool Simulated,
+    IReadOnlyList<RuleEvaluation> Evaluations,
+    SchedulingRuleEvaluationSummary Summary);
+
+public sealed record SchedulingRuleEvaluationSummary(
+    int Total,
+    int Compliant,
+    int Blocked,
+    int ExceptionRequired,
+    int Warning,
+    int NotApplicable,
+    bool CanApproveOrPublish);
+
+public sealed class SchedulingRuleEvaluator
+{
+    // Keeps the evaluator compatible with focused harnesses that exercise only R01/R02.
+    private const string R03EvaluatorEntryPoint = "SchedulingOverlapTravelRules.EvaluateR03(";
+    private const string R05EvaluatorEntryPoint = "SchedulingOverlapTravelRules.EvaluateR05(";
+    private const string R04EvaluatorEntryPoint = "SchedulingNoveltyRequirementRules.EvaluateR04(";
+    private const string R06EvaluatorEntryPoint = "SchedulingNoveltyRequirementRules.EvaluateR06(";
+    private const int MaximumFactsUtf8Bytes = 256 * 1024;
+    private const int MaximumFactsDepth = 32;
+    private const int MaximumFactsNodes = 4096;
+    private static readonly IReadOnlyDictionary<string, HashSet<string>> RootFactsByRule =
+        new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+    {
+        ["I9-R01"] = Fields("assignmentId", "scheduleVersionId", "dailyHours", "weeklyHours", "writtenAgreement"),
+        ["I9-R02"] = Fields("assignmentId", "scheduleVersionId", "previousShiftEnd", "proposedShiftStart"),
+        ["I9-R03"] = Fields("assignmentId", "scheduleVersionId", "employeeId", "proposedShiftStart", "proposedShiftEnd", "existingIntervals"),
+        ["I9-R04"] = Fields("assignmentId", "scheduleVersionId", "employeeId", "shiftId", "shiftStart", "shiftEnd", "noveltyEvaluations"),
+        ["I9-R05"] = Fields("assignmentId", "previousAssignmentId", "scheduleVersionId", "employeeId", "originPositionCode", "destinationPositionCode", "previousShiftStart", "previousShiftEnd", "proposedShiftStart", "proposedShiftEnd"),
+        ["I9-R06"] = Fields("assignmentId", "scheduleVersionId", "employeeId", "positionCode", "shiftId", "shiftStart", "shiftEnd", "requirementEvaluations"),
+        ["I9-R07"] = Fields("assignmentId", "scheduleVersionId", "templateCode", "templateVersion", "anchorDate", "expectedCells", "proposedCells")
+    };
+    private static readonly HashSet<string> AllowedRootFacts = RootFactsByRule.Values
+        .SelectMany(fields => fields).ToHashSet(StringComparer.Ordinal);
+    private static readonly HashSet<string> AllowedNestedFacts = Fields(
+        "start", "end", "positionCode", "shiftId", "code", "status", "validFrom", "validTo", "required",
+        "evidenceCode", "minutes", "prohibited", "cell", "expected", "proposed", "date", "shiftCode", "employeeId",
+        "noveltyId", "sourceSystem", "sourceCode", "sourceStatus", "semanticCategory", "mappingVersion",
+        "evaluationId", "requirementCode", "category", "catalogVersion", "sourceRequirementCode",
+        "evidenceId", "evidenceSource", "evidenceState", "evidenceType", "informativeRemediable",
+        "remediationOwnerRole", "remediationOwnerKey", "dueDate");
+    private static readonly Regex AnonymousCode = new("^[A-Za-z0-9._:/-]{1,80}$", RegexOptions.CultureInvariant);
+
+    public SchedulingRuleEvaluationBatch Evaluate(
+        SchedulingRuleProfile profile,
+        string projectCode,
+        DateOnly period,
+        JsonElement facts,
+        IReadOnlySet<string>? approvedExceptionScopeHashes = null)
+    {
+        if (string.IsNullOrWhiteSpace(projectCode) || facts.ValueKind != JsonValueKind.Object)
+            throw new ArgumentException("Project and object-shaped facts are required for rule evaluation.");
+        ValidateFacts(facts);
+
+        var results = profile.Entries
+            // No rule is ever dropped for being disabled. A missing evaluation would let the summary
+            // approve by omission, which is the opposite of what every rule contract requires in
+            // development mode: "no decide cumplimiento productivo".
+            .OrderBy(entry => entry.RuleCode, StringComparer.Ordinal)
+            .Select(entry => CreateEvaluation(profile, entry, projectCode, period, facts))
+            .ToArray();
+
+        var summary = new SchedulingRuleEvaluationSummary(
+            results.Length,
+            results.Count(result => result.Outcome == SchedulingRuleOutcome.COMPLIANT),
+            results.Count(result => result.Outcome == SchedulingRuleOutcome.BLOCKED),
+            results.Count(result => result.Outcome == SchedulingRuleOutcome.EXCEPTION_REQUIRED),
+            results.Count(result => result.Outcome == SchedulingRuleOutcome.WARNING),
+            results.Count(result => result.Outcome == SchedulingRuleOutcome.NOT_APPLICABLE),
+            CanApproveOrPublish: results.Length > 0 && results.All(result =>
+                result.Outcome is SchedulingRuleOutcome.COMPLIANT or SchedulingRuleOutcome.NOT_APPLICABLE ||
+                result.Outcome == SchedulingRuleOutcome.EXCEPTION_REQUIRED && result.ExceptionAllowed &&
+                approvedExceptionScopeHashes?.Contains(result.ScopeHash) == true));
+
+        return new SchedulingRuleEvaluationBatch(
+            profile.Id,
+            profile.ProfileCode,
+            profile.Version,
+            profile.Origin == SchedulingRuleOrigin.SIMULATED,
+            results,
+            summary);
+    }
+
+    private static void ValidateFacts(JsonElement facts)
+    {
+        if (Encoding.UTF8.GetByteCount(facts.GetRawText()) > MaximumFactsUtf8Bytes)
+            throw new ArgumentException("Facts exceed the safe MVP size limit.");
+        var pending = new Stack<(JsonElement Element, int Depth)>();
+        pending.Push((facts, 1));
+        var nodes = 0;
+        while (pending.Count > 0)
+        {
+            var current = pending.Pop();
+            if (++nodes > MaximumFactsNodes || current.Depth > MaximumFactsDepth)
+                throw new ArgumentException("Facts exceed safe MVP structural limits.");
+            if (current.Element.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var property in current.Element.EnumerateObject())
+                {
+                    var allowed = current.Depth == 1 ? AllowedRootFacts : AllowedNestedFacts;
+                    if (!allowed.Contains(property.Name))
+                        throw new ArgumentException("Facts contain a field outside the anonymous rule schema.");
+                    if (property.Value.ValueKind == JsonValueKind.Array)
+                        foreach (var item in property.Value.EnumerateArray())
+                        {
+                            if (item.ValueKind == JsonValueKind.Array)
+                                throw new ArgumentException("Facts cannot contain nested arrays.");
+                            ValidateScalar(property.Name, item);
+                        }
+                    else ValidateScalar(property.Name, property.Value);
+                    pending.Push((property.Value, current.Depth + 1));
+                }
+            }
+            else if (current.Element.ValueKind == JsonValueKind.Array)
+                foreach (var item in current.Element.EnumerateArray()) pending.Push((item, current.Depth + 1));
+        }
+    }
+
+    private static void ValidateScalar(string propertyName, JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.String) return;
+        var text = value.GetString() ?? string.Empty;
+        if (propertyName.EndsWith("Start", StringComparison.Ordinal) || propertyName.EndsWith("End", StringComparison.Ordinal) ||
+            propertyName is "start" or "end" or "validFrom" or "validTo" or "date" or "anchorDate" or "validatedAt")
+        {
+            if (!DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out _) &&
+                !DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+                throw new ArgumentException("Facts contain an invalid temporal value.");
+            return;
+        }
+        if (!AnonymousCode.IsMatch(text))
+            throw new ArgumentException("Facts contain a non-anonymous free-text value.");
+    }
+
+    private static JsonElement SanitizeFacts(string ruleCode, JsonElement facts)
+    {
+        if (!RootFactsByRule.TryGetValue(ruleCode, out var allowed)) throw new SchedulingRuleContractException();
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            foreach (var property in facts.EnumerateObject().Where(property => allowed.Contains(property.Name))
+                         .OrderBy(property => property.Name, StringComparer.Ordinal))
+            {
+                writer.WritePropertyName(property.Name);
+                property.Value.WriteTo(writer);
+            }
+            writer.WriteEndObject();
+        }
+        using var document = JsonDocument.Parse(stream.ToArray());
+        return document.RootElement.Clone();
+    }
+
+    private static HashSet<string> Fields(params string[] names) => new(names, StringComparer.Ordinal);
+
+    private static RuleEvaluation CreateEvaluation(
+        SchedulingRuleProfile profile,
+        SchedulingRuleProfileEntry entry,
+        string projectCode,
+        DateOnly period,
+        JsonElement facts)
+    {
+        var sanitizedFacts = SanitizeFacts(entry.RuleCode, facts);
+        var scopeHash = ComputeScopeHash(profile, entry, projectCode, period, sanitizedFacts);
+        if (!entry.Enabled)
+            return new RuleEvaluation(
+                entry.RuleCode,
+                profile.Version,
+                SchedulingRuleOutcome.WARNING,
+                SchedulingRuleSeverity.ERROR,
+                entry.RuleCode.Replace("-", "_", StringComparison.Ordinal) + "_DISABLED_UNVERIFIED",
+                "La regla esta desactivada y no produce una decision de cumplimiento.",
+                scopeHash,
+                entry.Parameters.Clone(),
+                sanitizedFacts,
+                ExceptionAllowed: false);
+        var decision = entry.RuleCode switch
+        {
+            "I9-R01" => ToRuleDecision(SchedulingWorkRestRules.EvaluateR01(entry.Parameters, sanitizedFacts)),
+            "I9-R02" => ToRuleDecision(SchedulingWorkRestRules.EvaluateR02(entry.Parameters, sanitizedFacts)),
+            "I9-R03" => EvaluateOverlapTravelRule("EvaluateR03", entry.Parameters, sanitizedFacts),
+            "I9-R04" => EvaluateNoveltyRequirementRule("EvaluateR04", entry.Parameters, entry.CatalogSnapshot, sanitizedFacts),
+            "I9-R05" => EvaluateOverlapTravelRule("EvaluateR05", entry.Parameters, entry.CatalogSnapshot, sanitizedFacts),
+            "I9-R06" => EvaluateNoveltyRequirementRule("EvaluateR06", entry.Parameters, entry.CatalogSnapshot, sanitizedFacts, projectCode),
+            "I9-R07" => EvaluateTemplateDeviationRule("EvaluateR07", entry.Parameters, entry.CatalogSnapshot, sanitizedFacts),
+            _ => null
+        };
+        if (decision is not null)
+            return new RuleEvaluation(
+                entry.RuleCode,
+                profile.Version,
+                decision.Outcome,
+                decision.Severity,
+                decision.MessageCode,
+                decision.Explanation,
+                scopeHash,
+                entry.Parameters.Clone(),
+                sanitizedFacts,
+                decision.ExceptionAllowed);
+
+        return new RuleEvaluation(
+            entry.RuleCode,
+            profile.Version,
+            SchedulingRuleOutcome.WARNING,
+            SchedulingRuleSeverity.ERROR,
+            "I9_RULE_NOT_IMPLEMENTED",
+            "La regla aun no tiene evaluador funcional; no se acredita cumplimiento.",
+            scopeHash,
+            entry.Parameters.Clone(),
+            sanitizedFacts,
+            ExceptionAllowed: false);
+    }
+
+    private static RuleDecision ToRuleDecision(WorkRestRuleDecision decision) =>
+        new(decision.Outcome, decision.Severity, decision.MessageCode, decision.Explanation, decision.ExceptionAllowed);
+
+    private static RuleDecision EvaluateOverlapTravelRule(string methodName, params object[] arguments)
+    {
+        try
+        {
+            var rulesType = typeof(SchedulingRuleEvaluator).Assembly
+                .GetType("Sg.SuperApp.Api.Services.SchedulingOverlapTravelRules", throwOnError: false);
+            var method = rulesType?.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static);
+            var decision = method?.Invoke(null, arguments);
+            if (decision is null ||
+                decision.GetType().GetProperty("Outcome")?.GetValue(decision) is not SchedulingRuleOutcome outcome ||
+                decision.GetType().GetProperty("Severity")?.GetValue(decision) is not SchedulingRuleSeverity severity ||
+                decision.GetType().GetProperty("MessageCode")?.GetValue(decision) is not string messageCode ||
+                decision.GetType().GetProperty("Explanation")?.GetValue(decision) is not string explanation ||
+                decision.GetType().GetProperty("ExceptionAllowed")?.GetValue(decision) is not bool exceptionAllowed)
+                return OverlapEvaluatorUnavailable();
+            return new RuleDecision(outcome, severity, messageCode, explanation, exceptionAllowed);
+        }
+        catch (TargetInvocationException)
+        {
+            return OverlapEvaluatorUnavailable();
+        }
+    }
+
+    private static RuleDecision OverlapEvaluatorUnavailable() => new(
+        SchedulingRuleOutcome.BLOCKED,
+        SchedulingRuleSeverity.BLOCKING,
+        "I9_OVERLAP_TRAVEL_EVALUATOR_UNAVAILABLE",
+        "El evaluador de solapamiento o traslado no esta disponible; el MVP falla de forma cerrada.",
+        ExceptionAllowed: false);
+
+    private static RuleDecision EvaluateTemplateDeviationRule(string methodName, params object[] arguments)
+    {
+        try
+        {
+            var rulesType = typeof(SchedulingRuleEvaluator).Assembly
+                .GetType("Sg.SuperApp.Api.Services.SchedulingTemplateDeviationRule", throwOnError: false);
+            var method = rulesType?.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static);
+            var decision = method?.Invoke(null, arguments);
+            if (decision is null ||
+                decision.GetType().GetProperty("Outcome")?.GetValue(decision) is not SchedulingRuleOutcome outcome ||
+                decision.GetType().GetProperty("Severity")?.GetValue(decision) is not SchedulingRuleSeverity severity ||
+                decision.GetType().GetProperty("MessageCode")?.GetValue(decision) is not string messageCode ||
+                decision.GetType().GetProperty("Explanation")?.GetValue(decision) is not string explanation ||
+                decision.GetType().GetProperty("ExceptionAllowed")?.GetValue(decision) is not bool exceptionAllowed)
+                return TemplateDeviationEvaluatorUnavailable();
+            return new RuleDecision(outcome, severity, messageCode, explanation, exceptionAllowed);
+        }
+        catch (TargetInvocationException)
+        {
+            return TemplateDeviationEvaluatorUnavailable();
+        }
+    }
+
+    private static RuleDecision TemplateDeviationEvaluatorUnavailable() => new(
+        SchedulingRuleOutcome.WARNING,
+        SchedulingRuleSeverity.ERROR,
+        "I9_TEMPLATE_DEVIATION_EVALUATOR_UNAVAILABLE",
+        "El evaluador de desviacion de plantilla no esta disponible; no se acredita cumplimiento.",
+        ExceptionAllowed: false);
+
+    private static RuleDecision EvaluateNoveltyRequirementRule(string methodName, params object[] arguments)
+    {
+        try
+        {
+            var rulesType = typeof(SchedulingRuleEvaluator).Assembly
+                .GetType("Sg.SuperApp.Api.Services.SchedulingNoveltyRequirementRules", throwOnError: false);
+            var method = rulesType?.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static);
+            var decision = method?.Invoke(null, arguments);
+            if (decision is null ||
+                decision.GetType().GetProperty("Outcome")?.GetValue(decision) is not SchedulingRuleOutcome outcome ||
+                decision.GetType().GetProperty("Severity")?.GetValue(decision) is not SchedulingRuleSeverity severity ||
+                decision.GetType().GetProperty("MessageCode")?.GetValue(decision) is not string messageCode ||
+                decision.GetType().GetProperty("Explanation")?.GetValue(decision) is not string explanation ||
+                decision.GetType().GetProperty("ExceptionAllowed")?.GetValue(decision) is not bool exceptionAllowed)
+                return NoveltyRequirementEvaluatorUnavailable();
+            return new RuleDecision(outcome, severity, messageCode, explanation, exceptionAllowed);
+        }
+        catch (TargetInvocationException exception) when (exception.InnerException is SchedulingRuleContractException)
+        {
+            throw new SchedulingRuleContractException();
+        }
+        catch (TargetInvocationException)
+        {
+            return NoveltyRequirementEvaluatorUnavailable();
+        }
+    }
+
+    private static RuleDecision NoveltyRequirementEvaluatorUnavailable() => new(
+        SchedulingRuleOutcome.WARNING,
+        SchedulingRuleSeverity.ERROR,
+        "I9_NOVELTY_REQUIREMENT_EVALUATOR_UNAVAILABLE",
+        "El evaluador R04/R06 no esta disponible; no se acredita cumplimiento.",
+        ExceptionAllowed: false);
+
+    private sealed record RuleDecision(
+        SchedulingRuleOutcome Outcome,
+        SchedulingRuleSeverity Severity,
+        string MessageCode,
+        string Explanation,
+        bool ExceptionAllowed);
+
+    private static string ComputeScopeHash(
+        SchedulingRuleProfile profile,
+        SchedulingRuleProfileEntry entry,
+        string projectCode,
+        DateOnly period,
+        JsonElement facts)
+    {
+        var scope = string.Join("|", new[]
+        {
+            profile.Id.ToString(CultureInfo.InvariantCulture),
+            profile.ProfileCode,
+            profile.Version.ToString(CultureInfo.InvariantCulture),
+            profile.Checksum.ToLowerInvariant(),
+            profile.EnvironmentScope.ToString(),
+            projectCode.Trim(),
+            period.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            entry.RuleCode,
+            Canonicalize(entry.Parameters),
+            Canonicalize(entry.CatalogSnapshot),
+            Canonicalize(facts)
+        });
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(scope))).ToLowerInvariant();
+    }
+
+    private static string Canonicalize(JsonElement element) => element.ValueKind switch
+    {
+        JsonValueKind.Object => "{" + string.Join(",", element.EnumerateObject()
+            .GroupBy(property => property.Name, StringComparer.Ordinal)
+            .Select(group => group.Last())
+            .OrderBy(property => property.Name, StringComparer.Ordinal)
+            .Select(property => JsonSerializer.Serialize(property.Name) + ":" + Canonicalize(property.Value))) + "}",
+        JsonValueKind.Array => "[" + string.Join(",", element.EnumerateArray().Select(Canonicalize)) + "]",
+        JsonValueKind.String => JsonSerializer.Serialize(element.GetString()),
+        JsonValueKind.Number => SchedulingRuleProfileValidator.NormalizeJsonNumber(element.GetRawText()),
+        JsonValueKind.True => "true",
+        JsonValueKind.False => "false",
+        JsonValueKind.Null => "null",
+        _ => throw new ArgumentException("Facts contain an unsupported JSON value.")
+    };
+}
+
+public sealed record PersistedRequirementValidation(long Id,long EvaluationId,string RuleCode,string ScopeHash,
+    string EvidenceId,string Status,long ValidatorUserId,string ValidatorUsername,string ValidatedAt);
+
+public sealed class SchedulingRuleHttpRepository
+{
+    private readonly string _connectionString;
+
+    public SchedulingRuleHttpRepository(IConfiguration configuration)
+    {
+        _connectionString = configuration.GetConnectionString("Postgres")
+            ?? throw new InvalidOperationException("Postgres is not configured.");
+    }
+
+    public async Task<IReadOnlyList<SchedulingRuleProfile>> LoadProfilesAsync(string projectCode, DateOnly period,
+        SchedulingEnvironmentScope environment, CancellationToken cancellationToken)
+    {
+        const string sql = @"SELECT p.id,p.profile_code,p.version,p.origin,p.environment_scope,p.scope_code,p.effective_from,p.effective_to,p.status,p.checksum,
+limits.entry_count,limits.payload_within_limits,e.rule_code,e.parameters::text,e.catalog_snapshot::text,e.enabled FROM scheduling_rule_profiles p
+CROSS JOIN LATERAL (SELECT count(*) entry_count,coalesce(bool_and(
+octet_length(convert_to(s.parameters::text,'UTF8'))<=@parameters_bytes AND
+octet_length(convert_to(s.catalog_snapshot::text,'UTF8'))<=@catalog_bytes),TRUE) payload_within_limits
+FROM scheduling_rule_profile_entries s WHERE s.rule_profile_id=p.id) limits
+LEFT JOIN scheduling_rule_profile_entries e ON e.rule_profile_id=p.id AND limits.entry_count<=@maximum_entries AND limits.payload_within_limits
+WHERE p.scope_code=@scope AND p.environment_scope=@environment AND p.effective_from<=@period
+AND (p.effective_to IS NULL OR p.effective_to>=@period) ORDER BY p.id,e.rule_code";
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("scope", projectCode.Trim());
+        command.Parameters.AddWithValue("environment", environment.ToString());
+        command.Parameters.AddWithValue("period", period.ToDateTime(TimeOnly.MinValue));
+        AddPayloadLimitParameters(command);
+        return await ReadProfilesAsync(command, cancellationToken);
+    }
+
+    public async Task<SchedulingRuleProfile?> LoadProfileByIdAsync(long id, CancellationToken cancellationToken)
+    {
+        const string sql = @"SELECT p.id,p.profile_code,p.version,p.origin,p.environment_scope,p.scope_code,p.effective_from,p.effective_to,p.status,p.checksum,
+limits.entry_count,limits.payload_within_limits,e.rule_code,e.parameters::text,e.catalog_snapshot::text,e.enabled FROM scheduling_rule_profiles p
+CROSS JOIN LATERAL (SELECT count(*) entry_count,coalesce(bool_and(
+octet_length(convert_to(s.parameters::text,'UTF8'))<=@parameters_bytes AND
+octet_length(convert_to(s.catalog_snapshot::text,'UTF8'))<=@catalog_bytes),TRUE) payload_within_limits
+FROM scheduling_rule_profile_entries s WHERE s.rule_profile_id=p.id) limits
+LEFT JOIN scheduling_rule_profile_entries e ON e.rule_profile_id=p.id AND limits.entry_count<=@maximum_entries AND limits.payload_within_limits
+WHERE p.id=@id ORDER BY e.rule_code";
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("id", id);
+        AddPayloadLimitParameters(command);
+        return (await ReadProfilesAsync(command, cancellationToken)).SingleOrDefault();
+    }
+
+    public async Task<bool> ActivateProfileAsync(long id, string expectedChecksum, string actor,
+        CancellationToken cancellationToken)
+    {
+        const string sql = @"UPDATE scheduling_rule_profiles p SET status='ACTIVE',activated_by=@actor,activated_at=NOW()
+WHERE p.id=@id AND p.status='DRAFT' AND p.checksum=@checksum
+AND p.checksum=(SELECT encode(public.digest(convert_to(string_agg(e.rule_code||':'||i9_mvp_canonical_jsonb(e.parameters)||':'||i9_mvp_canonical_jsonb(e.catalog_snapshot),'|' ORDER BY e.rule_code),'UTF8'),'sha256'),'hex')
+FROM scheduling_rule_profile_entries e WHERE e.rule_profile_id=p.id)
+AND (SELECT count(*) FROM scheduling_rule_profile_entries e WHERE e.rule_profile_id=p.id)=7 RETURNING p.id";
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("checksum", expectedChecksum);
+        command.Parameters.AddWithValue("actor", actor);
+        return await command.ExecuteScalarAsync(cancellationToken) is not null;
+    }
+
+    public async Task<bool> RetireProfileAsync(long id, CancellationToken cancellationToken)
+    {
+        const string sql = "UPDATE scheduling_rule_profiles SET status='RETIRED',effective_to=CURRENT_DATE WHERE id=@id AND status='ACTIVE' AND effective_from<=CURRENT_DATE RETURNING id";
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("id", id);
+        return await command.ExecuteScalarAsync(cancellationToken) is not null;
+    }
+
+    public async Task<IReadOnlyList<PersistedRuleEvaluation>> PersistEvaluationsAsync(
+        long scheduleVersionId, long? assignmentId, string projectCode, SchedulingRuleEvaluationBatch batch,
+        string actor, CancellationToken cancellationToken)
+    {
+        if (!batch.Simulated)
+            throw new InvalidOperationException("Solo se permite persistir evaluaciones SIMULATED/MVP_TEST en este MVP.");
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        const string bindSql = @"UPDATE schedule_versions sv
+SET rule_profile_id=@profile,rule_profile_version=@profile_version,simulated=@simulated
+FROM schedules s JOIN service_projects p ON p.id=s.project_id, scheduling_rule_profiles rp
+WHERE sv.id=@version AND s.id=sv.schedule_id AND p.code=@project AND sv.status='PROPUESTA'
+AND rp.id=@profile AND rp.origin='SIMULATED' AND rp.environment_scope='MVP_TEST'
+AND (sv.rule_profile_id IS NULL OR (sv.rule_profile_id=@profile AND sv.rule_profile_version=@profile_version AND sv.simulated=@simulated))
+RETURNING sv.id";
+        await using (var bind = new NpgsqlCommand(bindSql, connection, transaction))
+        {
+            bind.Parameters.AddWithValue("profile", batch.RuleProfileId);
+            bind.Parameters.AddWithValue("profile_version", batch.ProfileVersion);
+            bind.Parameters.AddWithValue("simulated", batch.Simulated);
+            bind.Parameters.AddWithValue("version", scheduleVersionId);
+            bind.Parameters.AddWithValue("project", projectCode.Trim());
+            if (await bind.ExecuteScalarAsync(cancellationToken) is null)
+                throw new InvalidOperationException("La propuesta no acepta esta evaluacion o perfil de reglas.");
+        }
+
+        if (assignmentId.HasValue)
+        {
+            await using var assignment = new NpgsqlCommand(
+                "SELECT EXISTS(SELECT 1 FROM schedule_assignments WHERE id=@assignment AND schedule_version_id=@version)",
+                connection, transaction);
+            assignment.Parameters.AddWithValue("assignment", assignmentId.Value);
+            assignment.Parameters.AddWithValue("version", scheduleVersionId);
+            if (await assignment.ExecuteScalarAsync(cancellationToken) is not true)
+                throw new InvalidOperationException("La asignacion no pertenece a la propuesta evaluada.");
+        }
+
+        var correlationId = Guid.NewGuid().ToString("N");
+        var persisted = new List<PersistedRuleEvaluation>(batch.Evaluations.Count);
+        const string insertSql = @"INSERT INTO scheduling_rule_evaluations(
+schedule_version_id,assignment_id,rule_profile_id,rule_code,outcome,severity,message_code,explanation,
+parameters_snapshot,facts_snapshot,scope_hash,exception_allowed,exception_status,correlation_id,audit_actor)
+VALUES(@version,@assignment,@profile,@rule,@outcome,@severity,@message,@explanation,
+@parameters::jsonb,@facts::jsonb,@scope,@exception_allowed,@exception_status,@correlation,@actor)
+RETURNING id";
+        foreach (var evaluation in batch.Evaluations)
+        {
+            await using var command = new NpgsqlCommand(insertSql, connection, transaction);
+            command.Parameters.AddWithValue("version", scheduleVersionId);
+            command.Parameters.Add("assignment", NpgsqlTypes.NpgsqlDbType.Bigint).Value =
+                assignmentId.HasValue ? assignmentId.Value : DBNull.Value;
+            command.Parameters.AddWithValue("profile", batch.RuleProfileId);
+            command.Parameters.AddWithValue("rule", evaluation.RuleCode);
+            command.Parameters.AddWithValue("outcome", evaluation.Outcome.ToString());
+            command.Parameters.AddWithValue("severity", evaluation.Severity.ToString());
+            command.Parameters.AddWithValue("message", evaluation.MessageCode);
+            command.Parameters.AddWithValue("explanation", evaluation.Explanation);
+            command.Parameters.AddWithValue("parameters", evaluation.ParametersSnapshot.GetRawText());
+            command.Parameters.AddWithValue("facts", evaluation.FactsSnapshot.GetRawText());
+            command.Parameters.AddWithValue("scope", evaluation.ScopeHash);
+            command.Parameters.AddWithValue("exception_allowed", evaluation.ExceptionAllowed);
+            command.Parameters.AddWithValue("exception_status",
+                evaluation.Outcome == SchedulingRuleOutcome.EXCEPTION_REQUIRED && evaluation.ExceptionAllowed
+                    ? "PENDING" : "NOT_REQUIRED");
+            command.Parameters.AddWithValue("correlation", correlationId);
+            command.Parameters.AddWithValue("actor", actor);
+            var id = (long)(await command.ExecuteScalarAsync(cancellationToken)
+                ?? throw new InvalidOperationException("No fue posible persistir la evaluacion de reglas."));
+            persisted.Add(new PersistedRuleEvaluation(id, evaluation));
+        }
+
+        await using (var audit = new NpgsqlCommand(@"INSERT INTO audit_log(
+actor_username,event_type,entity_type,entity_id,result,detail)
+VALUES(@actor,'SCHEDULE_RULES_EVALUATED','SCHEDULE_VERSION',@entity,'SUCCESS',
+jsonb_build_object('correlationId',@correlation,'evaluationCount',@count,'ruleProfileId',@profile))", connection, transaction))
+        {
+            audit.Parameters.AddWithValue("actor", actor);
+            audit.Parameters.AddWithValue("entity", scheduleVersionId.ToString(CultureInfo.InvariantCulture));
+            audit.Parameters.AddWithValue("correlation", correlationId);
+            audit.Parameters.AddWithValue("count", persisted.Count);
+            audit.Parameters.AddWithValue("profile", batch.RuleProfileId);
+            await audit.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+        return persisted;
+    }
+
+    public async Task<IReadOnlyList<RuleEvaluation>> LoadEvaluationsAsync(long scheduleVersionId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = @"SELECT rule_code,p.version,outcome,severity,message_code,explanation,scope_hash,
+parameters_snapshot::text,facts_snapshot::text,exception_allowed FROM scheduling_rule_evaluations e
+JOIN scheduling_rule_profiles p ON p.id=e.rule_profile_id WHERE schedule_version_id=@version ORDER BY rule_code,scope_hash";
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("version", scheduleVersionId);
+        var results = new List<RuleEvaluation>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            results.Add(new RuleEvaluation(reader.GetString(0), reader.GetInt32(1),
+                ParseStoredEnum<SchedulingRuleOutcome>(reader.GetString(2)),
+                ParseStoredEnum<SchedulingRuleSeverity>(reader.GetString(3)), reader.GetString(4), reader.GetString(5),
+                reader.GetString(6), ReadJson(reader.GetString(7)), ReadJson(reader.GetString(8)), reader.GetBoolean(9)));
+        return results;
+    }
+
+    public async Task<PersistedRequirementValidation> ValidateRequirementEvidenceAsync(
+        long evaluationId, string evidenceId, long validatorUserId, string validatorUsername,
+        CancellationToken cancellationToken)
+    {
+        const string sql = @"INSERT INTO scheduling_rule_hr_validations(
+evaluation_id,rule_code,scope_hash,evidence_id,status,validator_user_id,validator_username,audit_detail)
+SELECT e.id,e.rule_code,e.scope_hash,@evidence,'VALIDATED',@user,@username,
+jsonb_build_object('source','TH_AUTHORIZED_ENDPOINT','environment','MVP_TEST')
+FROM scheduling_rule_evaluations e
+JOIN scheduling_rule_profiles p ON p.id=e.rule_profile_id AND p.origin='SIMULATED' AND p.environment_scope='MVP_TEST'
+JOIN schedule_versions sv ON sv.id=e.schedule_version_id AND sv.simulated=true
+WHERE e.id=@evaluation AND e.rule_code='I9-R06' AND e.outcome='EXCEPTION_REQUIRED'
+AND EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(e.facts_snapshot->'requirementEvaluations','[]'::jsonb)) f WHERE f->>'evidenceId'=@evidence)
+ON CONFLICT(evaluation_id,rule_code,scope_hash,evidence_id) DO NOTHING
+RETURNING id,evaluation_id,rule_code,scope_hash,evidence_id,status,validator_user_id,validator_username,validated_at";
+        await using var connection=new NpgsqlConnection(_connectionString);await connection.OpenAsync(cancellationToken);
+        await using var command=new NpgsqlCommand(sql,connection);command.Parameters.AddWithValue("evaluation",evaluationId);command.Parameters.AddWithValue("evidence",evidenceId.Trim());command.Parameters.AddWithValue("user",validatorUserId);command.Parameters.AddWithValue("username",validatorUsername);
+        await using var reader=await command.ExecuteReaderAsync(cancellationToken);
+        if(!await reader.ReadAsync(cancellationToken))throw new InvalidOperationException("La evidencia no pertenece a una evaluacion R06 SIMULATED/MVP_TEST pendiente.");
+        return new(reader.GetInt64(0),reader.GetInt64(1),reader.GetString(2),reader.GetString(3),reader.GetString(4),reader.GetString(5),reader.GetInt64(6),reader.GetString(7),reader.GetFieldValue<DateTime>(8).ToString("O"));
+    }
+
+    public async Task<bool> AuditRequirementValidationDenialAsync(long evaluationId,long actorId,string actor,CancellationToken cancellationToken)
+    {
+        const string sql=@"INSERT INTO audit_log(actor_user_id,actor_username,event_type,entity_type,entity_id,result,detail)
+SELECT @user,@actor,'SCHEDULE_REQUIREMENT_VALIDATION_DENIED','RULE_EVALUATION',@entity,'DENIED',jsonb_build_object('action','VALIDATE_REQUIREMENT','environment','MVP_TEST')
+FROM scheduling_rule_evaluations e JOIN scheduling_rule_profiles p ON p.id=e.rule_profile_id JOIN schedule_versions sv ON sv.id=e.schedule_version_id
+WHERE e.id=@evaluation AND e.rule_code='I9-R06' AND p.origin='SIMULATED' AND p.environment_scope='MVP_TEST' AND sv.simulated=true";
+        await using var connection=new NpgsqlConnection(_connectionString);await connection.OpenAsync(cancellationToken);await using var command=new NpgsqlCommand(sql,connection);command.Parameters.AddWithValue("user",actorId);command.Parameters.AddWithValue("actor",actor);command.Parameters.AddWithValue("entity",evaluationId.ToString(CultureInfo.InvariantCulture));command.Parameters.AddWithValue("evaluation",evaluationId);return await command.ExecuteNonQueryAsync(cancellationToken)==1;
+    }
+
+    public async Task<IReadOnlyList<SchedulingRuleProfile>> LoadProfilesForEvaluationsAsync(long scheduleVersionId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = "SELECT DISTINCT rule_profile_id FROM scheduling_rule_evaluations WHERE schedule_version_id=@version ORDER BY rule_profile_id";
+        var profileIds = new List<long>();
+        await using (var connection = new NpgsqlConnection(_connectionString))
+        {
+            await connection.OpenAsync(cancellationToken);
+            await using var command = new NpgsqlCommand(sql, connection);
+            command.Parameters.AddWithValue("version", scheduleVersionId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken)) profileIds.Add(reader.GetInt64(0));
+        }
+        var profiles = new List<SchedulingRuleProfile>(profileIds.Count);
+        foreach (var profileId in profileIds)
+        {
+            var profile = await LoadProfileByIdAsync(profileId, cancellationToken);
+            if (profile is null) throw new SchedulingRuleContractException();
+            profiles.Add(profile);
+        }
+        return profiles;
+    }
+
+    private static async Task<IReadOnlyList<SchedulingRuleProfile>> ReadProfilesAsync(NpgsqlCommand command,
+        CancellationToken cancellationToken)
+    {
+        var builders = new Dictionary<long, ProfileBuilder>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            if (reader.GetInt64(10) > SchedulingRuleProfileValidator.MaximumProfileEntries || !reader.GetBoolean(11))
+                throw new InvalidOperationException("The rule profile payload exceeds safe MVP limits.");
+            var id = reader.GetInt64(0);
+            if (!builders.TryGetValue(id, out var builder))
+            {
+                builder = new ProfileBuilder(id, reader.GetString(1), reader.GetInt32(2),
+                    ParseStoredEnum<SchedulingRuleOrigin>(reader.GetString(3)),
+                    ParseStoredEnum<SchedulingEnvironmentScope>(reader.GetString(4)), reader.GetString(5),
+                    DateOnly.FromDateTime(reader.GetDateTime(6)), reader.IsDBNull(7) ? null : DateOnly.FromDateTime(reader.GetDateTime(7)),
+                    ParseStoredEnum<SchedulingRuleProfileStatus>(reader.GetString(8)), reader.GetString(9));
+                builders.Add(id, builder);
+            }
+            if (!reader.IsDBNull(12))
+                builder.Entries.Add(new SchedulingRuleProfileEntry(reader.GetString(12), ReadJson(reader.GetString(13)),
+                    ReadJson(reader.GetString(14)), reader.GetBoolean(15)));
+        }
+        return builders.Values.Select(builder => builder.Build()).ToArray();
+    }
+
+    private static void AddPayloadLimitParameters(NpgsqlCommand command)
+    {
+        command.Parameters.AddWithValue("maximum_entries", SchedulingRuleProfileValidator.MaximumProfileEntries);
+        command.Parameters.AddWithValue("parameters_bytes", SchedulingRuleProfileValidator.MaximumParametersUtf8Bytes);
+        command.Parameters.AddWithValue("catalog_bytes", SchedulingRuleProfileValidator.MaximumCatalogSnapshotUtf8Bytes);
+    }
+
+    private static JsonElement ReadJson(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.Clone();
+    }
+
+    private static T ParseStoredEnum<T>(string value) where T : struct, Enum
+    {
+        if (!Enum.GetNames<T>().Contains(value, StringComparer.Ordinal) || !Enum.TryParse<T>(value, out var parsed))
+            throw new SchedulingRuleContractException();
+        return parsed;
+    }
+
+    private sealed record ProfileBuilder(long Id, string ProfileCode, int Version, SchedulingRuleOrigin Origin,
+        SchedulingEnvironmentScope EnvironmentScope, string ScopeCode, DateOnly EffectiveFrom, DateOnly? EffectiveTo,
+        SchedulingRuleProfileStatus Status, string Checksum)
+    {
+        public List<SchedulingRuleProfileEntry> Entries { get; } = new();
+        public SchedulingRuleProfile Build() => new(Id, ProfileCode, Version, Origin, EnvironmentScope, ScopeCode,
+            EffectiveFrom, EffectiveTo, Status, Checksum, Entries);
+    }
+}
+
+public sealed record PersistedRuleEvaluation(long Id, RuleEvaluation Evaluation);

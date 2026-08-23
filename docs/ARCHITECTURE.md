@@ -31,7 +31,8 @@ S&G Super App
   ├─ Cursos y acreditaciones
   ├─ Alertas y notificaciones
   ├─ Dashboard
-  └─ Auditoria
+  ├─ Auditoria
+  └─ Programacion asistida de turnos
         │
         ▼
 Base de datos relacional
@@ -255,6 +256,38 @@ Conceptos preliminares:
 - evidencia;
 - cierre.
 
+### 5.11 Programacion Asistida De Turnos
+
+I9 incorpora un modulo delimitado que produce propuestas explicables de
+programacion mensual. No reemplaza la decision de Operaciones: genera, valida y
+compara; un usuario autorizado revisa, aprueba y publica.
+
+Entidades del limite I9:
+
+- `PlantillaDeTurno`: ciclo y cobertura esperada versionados;
+- `ProyectoDeProgramacion`: puesto, periodo y parametros de una corrida;
+- `TurnoRequerido`: necesidad concreta por fecha, franja y puesto;
+- `VersionDeProgramacion`: snapshot de fuentes, reglas, parametros y resultados;
+- `AsignacionDeProgramacion`: guarda asignado o vacante explicita;
+- `ExcepcionDeProgramacion`: desviacion tipificada, motivada y con responsable;
+- `CorridaDeGeneracion`: ejecucion idempotente y auditable del motor.
+
+Limites:
+
+- I9 no mantiene empleados, puestos, asignaciones base ni acreditaciones;
+- I9 no decide la validez juridica de una regla;
+- I9 no modifica novedades en su fuente;
+- I9 no aprueba ni publica autonomamente;
+- una version publicada es inmutable y todo cambio crea otra version.
+
+Integracion entre incrementos: **I2** aporta empleados y maestros; **I3** aporta
+puestos y asignaciones habituales; **I5** aporta cursos, acreditaciones y
+habilitacion; **I6** recibe avisos de vacantes, excepciones y propuestas; **I7**
+recibe eventos de auditoria e indicadores. La integracion usa identificadores y
+snapshots, sin duplicar la propiedad de esos dominios.
+
+Resumen de integracion I9: I2 -> I3 -> I5 -> I6 -> I7.
+
 ## 6. Modelo Conceptual Inicial
 
 ```text
@@ -288,6 +321,15 @@ Notificacion
   ├─ Estado lectura
   ├─ Gestion
   └─ Auditoria
+
+Programacion
+  ├─ PlantillaDeTurno
+  ├─ ProyectoDeProgramacion
+  ├─ TurnoRequerido
+  ├─ VersionDeProgramacion
+  │   ├─ AsignacionDeProgramacion
+  │   └─ ExcepcionDeProgramacion
+  └─ CorridaDeGeneracion
 ```
 
 ## 7. Patrones Requeridos
@@ -300,6 +342,9 @@ Notificacion
 - Historicos para relaciones que cambian en el tiempo.
 - Snapshots para documentos emitidos.
 - Auditoria transversal.
+- Motor deterministico separado del workflow de aprobacion/publicacion.
+- Snapshots de fuentes, reglas y parametros por version de programacion.
+- Vacantes y excepciones visibles; nunca se ocultan mediante una asignacion invalida.
 
 ## 8. Seguridad Y Permisos
 

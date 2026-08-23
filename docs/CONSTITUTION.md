@@ -14,8 +14,10 @@ Cuando exista tension entre documentos, decisiones, planes o codigo, aplicar est
 4. `docs/DESIGN.md`
 5. PRD vigente en `docs/prd/`
 6. SPEC tecnica del incremento activo en `docs/specs/`
-7. Plan de implementacion aprobado en `docs/plans/`
-8. Codigo fuente
+7. Catalogo operativo versionado y aprobado en `docs/operations/`
+8. Plan de implementacion aprobado en `docs/superpowers/plans/`
+9. Execution log documental en `docs/plans/`
+10. Codigo fuente
 
 El codigo nunca es la fuente primaria de verdad del proyecto. Si el codigo contradice la SPEC, se corrige el codigo o primero se actualiza la SPEC y luego el plan.
 
@@ -23,10 +25,18 @@ Los HTML ejecutivos y documentos de presentacion son artefactos de comunicacion.
 
 Los prototipos visuales en `Prototipos/` son referencias de diseño. Cuando una SPEC los cite explicitamente, pasan a ser referencia obligatoria para ese incremento, subordinada a `docs/DESIGN.md`.
 
+Los catalogos de `docs/operations/` estan subordinados a `CONSTITUTION`,
+`ARCHITECTURE`, `TECNOLOGIA`, `DESIGN` y la SPEC activa. Una vez versionado y
+aprobado, el catalogo es la fuente ejecutable de parametros operativos, pero no
+puede contradecir las autoridades superiores. Ante contradiccion, prevalece la
+autoridad superior, se bloquea la ejecucion de la regla y se corrige el catalogo
+antes de implementar o continuar.
+
 ## 2. Reglas SDD
 
 - Todo incremento debe tener SPEC escrita, revisada y aprobada antes de implementarse.
-- Todo incremento debe tener plan de implementacion en `docs/plans/` antes de ejecutar tareas.
+- Todo incremento debe tener plan tecnico en `docs/superpowers/plans/` y
+  execution log en `docs/plans/` antes de ejecutar tareas.
 - Todo cambio de alcance entra primero por PRD o SPEC, no por codigo.
 - Todo cambio de arquitectura entra primero por `docs/ARCHITECTURE.md` o por esta constitucion.
 - Todo cambio de stack entra primero por `docs/TECNOLOGIA.md`.
@@ -49,6 +59,8 @@ El piloto se ejecuta por incrementos:
 | I5 | Cursos y acreditaciones |
 | I6 | Alertas y notificaciones |
 | I7 | Auditoria, dashboard y cierre piloto |
+| I8 | Consolidacion operativa y experiencia Sentinel Enterprise |
+| I9 | Programacion asistida de turnos |
 
 La SPEC 00 define el orden y reglas iniciales: `docs/specs/2026-05-21-sg-superapp-spec-00-arquitectura-incrementos.md`.
 
@@ -71,7 +83,7 @@ Incluye:
 Excluye:
 
 - guardas como usuarios del portal;
-- programacion automatica de turnos;
+- programacion autonoma de turnos;
 - bloqueo automatico de asignaciones;
 - modulo completo de novedades;
 - inventario funcional;
@@ -80,6 +92,24 @@ Excluye:
 - nomina como integracion obligatoria;
 - WhatsApp;
 - analitica predictiva o IA avanzada.
+
+I9 autoriza la **programacion asistida de turnos** como incremento posterior al
+piloto base. El sistema puede validar reglas, generar propuestas deterministicas,
+comparar alternativas y explicar excepciones. Toda aprobacion y publicacion queda
+bajo control humano y requiere una accion explicita, autorizada y auditada. El
+motor no aprueba ni publica de forma autonoma o automatica.
+
+Las tres condiciones de Gate 0 quedaron satisfechas el 2026-07-29: SPEC
+aprobada, catalogo `APROBADO_PARA_PARAMETRIZACION` y cierre ejecutivo explicito.
+Gate 0 queda cerrado, pero el catalogo no es ejecutable por el motor hasta
+completar y validar sus parametros. El usuario
+confirma a Jorge Guzman por Operaciones; Carolina Rodriguez Russi por Talento
+Humano y Juridica; y Camilo Piedrahita, Gerente General, para el cierre.
+
+Para I9, `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`
+tiene estado **APROBADO COMO HOJA DE RUTA DOCUMENTAL**. El retake queda
+**TASK 2 AUTORIZADA - NO INICIADA**. Gate 0 esta cerrado; esta autorizacion no
+declara que la tarea tecnica haya comenzado.
 
 ## 5. Stack Y Restricciones
 
@@ -99,6 +129,10 @@ Excluye:
 - Estados de cursos/acreditaciones deben calcularse por reglas, no por texto manual.
 - Notificaciones por rol deben registrar quien las atiende.
 - Novedades se modela como evento transversal, pero no se implementa completo en el MVP.
+- La programacion asistida consume datos maestros y reglas versionadas, conserva
+  snapshots de cada propuesta y separa generar, revisar, aprobar y publicar.
+- Una version publicada es inmutable; cualquier ajuste posterior crea una nueva
+  version trazable.
 
 ## 7. Reglas UX/UI
 

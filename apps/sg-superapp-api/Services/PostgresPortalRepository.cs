@@ -2,6 +2,7 @@ using Npgsql;
 using NpgsqlTypes;
 using System.Text;
 using System.Text.Json;
+using System.Data;
 using Sg.SuperApp.Api.Configuration;
 using Sg.SuperApp.Api.Contracts.Auth;
 using Sg.SuperApp.Api.Contracts.Portal;
@@ -2833,6 +2834,635 @@ public sealed class PostgresPortalRepository
             command.Parameters.AddWithValue("fullName", request.FullName.Trim());
             command.Parameters.AddWithValue("jobTitle", request.JobTitle.Trim());
         };
+    }
+
+    public Task<long> CreateSchedulingClientAsync(UpsertSchedulingClientRequest request, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        InsertSchedulingConfigurationAsync(
+            "insert into clients(code,name,status) values (@code,@name,@status) returning id",
+            "SCHEDULING_CLIENT_CREATED", "SCHEDULING_CLIENT",
+            command =>
+            {
+                command.Parameters.AddWithValue("code", request.Code.Trim());
+                command.Parameters.AddWithValue("name", request.Name.Trim());
+                command.Parameters.AddWithValue("status", request.Status.Trim().ToUpperInvariant());
+            }, actorUserId, actorUsername, cancellationToken);
+
+    public Task<long> CreateSchedulingProjectAsync(UpsertSchedulingProjectRequest request, DateOnly effectiveFrom, DateOnly? effectiveTo, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        InsertSchedulingConfigurationAsync(
+            "insert into service_projects(client_id,code,name,effective_from,effective_to,status) values (@clientId,@code,@name,@effectiveFrom,@effectiveTo,@status) returning id",
+            "SCHEDULING_PROJECT_CREATED", "SCHEDULING_PROJECT",
+            command =>
+            {
+                command.Parameters.AddWithValue("clientId", request.ClientId);
+                command.Parameters.AddWithValue("code", request.Code.Trim());
+                command.Parameters.AddWithValue("name", request.Name.Trim());
+                command.Parameters.AddWithValue("effectiveFrom", effectiveFrom);
+                command.Parameters.Add("effectiveTo", NpgsqlDbType.Date).Value = effectiveTo.HasValue ? effectiveTo.Value : DBNull.Value;
+                command.Parameters.AddWithValue("status", request.Status.Trim().ToUpperInvariant());
+            }, actorUserId, actorUsername, cancellationToken);
+
+    public Task<long> CreateCoverageRuleAsync(UpsertCoverageRuleRequest request, TimeOnly startsAt, TimeOnly endsAt, DateOnly effectiveFrom, DateOnly? effectiveTo, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        InsertSchedulingConfigurationAsync(
+            "insert into position_coverage_rules(position_id,template_id,weekday_scope,starts_at,ends_at,required_quantity,effective_from,effective_to,status) values (@positionId,@templateId,@weekdayScope,@startsAt,@endsAt,@quantity,@effectiveFrom,@effectiveTo,@status) returning id",
+            "COVERAGE_RULE_CREATED", "POSITION_COVERAGE_RULE",
+            command =>
+            {
+                command.Parameters.AddWithValue("positionId", request.PositionId);
+                command.Parameters.AddWithValue("templateId", request.TemplateId);
+                command.Parameters.AddWithValue("weekdayScope", request.WeekdayScope.Trim());
+                command.Parameters.AddWithValue("startsAt", startsAt);
+                command.Parameters.AddWithValue("endsAt", endsAt);
+                command.Parameters.AddWithValue("quantity", request.RequiredGuards);
+                command.Parameters.AddWithValue("effectiveFrom", effectiveFrom);
+                command.Parameters.Add("effectiveTo", NpgsqlDbType.Date).Value = effectiveTo.HasValue ? effectiveTo.Value : DBNull.Value;
+                command.Parameters.AddWithValue("status", request.Status.Trim().ToUpperInvariant());
+            }, actorUserId, actorUsername, cancellationToken);
+
+    public Task<long> CreateAvailabilityExceptionAsync(UpsertAvailabilityExceptionRequest request, DateTimeOffset startsAt, DateTimeOffset endsAt, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        InsertSchedulingConfigurationAsync(
+            "insert into employee_availability_exceptions(employee_id,starts_at,ends_at,kind,blocking,reason,created_by) values (@employeeId,@startsAt,@endsAt,@kind,@blocking,@reason,@createdBy) returning id",
+            "AVAILABILITY_CREATED", "EMPLOYEE_AVAILABILITY_EXCEPTION",
+            command =>
+            {
+                command.Parameters.AddWithValue("employeeId", request.EmployeeId);
+                command.Parameters.AddWithValue("startsAt", startsAt.ToUniversalTime());
+                command.Parameters.AddWithValue("endsAt", endsAt.ToUniversalTime());
+                command.Parameters.AddWithValue("kind", request.Kind.Trim());
+                command.Parameters.AddWithValue("blocking", request.Blocking);
+                command.Parameters.AddWithValue("reason", request.Reason.Trim());
+                command.Parameters.AddWithValue("createdBy", actorUsername);
+            }, actorUserId, actorUsername, cancellationToken);
+
+    public Task<long> CreatePositionRequirementAsync(UpsertPositionRequirementRequest request, DateOnly? resolutionDueDate, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        InsertSchedulingConfigurationAsync(
+            "insert into position_requirements(position_id,requirement_type_id,severity,resolution_due_date) values (@positionId,@requirementTypeId,@severity,@resolutionDueDate) returning id",
+            "POSITION_REQUIREMENT_CREATED", "POSITION_REQUIREMENT",
+            command =>
+            {
+                command.Parameters.AddWithValue("positionId", request.PositionId);
+                command.Parameters.AddWithValue("requirementTypeId", request.RequirementTypeId);
+                command.Parameters.AddWithValue("severity", request.Severity.Trim().ToUpperInvariant());
+                command.Parameters.Add("resolutionDueDate", NpgsqlDbType.Date).Value = resolutionDueDate.HasValue ? resolutionDueDate.Value : DBNull.Value;
+            }, actorUserId, actorUsername, cancellationToken);
+
+    public async Task<SchedulingClientResponse?> GetSchedulingClientAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("select id,code,name,status from clients where id=@id", connection);
+        command.Parameters.AddWithValue("id", id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? new SchedulingClientResponse(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)) : null;
+    }
+
+    // An assignment is only written when every rule verdict the caller declared for the chosen
+    // candidate is one this schedule version actually persisted, with the same outcome, the same
+    // scope and the same profile version. Without this the caller could declare its own compliance
+    // and have it written: the ranking projection alone only reads what the caller sent.
+    private static string VerdictKey(string ruleCode, string scopeHash, string outcome, int profileVersion) =>
+        (ruleCode ?? string.Empty).Trim() + "\u001f" + (scopeHash ?? string.Empty).Trim() + "\u001f" +
+        (outcome ?? string.Empty).Trim() + "\u001f" +
+        profileVersion.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private static async Task<HashSet<string>> LoadPersistedVerdictsAsync(
+        NpgsqlConnection cn, NpgsqlTransaction tx, long versionId, CancellationToken ct)
+    {
+        var verdicts = new HashSet<string>(StringComparer.Ordinal);
+        await using var cmd = new NpgsqlCommand(@"select e.rule_code,e.scope_hash,e.outcome,rp.version
+from scheduling_rule_evaluations e
+join scheduling_rule_profiles rp on rp.id=e.rule_profile_id and rp.origin='SIMULATED' and rp.environment_scope='MVP_TEST'
+where e.schedule_version_id=@version", cn, tx);
+        cmd.Parameters.AddWithValue("version", versionId);
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+            verdicts.Add(VerdictKey(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetInt32(3)));
+        return verdicts;
+    }
+
+    private static void RequireDeclaredVerdictsArePersisted(
+        ScheduleRecommendationRequest request, ScheduleAssignmentRecommendation assignment, HashSet<string> persisted)
+    {
+        if (assignment.EmployeeId is null) return;
+        var candidate = request.Shifts
+            .FirstOrDefault(shift => shift.RequiredShiftId == assignment.RequiredShiftId)?.Candidates
+            ?.FirstOrDefault(item => item.EmployeeId == assignment.EmployeeId.Value);
+        var declared = candidate?.RuleEvaluations ?? Array.Empty<RuleEvaluationReference>();
+        if (declared.Count == 0)
+            throw new InvalidOperationException(
+                "No se puede asignar un guarda sin evaluacion versionada persistida para esta version.");
+        foreach (var evaluation in declared)
+        {
+            if (!persisted.Contains(VerdictKey(
+                    evaluation.RuleCode, evaluation.ScopeHash, evaluation.Outcome, evaluation.RuleProfileVersion)))
+                throw new InvalidOperationException(
+                    "La evaluacion declarada no corresponde a un veredicto persistido de esta version.");
+        }
+    }
+
+    public async Task<long> PersistScheduleRecommendationAsync(
+        ScheduleRecommendationRequest request,
+        ScheduleRecommendationResult result,
+        CancellationToken cancellationToken = default)
+    {
+        if (request.ScheduleVersionId is null)
+            throw new ArgumentException("La version de programacion es obligatoria para persistir la corrida.");
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        await using (var existing = new NpgsqlCommand(
+            "select id from schedule_generation_runs where idempotency_key=@key", connection, transaction))
+        {
+            existing.Parameters.AddWithValue("key", request.IdempotencyKey.Trim());
+            var existingId = await existing.ExecuteScalarAsync(cancellationToken);
+            if (existingId is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return (long)existingId;
+            }
+        }
+
+        long runId;
+        await using (var createRun = new NpgsqlCommand(@"
+            insert into schedule_generation_runs(schedule_version_id,idempotency_key,status,started_at)
+            values (@versionId,@key,'EN_COLA',NOW()) returning id", connection, transaction))
+        {
+            createRun.Parameters.AddWithValue("versionId", request.ScheduleVersionId.Value);
+            createRun.Parameters.AddWithValue("key", request.IdempotencyKey.Trim());
+            runId = (long)(await createRun.ExecuteScalarAsync(cancellationToken)
+                ?? throw new InvalidOperationException("No fue posible crear la corrida I9."));
+        }
+
+        await using (var processing = new NpgsqlCommand(
+            "update schedule_generation_runs set status='PROCESANDO' where id=@id", connection, transaction))
+        {
+            processing.Parameters.AddWithValue("id", runId);
+            await processing.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        var sourceSnapshot = JsonSerializer.Serialize(new { shifts = request.Shifts });
+        var parametersSnapshot = JsonSerializer.Serialize(request.Weights);
+        await using (var snapshot = new NpgsqlCommand(@"
+            update schedule_versions
+               set source_snapshot=@source::jsonb,
+                   parameters_snapshot=@parameters::jsonb
+             where id=@versionId and status = 'PROPUESTA'", connection, transaction))
+        {
+            snapshot.Parameters.AddWithValue("source", sourceSnapshot);
+            snapshot.Parameters.AddWithValue("parameters", parametersSnapshot);
+            snapshot.Parameters.AddWithValue("versionId", request.ScheduleVersionId.Value);
+            if (await snapshot.ExecuteNonQueryAsync(cancellationToken) != 1)
+                throw new InvalidOperationException("La generacion solo procede sobre una propuesta; la version no existe o ya fue aprobada o publicada.");
+        }
+
+        var persistedVerdicts = await LoadPersistedVerdictsAsync(
+            connection, transaction, request.ScheduleVersionId.Value, cancellationToken);
+
+        foreach (var assignment in result.Assignments)
+        {
+            RequireDeclaredVerdictsArePersisted(request, assignment, persistedVerdicts);
+            await using var insertAssignment = new NpgsqlCommand(@"
+                insert into schedule_assignments(
+                    schedule_version_id,required_shift_id,employee_id,status,score,reasons)
+                values (@versionId,@shiftId,@employeeId,@status,@score,@reasons::jsonb)", connection, transaction);
+            insertAssignment.Parameters.AddWithValue("versionId", request.ScheduleVersionId.Value);
+            insertAssignment.Parameters.AddWithValue("shiftId", assignment.RequiredShiftId);
+            insertAssignment.Parameters.Add("employeeId", NpgsqlDbType.Bigint).Value = assignment.EmployeeId.HasValue ? assignment.EmployeeId.Value : DBNull.Value;
+            insertAssignment.Parameters.AddWithValue("status", assignment.Status);
+            insertAssignment.Parameters.Add("score", NpgsqlDbType.Numeric).Value = assignment.Score.HasValue ? assignment.Score.Value : DBNull.Value;
+            insertAssignment.Parameters.AddWithValue("reasons", JsonSerializer.Serialize(assignment.RankingReasons));
+            await insertAssignment.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using (var complete = new NpgsqlCommand(@"
+            update schedule_generation_runs
+               set status=@status, completed_at=NOW()
+             where id=@id", connection, transaction))
+        {
+            complete.Parameters.AddWithValue("status", result.Status);
+            complete.Parameters.AddWithValue("id", runId);
+            await complete.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return runId;
+    }
+
+    // The scheduling screen cannot open without these two listings, and neither route existed: the
+    // client asked for a list of projects and got 405 because only POST was mapped, and asked for
+    // the shift templates and got 404. Every verifier asserted the client functions were declared;
+    // none asked whether the routes they call are there.
+    public async Task<IReadOnlyList<SchedulingProjectResponse>> GetSchedulingProjectsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            "select id,client_id,code,name,effective_from,effective_to,status from service_projects where status='ACTIVO' order by name", connection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var projects = new List<SchedulingProjectResponse>();
+        while (await reader.ReadAsync(cancellationToken))
+            projects.Add(new SchedulingProjectResponse(reader.GetInt64(0), reader.GetInt64(1), reader.GetString(2), reader.GetString(3),
+                reader.GetFieldValue<DateOnly>(4).ToString("yyyy-MM-dd"),
+                reader.IsDBNull(5) ? null : reader.GetFieldValue<DateOnly>(5).ToString("yyyy-MM-dd"), reader.GetString(6)));
+        return projects;
+    }
+
+    public async Task<IReadOnlyList<ShiftTemplateResponse>> GetShiftTemplatesAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(@"select t.id,t.code,t.name,t.version,t.mandatory_by_default,t.status,
+coalesce(s.step_order,0),coalesce(s.shift_code,'')
+from shift_templates t left join shift_template_steps s on s.template_id=t.id
+where t.status='ACTIVO' order by t.code,s.step_order", connection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var templates = new Dictionary<long, (ShiftTemplateResponse Template, List<ShiftTemplateStepResponse> Steps)>();
+        var order = new List<long>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var id = reader.GetInt64(0);
+            if (!templates.ContainsKey(id))
+            {
+                order.Add(id);
+                templates[id] = (new ShiftTemplateResponse(id, reader.GetString(1), reader.GetString(2), reader.GetInt32(3),
+                    reader.GetBoolean(4), reader.GetString(5), Array.Empty<ShiftTemplateStepResponse>()),
+                    new List<ShiftTemplateStepResponse>());
+            }
+
+            var stepOrder = reader.GetInt32(6);
+            var shiftCode = reader.GetString(7).Trim();
+            if (stepOrder > 0 && shiftCode.Length > 0)
+                templates[id].Steps.Add(new ShiftTemplateStepResponse(stepOrder, shiftCode));
+        }
+
+        return order.Select(id => templates[id].Template with { Steps = templates[id].Steps }).ToArray();
+    }
+
+    public async Task<SchedulingProjectResponse?> GetSchedulingProjectAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("select id,client_id,code,name,effective_from,effective_to,status from service_projects where id=@id", connection);
+        command.Parameters.AddWithValue("id", id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken)) return null;
+        return new SchedulingProjectResponse(reader.GetInt64(0), reader.GetInt64(1), reader.GetString(2), reader.GetString(3),
+            reader.GetFieldValue<DateOnly>(4).ToString("yyyy-MM-dd"), reader.IsDBNull(5) ? null : reader.GetFieldValue<DateOnly>(5).ToString("yyyy-MM-dd"), reader.GetString(6));
+    }
+
+    public async Task<CoverageRuleResponse?> GetCoverageRuleAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("select id,position_id,template_id,weekday_scope,starts_at,ends_at,required_quantity,effective_from,effective_to,status from position_coverage_rules where id=@id", connection);
+        command.Parameters.AddWithValue("id", id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken)) return null;
+        return new CoverageRuleResponse(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetString(3),
+            reader.GetFieldValue<TimeOnly>(4).ToString("HH:mm"), reader.GetFieldValue<TimeOnly>(5).ToString("HH:mm"), reader.GetInt32(6),
+            reader.GetFieldValue<DateOnly>(7).ToString("yyyy-MM-dd"), reader.IsDBNull(8) ? null : reader.GetFieldValue<DateOnly>(8).ToString("yyyy-MM-dd"), reader.GetString(9));
+    }
+
+    public async Task<AvailabilityExceptionResponse?> GetAvailabilityExceptionAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("select id,employee_id,starts_at,ends_at,kind,blocking,reason,status from employee_availability_exceptions where id=@id", connection);
+        command.Parameters.AddWithValue("id", id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken)) return null;
+        return new AvailabilityExceptionResponse(reader.GetInt64(0), reader.GetInt64(1), reader.GetFieldValue<DateTimeOffset>(2).ToString("O"),
+            reader.GetFieldValue<DateTimeOffset>(3).ToString("O"), reader.GetString(4), reader.GetBoolean(5), reader.GetString(6), reader.GetString(7));
+    }
+
+    public async Task<PositionRequirementResponse?> GetPositionRequirementAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("select id,position_id,requirement_type_id,severity,resolution_due_date,status from position_requirements where id=@id", connection);
+        command.Parameters.AddWithValue("id", id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken)) return null;
+        return new PositionRequirementResponse(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetString(3),
+            reader.IsDBNull(4) ? null : reader.GetFieldValue<DateOnly>(4).ToString("yyyy-MM-dd"), reader.GetString(5));
+    }
+
+    public Task<bool> UpdateSchedulingClientAsync(long id, UpsertSchedulingClientRequest request, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        UpdateSchedulingConfigurationAsync("update clients set code=@code,name=@name,status=@status,updated_at=now() where id=@id returning id", "SCHEDULING_CLIENT_UPDATED", "SCHEDULING_CLIENT", id,
+            c => { c.Parameters.AddWithValue("code", request.Code.Trim()); c.Parameters.AddWithValue("name", request.Name.Trim()); c.Parameters.AddWithValue("status", request.Status.Trim().ToUpperInvariant()); }, actorUserId, actorUsername, cancellationToken);
+
+    public Task<bool> UpdateSchedulingProjectAsync(long id, UpsertSchedulingProjectRequest request, DateOnly effectiveFrom, DateOnly? effectiveTo, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        UpdateSchedulingConfigurationAsync("update service_projects set client_id=@clientId,code=@code,name=@name,effective_from=@effectiveFrom,effective_to=@effectiveTo,status=@status,updated_at=now() where id=@id returning id", "SCHEDULING_PROJECT_UPDATED", "SCHEDULING_PROJECT", id,
+            c => { c.Parameters.AddWithValue("clientId", request.ClientId); c.Parameters.AddWithValue("code", request.Code.Trim()); c.Parameters.AddWithValue("name", request.Name.Trim()); c.Parameters.AddWithValue("effectiveFrom", effectiveFrom); c.Parameters.Add("effectiveTo", NpgsqlDbType.Date).Value=effectiveTo.HasValue?effectiveTo.Value:DBNull.Value; c.Parameters.AddWithValue("status", request.Status.Trim().ToUpperInvariant()); }, actorUserId, actorUsername, cancellationToken);
+
+    public Task<bool> UpdateCoverageRuleAsync(long id, UpsertCoverageRuleRequest request, TimeOnly startsAt, TimeOnly endsAt, DateOnly effectiveFrom, DateOnly? effectiveTo, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        UpdateSchedulingConfigurationAsync("update position_coverage_rules set position_id=@positionId,template_id=@templateId,weekday_scope=@weekdayScope,starts_at=@startsAt,ends_at=@endsAt,required_quantity=@quantity,effective_from=@effectiveFrom,effective_to=@effectiveTo,status=@status,updated_at=now() where id=@id returning id", "COVERAGE_RULE_UPDATED", "POSITION_COVERAGE_RULE", id,
+            c => { c.Parameters.AddWithValue("positionId", request.PositionId); c.Parameters.AddWithValue("templateId", request.TemplateId); c.Parameters.AddWithValue("weekdayScope", request.WeekdayScope.Trim()); c.Parameters.AddWithValue("startsAt", startsAt); c.Parameters.AddWithValue("endsAt", endsAt); c.Parameters.AddWithValue("quantity", request.RequiredGuards); c.Parameters.AddWithValue("effectiveFrom", effectiveFrom); c.Parameters.Add("effectiveTo", NpgsqlDbType.Date).Value=effectiveTo.HasValue?effectiveTo.Value:DBNull.Value; c.Parameters.AddWithValue("status", request.Status.Trim().ToUpperInvariant()); }, actorUserId, actorUsername, cancellationToken);
+
+    public Task<bool> UpdateAvailabilityExceptionAsync(long id, UpsertAvailabilityExceptionRequest request, DateTimeOffset from, DateTimeOffset to, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        UpdateSchedulingConfigurationAsync("update employee_availability_exceptions set employee_id=@employeeId,starts_at=@startsAt,ends_at=@endsAt,kind=@kind,blocking=@blocking,reason=@reason,updated_at=now() where id=@id returning id", "AVAILABILITY_UPDATED", "EMPLOYEE_AVAILABILITY_EXCEPTION", id,
+            c => { c.Parameters.AddWithValue("employeeId", request.EmployeeId); c.Parameters.AddWithValue("startsAt", from.ToUniversalTime()); c.Parameters.AddWithValue("endsAt", to.ToUniversalTime()); c.Parameters.AddWithValue("kind", request.Kind.Trim()); c.Parameters.AddWithValue("blocking", request.Blocking); c.Parameters.AddWithValue("reason", request.Reason.Trim()); }, actorUserId, actorUsername, cancellationToken);
+
+    public Task<bool> UpdatePositionRequirementAsync(long id, UpsertPositionRequirementRequest request, DateOnly? dueDate, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) =>
+        UpdateSchedulingConfigurationAsync("update position_requirements set position_id=@positionId,requirement_type_id=@requirementTypeId,severity=@severity,resolution_due_date=@dueDate,updated_at=now() where id=@id returning id", "POSITION_REQUIREMENT_UPDATED", "POSITION_REQUIREMENT", id,
+            c => { c.Parameters.AddWithValue("positionId", request.PositionId); c.Parameters.AddWithValue("requirementTypeId", request.RequirementTypeId); c.Parameters.AddWithValue("severity", request.Severity.Trim().ToUpperInvariant()); c.Parameters.Add("dueDate", NpgsqlDbType.Date).Value=dueDate.HasValue?dueDate.Value:DBNull.Value; }, actorUserId, actorUsername, cancellationToken);
+
+    public Task<bool> InactivateSchedulingClientAsync(long id, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) => InactivateSchedulingConfigurationAsync("clients", "SCHEDULING_CLIENT_INACTIVATED", "SCHEDULING_CLIENT", id, actorUserId, actorUsername, cancellationToken);
+    public Task<bool> InactivateSchedulingProjectAsync(long id, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) => InactivateSchedulingConfigurationAsync("service_projects", "SCHEDULING_PROJECT_INACTIVATED", "SCHEDULING_PROJECT", id, actorUserId, actorUsername, cancellationToken);
+    public Task<bool> InactivateCoverageRuleAsync(long id, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) => InactivateSchedulingConfigurationAsync("position_coverage_rules", "COVERAGE_RULE_INACTIVATED", "POSITION_COVERAGE_RULE", id, actorUserId, actorUsername, cancellationToken);
+    public Task<bool> InactivateAvailabilityExceptionAsync(long id, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) => InactivateSchedulingConfigurationAsync("employee_availability_exceptions", "AVAILABILITY_INACTIVATED", "EMPLOYEE_AVAILABILITY_EXCEPTION", id, actorUserId, actorUsername, cancellationToken);
+    public Task<bool> InactivatePositionRequirementAsync(long id, long actorUserId, string actorUsername, CancellationToken cancellationToken = default) => InactivateSchedulingConfigurationAsync("position_requirements", "POSITION_REQUIREMENT_INACTIVATED", "POSITION_REQUIREMENT", id, actorUserId, actorUsername, cancellationToken);
+
+    public async Task<ScheduleWorkflowResponse> CreateScheduleProposalAsync(long projectId, DateOnly from, DateOnly to, bool acceptedVacancy, long actorId, string actor, CancellationToken ct = default)
+    {
+        await using var cn = new NpgsqlConnection(_connectionString); await cn.OpenAsync(ct); await using var tx = await cn.BeginTransactionAsync(ct);
+        long scheduleId;
+        await using (var cmd = new NpgsqlCommand("insert into schedules(project_id,period_start,period_end,created_by) values(@p,@f,@t,@a) on conflict(project_id,period_start,period_end) do update set project_id=excluded.project_id returning id", cn, tx))
+        { cmd.Parameters.AddWithValue("p", projectId); cmd.Parameters.AddWithValue("f", from); cmd.Parameters.AddWithValue("t", to); cmd.Parameters.AddWithValue("a", actor); scheduleId=(long)(await cmd.ExecuteScalarAsync(ct) ?? throw new InvalidOperationException("No fue posible crear la programacion.")); }
+        long versionId;
+        await using (var cmd = new NpgsqlCommand("insert into schedule_versions(schedule_id,version_number,status,source_snapshot,created_by) select @s,coalesce(max(version_number),0)+1,'PROPUESTA',jsonb_build_object('acceptedVacancy',@v),@a from schedule_versions where schedule_id=@s returning id", cn, tx))
+        { cmd.Parameters.AddWithValue("s",scheduleId); cmd.Parameters.AddWithValue("v",acceptedVacancy); cmd.Parameters.AddWithValue("a",actor); versionId=(long)(await cmd.ExecuteScalarAsync(ct) ?? throw new InvalidOperationException("No fue posible crear la propuesta.")); }
+        await InsertAuditLogAsync(cn,tx,actorId,actor,"SCHEDULE_PROPOSAL_CREATED","SCHEDULE_VERSION",versionId.ToString(),"jsonb_build_object('acceptedVacancy',@vacancy)",c=>c.Parameters.AddWithValue("vacancy",acceptedVacancy),ct);
+        await tx.CommitAsync(ct); return (await GetScheduleVersionAsync(versionId,ct))!;
+    }
+
+    public Task<ScheduleWorkflowResponse?> GetScheduleVersionAsync(long id, CancellationToken ct=default) => QueryScheduleAsync("sv.id=@id",id,null,ct);
+    public Task<ScheduleWorkflowResponse?> GetScheduleByProjectPeriodAsync(long projectId, DateOnly period, CancellationToken ct=default) => QueryScheduleAsync("s.project_id=@id and s.period_start=@period order by sv.version_number desc limit 1",projectId,period,ct);
+
+    public async Task<ScheduleWorkflowResponse> UpdateScheduleAssignmentAsync(long versionId,long assignmentId,UpdateScheduleAssignmentRequest request,long actorId,string actor,CancellationToken ct=default)
+    {
+        var status=request.Status.Trim().ToUpperInvariant();
+        await using var cn=new NpgsqlConnection(_connectionString); await cn.OpenAsync(ct); await using var tx=await cn.BeginTransactionAsync(ct);
+        await RequireScheduleStateAsync(cn,tx,versionId,request.ExpectedVersion,"PROPUESTA",ct);
+        // Counted before the edit lands, because afterwards every one of them is superseded.
+        var superseded=await CountStandingAssignmentDecisionsAsync(cn,tx,versionId,assignmentId,ct);
+        await using (var cmd=new NpgsqlCommand("update schedule_assignments set employee_id=@e,status=@s,reasons=@r::jsonb,updated_at=now() where id=@id and schedule_version_id=@v",cn,tx))
+        { cmd.Parameters.Add("e",NpgsqlDbType.Bigint).Value=request.EmployeeId.HasValue?request.EmployeeId.Value:DBNull.Value; cmd.Parameters.AddWithValue("s",status); cmd.Parameters.AddWithValue("r",JsonSerializer.Serialize(request.Reasons??Array.Empty<string>())); cmd.Parameters.AddWithValue("id",assignmentId); cmd.Parameters.AddWithValue("v",versionId); if(await cmd.ExecuteNonQueryAsync(ct)!=1) throw new KeyNotFoundException("La asignacion no existe."); }
+        await RefreshScheduleMetricsAsync(cn,tx,versionId,ct);
+        await InsertAuditLogAsync(cn,tx,actorId,actor,"SCHEDULE_ASSIGNMENT_REVALIDATED","SCHEDULE_VERSION",versionId.ToString(),"jsonb_build_object('assignmentId',@id,'status',@status,'supersededDecisions',@superseded)",c=>{c.Parameters.AddWithValue("id",assignmentId);c.Parameters.AddWithValue("status",status);c.Parameters.AddWithValue("superseded",superseded);},ct);
+        await tx.CommitAsync(ct); return (await GetScheduleVersionAsync(versionId,ct))!;
+    }
+
+    public async Task<ScheduleWorkflowResponse> CreateScheduleExceptionAsync(long versionId,CreateScheduleExceptionRequest request,DateOnly resolutionDate,long actorId,string actor,CancellationToken ct=default)
+    {
+        await using var cn=new NpgsqlConnection(_connectionString); await cn.OpenAsync(ct); await using var tx=await cn.BeginTransactionAsync(ct);
+        await RequireScheduleStateAsync(cn,tx,versionId,request.ExpectedVersion,"PROPUESTA",ct);
+        string ruleCode,scopeHash,outcome; bool exceptionAllowed,superseded; long? evaluatedAssignment; string factsJson,catalogJson;
+        const string evaluationSql=@"select e.rule_code,e.scope_hash,e.outcome,e.exception_allowed,e.assignment_id,
+e.facts_snapshot::text,pe.catalog_snapshot::text,coalesce(a.updated_at>e.evaluated_at,false)
+from scheduling_rule_evaluations e
+left join schedule_assignments a on a.id=e.assignment_id
+join scheduling_rule_profiles rp on rp.id=e.rule_profile_id and rp.origin='SIMULATED' and rp.environment_scope='MVP_TEST'
+join scheduling_rule_profile_entries pe on pe.rule_profile_id=e.rule_profile_id and pe.rule_code=e.rule_code
+join schedule_versions sv on sv.id=e.schedule_version_id and sv.simulated=true and sv.rule_profile_id=rp.id
+where e.id=@evaluation and e.schedule_version_id=@version for share of e";
+        await using(var evaluation=new NpgsqlCommand(evaluationSql,cn,tx))
+        {
+            evaluation.Parameters.AddWithValue("evaluation",request.EvaluationId);evaluation.Parameters.AddWithValue("version",versionId);
+            await using var rd=await evaluation.ExecuteReaderAsync(ct);
+            if(!await rd.ReadAsync(ct))throw new KeyNotFoundException("La evaluacion MVP_TEST no pertenece a la propuesta simulada.");
+            ruleCode=rd.GetString(0);scopeHash=rd.GetString(1);outcome=rd.GetString(2);exceptionAllowed=rd.GetBoolean(3);
+            evaluatedAssignment=rd.IsDBNull(4)?null:rd.GetInt64(4);factsJson=rd.GetString(5);catalogJson=rd.GetString(6);superseded=rd.GetBoolean(7);
+        }
+        if(!string.Equals(scopeHash,(request.ScopeHash??string.Empty).Trim(),StringComparison.Ordinal))
+            throw new SchedulingScopeHashMismatchException();
+        // The assignment was edited after this evaluation, so it describes facts that no longer
+        // hold. Re-evaluating the edited assignment yields a fresh evaluation, and that is what
+        // a decision must bind to; this one can no longer receive any.
+        if(superseded)
+            throw new InvalidOperationException("La evaluacion quedo obsoleta por una edicion posterior; se debe reevaluar la asignacion.");
+        if(!string.Equals(ruleCode,request.RuleCode.Trim(),StringComparison.Ordinal) || outcome!="EXCEPTION_REQUIRED" ||
+           (ruleCode!="I9-R06" && !exceptionAllowed))
+            throw new InvalidOperationException("La evaluacion no admite la excepcion solicitada.");
+        if(request.AssignmentId!=evaluatedAssignment)throw new InvalidOperationException("La excepcion no coincide con la asignacion evaluada.");
+        if(!CatalogAllowsMotive(catalogJson,request.MotiveCode.Trim()))throw new InvalidOperationException("El motivo no pertenece al catalogo versionado de la regla.");
+        if(ruleCode=="I9-R06" && !await HasPersistedHrValidationsAsync(cn,tx,request.EvaluationId,factsJson,ct))throw new InvalidOperationException("R06 exige validacion persistida de Talento Humano ligada a cada evidencia.");
+        const string insertSql=@"insert into schedule_exceptions(schedule_version_id,assignment_id,exception_type,reason,responsible,evaluation_id,rule_code,scope_hash,motive_code,decision,decided_by,decided_at,decision_detail)
+values(@v,@a,'RULE_EXCEPTION',@r,@p,@evaluation,@rule,@scope,@motive,'APPROVED',@actor,now(),jsonb_build_object('resolutionDate',@date,'source','PERSISTED_MVP_TEST_EVALUATION'))
+on conflict on constraint uq_schedule_exceptions_evaluation_rule_scope_motive do nothing";
+        try
+        {
+            await using var cmd=new NpgsqlCommand(insertSql,cn,tx);
+            cmd.Parameters.AddWithValue("v",versionId);cmd.Parameters.Add("a",NpgsqlDbType.Bigint).Value=request.AssignmentId.HasValue?request.AssignmentId.Value:DBNull.Value;cmd.Parameters.AddWithValue("r",request.Reason.Trim());cmd.Parameters.AddWithValue("p",request.Responsible.Trim());cmd.Parameters.AddWithValue("evaluation",request.EvaluationId);cmd.Parameters.AddWithValue("rule",ruleCode);cmd.Parameters.AddWithValue("scope",scopeHash);cmd.Parameters.AddWithValue("motive",request.MotiveCode.Trim());cmd.Parameters.AddWithValue("actor",actor);cmd.Parameters.AddWithValue("date",resolutionDate.ToString("yyyy-MM-dd"));
+            if(await cmd.ExecuteNonQueryAsync(ct)!=1)throw new InvalidOperationException("Ya existe una decision para la misma evaluacion, regla, alcance y motivo.");
+        }
+        catch(PostgresException ex) when(ex.SqlState==PostgresErrorCodes.UniqueViolation && ex.ConstraintName=="uq_schedule_exceptions_evaluation_rule_scope_motive")
+        {
+            throw new InvalidOperationException("Ya existe una decision para la misma evaluacion, regla, alcance y motivo.",ex);
+        }
+        await RefreshScheduleMetricsAsync(cn,tx,versionId,ct);
+        await InsertAuditLogAsync(cn,tx,actorId,actor,"SCHEDULE_RULE_EXCEPTION_APPROVED","SCHEDULE_VERSION",versionId.ToString(),"jsonb_build_object('evaluationId',@evaluation,'ruleCode',@rule,'scopeHash',@scope,'motiveCode',@motive,'resolutionDate',@date,'environment','MVP_TEST')",c=>{c.Parameters.AddWithValue("evaluation",request.EvaluationId);c.Parameters.AddWithValue("rule",ruleCode);c.Parameters.AddWithValue("scope",scopeHash);c.Parameters.AddWithValue("motive",request.MotiveCode.Trim());c.Parameters.AddWithValue("date",resolutionDate.ToString("yyyy-MM-dd"));},ct);
+        await tx.CommitAsync(ct); return (await GetScheduleVersionAsync(versionId,ct))!;
+    }
+
+    public async Task<bool> AuditScheduleExceptionDenialAsync(long versionId,long actorId,string actor,CancellationToken ct=default)
+    {
+        await using var cn=new NpgsqlConnection(_connectionString);await cn.OpenAsync(ct);
+        await using var cmd=new NpgsqlCommand(@"insert into audit_log(actor_user_id,actor_username,event_type,entity_type,entity_id,result,detail)
+select @actorId,@actor,'SCHEDULE_RULE_EXCEPTION_DENIED','SCHEDULE_VERSION',@entity,'DENIED',jsonb_build_object('action','APPROVE_EXCEPTION','environment','MVP_TEST')
+where exists(select 1 from schedule_versions sv join scheduling_rule_profiles rp on rp.id=sv.rule_profile_id where sv.id=@version and sv.simulated=true and rp.origin='SIMULATED' and rp.environment_scope='MVP_TEST')",cn);
+        cmd.Parameters.AddWithValue("actorId",actorId);cmd.Parameters.AddWithValue("actor",actor);cmd.Parameters.AddWithValue("entity",versionId.ToString(System.Globalization.CultureInfo.InvariantCulture));cmd.Parameters.AddWithValue("version",versionId);
+        return await cmd.ExecuteNonQueryAsync(ct)==1;
+    }
+
+    private static bool CatalogAllowsMotive(string catalogJson,string motiveCode)
+    { using var d=JsonDocument.Parse(catalogJson);return d.RootElement.TryGetProperty("approvedMotiveCodes",out var a)&&a.ValueKind==JsonValueKind.Array&&a.EnumerateArray().Any(x=>x.ValueKind==JsonValueKind.String&&string.Equals(x.GetString(),motiveCode,StringComparison.Ordinal)); }
+
+    private static async Task<bool> HasPersistedHrValidationsAsync(NpgsqlConnection connection,NpgsqlTransaction transaction,long evaluationId,string factsJson,CancellationToken cancellationToken)
+    {
+        using var document=JsonDocument.Parse(factsJson);if(!document.RootElement.TryGetProperty("requirementEvaluations",out var evaluations)||evaluations.ValueKind!=JsonValueKind.Array||evaluations.GetArrayLength()==0)return false;
+        var evidenceIds=evaluations.EnumerateArray().Select(item=>item.TryGetProperty("evidenceId",out var id)&&id.ValueKind==JsonValueKind.String?id.GetString():null).Where(id=>!string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).ToArray();
+        if(evidenceIds.Length!=evaluations.GetArrayLength())return false;
+        await using var command=new NpgsqlCommand("SELECT count(DISTINCT evidence_id) FROM scheduling_rule_hr_validations WHERE evaluation_id=@evaluation AND rule_code='I9-R06' AND status='VALIDATED' AND evidence_id=ANY(@evidence)",connection,transaction);command.Parameters.AddWithValue("evaluation",evaluationId);command.Parameters.AddWithValue("evidence",evidenceIds!);return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken),System.Globalization.CultureInfo.InvariantCulture)==evidenceIds.Length;
+    }
+
+    // What the transition gate actually verified, carried into the audit trail so a reader can tell
+    // which versioned profile backed the decision and that it was a simulated MVP_TEST run.
+    private sealed record SchedulingTransitionEvidence(
+        bool Simulated,long RuleProfileId,long RuleProfileVersion,long Evaluations,long DecidedExceptions);
+
+    // Approving or publishing is the moment a proposal stops being a proposal, so by then every
+    // rule must have been decided. This mirrors SchedulingRuleEvaluationSummary.CanApproveOrPublish
+    // over what is actually persisted: only COMPLIANT and NOT_APPLICABLE pass on their own, an
+    // EXCEPTION_REQUIRED needs an approved decision bound to its exact evaluation, rule and scope,
+    // and BLOCKED or WARNING never pass - an unverified rule accredits nothing.
+    //
+    // Three things this gate learned the hard way. First, it judges only the CURRENT verdict for each
+    // subject, not the whole table: scheduling_rule_evaluations is append-only, so re-evaluating a
+    // corrected schedule adds a row rather than replacing one, and aggregating the history would
+    // leave an old BLOCKED - or an evaluation the edit outran - condemning the version for ever,
+    // with the refusal telling the operator to do exactly what they had already done. Second, it
+    // counts assignments, not only evaluations: an assignment nothing ever evaluated is invisible to
+    // any aggregate over the evaluation rows, and a version-level verdict must not be read as
+    // vouching for guards it never looked at. That is the unknown this module refuses to presume on.
+    //
+    // Third, a BLOCKED is not cleared by re-asserting facts. Every verdict is computed from facts the
+    // caller supplies, so if the newest evaluation simply replaced the previous one, whoever wanted
+    // the approval could post a clean fact set and walk a recorded hard block out of the way with no
+    // second authority involved - which an independent review demonstrated end to end. A block
+    // therefore stands until the assignment it was decided on is edited after it; only then does a
+    // later evaluation describe something that actually changed. Recovery stays possible, and it
+    // costs an edit that is itself permissioned and audited. A version-level block has no assignment
+    // to edit and so cannot be cleared this way at all, which is the fail-closed side of the trade.
+    //
+    // I9-R06 is admitted into `decided` with exception_allowed false because
+    // CreateScheduleExceptionAsync deliberately carves it out: its evidence is validated by Talento
+    // Humano rather than by the requesting actor, so the flag is never set on that path. Without the
+    // carve-out an approved R06 decision could never satisfy the gate.
+    private static async Task<SchedulingTransitionEvidence> RequireEveryRuleDecidedAsync(
+        NpgsqlConnection cn,NpgsqlTransaction tx,long versionId,CancellationToken ct)
+    {
+        const string sql=@"with current as (
+  select distinct on (coalesce(e.assignment_id,0),e.rule_code)
+         e.id,e.assignment_id,e.rule_code,e.scope_hash,e.outcome,e.exception_allowed,e.evaluated_at
+  from scheduling_rule_evaluations e
+  where e.schedule_version_id=@version
+  order by coalesce(e.assignment_id,0),e.rule_code,e.evaluated_at desc,e.id desc),
+decided as (
+  select c.id from current c
+  where c.outcome='EXCEPTION_REQUIRED' and (c.exception_allowed or c.rule_code='I9-R06') and exists(
+    select 1 from schedule_exceptions x
+    where x.evaluation_id=c.id and x.rule_code=c.rule_code and x.scope_hash=c.scope_hash
+      and x.decision='APPROVED'))
+select sv.simulated,coalesce(sv.rule_profile_id,0),coalesce(sv.rule_profile_version,0),
+(select count(*) from current),
+(select count(*) from current c join schedule_assignments a on a.id=c.assignment_id
+   where a.updated_at>c.evaluated_at),
+(select count(*) from scheduling_rule_evaluations b
+   left join schedule_assignments ba on ba.id=b.assignment_id
+ where b.schedule_version_id=sv.id and b.outcome='BLOCKED'
+   and coalesce(ba.updated_at<=b.evaluated_at,true)),
+(select count(*) from current c where c.outcome='WARNING'),
+(select count(*) from current c where c.outcome='EXCEPTION_REQUIRED' and c.id not in(select id from decided)),
+(select count(*) from decided),
+(select count(*) from schedule_assignments a where a.schedule_version_id=sv.id
+   and not exists(select 1 from current c where c.assignment_id=a.id))
+from schedule_versions sv where sv.id=@version";
+        bool simulated; long profileId,profileVersion,total,superseded,blocked,unverified,pending,decided,unevaluated;
+        await using(var cmd=new NpgsqlCommand(sql,cn,tx))
+        {
+            cmd.Parameters.AddWithValue("version",versionId);
+            await using var rd=await cmd.ExecuteReaderAsync(ct);
+            if(!await rd.ReadAsync(ct))throw new KeyNotFoundException("La version de programacion no existe.");
+            simulated=rd.GetBoolean(0);profileId=rd.GetInt64(1);profileVersion=rd.GetInt32(2);
+            total=rd.GetInt64(3);superseded=rd.GetInt64(4);blocked=rd.GetInt64(5);unverified=rd.GetInt64(6);
+            pending=rd.GetInt64(7);decided=rd.GetInt64(8);unevaluated=rd.GetInt64(9);
+        }
+        // A version that carries no rule profile never entered the versioned-rule regime and is left
+        // to the workflow it was built under. The test is the profile, not the simulated mark: the
+        // schema admits rule_profile_id with simulated=false, and keying on the mark would let such
+        // a version walk past the gate untouched.
+        if(profileId==0&&total==0)return new SchedulingTransitionEvidence(false,0,0,0,0);
+        if(total==0)
+            throw new SchedulingRuleGateException("RULE_EVALUATION_MISSING","La version no tiene evaluacion de reglas persistida; no se presume cumplimiento.");
+        if(unevaluated>0)
+            throw new SchedulingRuleGateException("RULE_ASSIGNMENT_UNEVALUATED","Hay asignaciones que ninguna regla ha evaluado; no se presume cumplimiento sobre ellas.");
+        if(superseded>0)
+            throw new SchedulingRuleGateException("RULE_EVALUATION_SUPERSEDED","Hay asignaciones editadas despues de su evaluacion vigente; se deben reevaluar antes de aprobar o publicar.");
+        if(blocked>0)
+            throw new SchedulingRuleGateException("RULE_BLOCKED","Hay reglas bloqueadas; no se puede aprobar ni publicar.");
+        if(unverified>0)
+            throw new SchedulingRuleGateException("RULE_UNVERIFIED","Hay reglas sin verificar; una regla sin verificar no acredita nada.");
+        if(pending>0)
+            throw new SchedulingRuleGateException("RULE_EXCEPTION_REQUIRED","Hay excepciones requeridas sin decision aprobada; no se puede aprobar ni publicar.");
+        return new SchedulingTransitionEvidence(simulated,profileId,profileVersion,total,decided);
+    }
+
+    public Task<ScheduleWorkflowResponse> ApproveScheduleAsync(long id,int expected,long actorId,string actor,CancellationToken ct=default)=>TransitionScheduleAsync(id,expected,"PROPUESTA","APROBADA","SCHEDULE_APPROVED",actorId,actor,ct);
+    public Task<ScheduleWorkflowResponse> PublishScheduleAsync(long id,int expected,long actorId,string actor,CancellationToken ct=default)=>TransitionScheduleAsync(id,expected,"APROBADA","PUBLICADA","SCHEDULE_PUBLISHED",actorId,actor,ct);
+
+    public async Task<IReadOnlyList<ScheduleAuditResponse>> GetScheduleAuditAsync(long id,CancellationToken ct=default)
+    { var items=new List<ScheduleAuditResponse>();await using var cn=new NpgsqlConnection(_connectionString);await cn.OpenAsync(ct);await using var cmd=new NpgsqlCommand("select id,event_type,actor_username,created_at,detail::text from audit_log where entity_type='SCHEDULE_VERSION' and entity_id=@id order by id",cn);cmd.Parameters.AddWithValue("id",id.ToString());await using var rd=await cmd.ExecuteReaderAsync(ct);while(await rd.ReadAsync(ct))items.Add(new(rd.GetInt64(0),rd.GetString(1),rd.GetString(2),rd.GetFieldValue<DateTime>(3).ToString("O"),rd.GetString(4)));return items; }
+
+    public async Task<ScheduleReplanningResponse> ReplanScheduleAsync(long versionId,ScheduleReplanningRequest request,SchedulingRecommendationEngine engine,long actorId,string actor,CancellationToken ct=default)
+    {
+        var modes=(request.Modes??Array.Empty<string>()).Select(x=>x.Trim().ToUpperInvariant()).Distinct().OrderBy(x=>x).ToArray();
+        await using var cn=new NpgsqlConnection(_connectionString);await cn.OpenAsync(ct);await using var tx=await cn.BeginTransactionAsync(ct);
+        int assignments,vacancies,exceptions,pendingProposals;
+        await using(var cmd=new NpgsqlCommand("select count(*)::int,(count(*) filter(where a.status='VACANTE'))::int,(select count(*)::int from schedule_exceptions x where x.schedule_version_id=@id and not "+SupersededDecisionPredicate+"),(select count(*)::int from schedule_versions p where p.schedule_id=v.schedule_id and p.status='PROPUESTA') from schedule_versions v left join schedule_assignments a on a.schedule_version_id=v.id where v.id=@id and v.status='PUBLICADA' group by v.id",cn,tx))
+        {cmd.Parameters.AddWithValue("id",versionId);await using var rd=await cmd.ExecuteReaderAsync(ct);if(!await rd.ReadAsync(ct))throw new InvalidOperationException("La reprogramacion requiere una version publicada.");assignments=rd.GetInt32(0);vacancies=rd.GetInt32(1);exceptions=rd.GetInt32(2);pendingProposals=rd.GetInt32(3);}
+        var result=engine.Replan(versionId,request.TriggerType,request.TriggerId,modes,assignments,vacancies,exceptions);var json=JsonSerializer.Serialize(result);var modesJson=JsonSerializer.Serialize(modes);
+        await using(var cmd=new NpgsqlCommand("insert into schedule_replanning_runs(schedule_version_id,trigger_type,trigger_id,modes,result_snapshot,created_by) values(@v,@t,@i,@m::jsonb,@r::jsonb,@a) on conflict(schedule_version_id,trigger_type,trigger_id,modes) do nothing",cn,tx)){cmd.Parameters.AddWithValue("v",versionId);cmd.Parameters.AddWithValue("t",result.TriggerType);cmd.Parameters.AddWithValue("i",result.TriggerId);cmd.Parameters.AddWithValue("m",modesJson);cmd.Parameters.AddWithValue("r",json);cmd.Parameters.AddWithValue("a",actor);await cmd.ExecuteNonQueryAsync(ct);}
+        var notifications=new List<(string,string)>();if(vacancies>0)notifications.Add(("CRITICAL_VACANCY","Vacante critica en programacion"));if(exceptions>0)notifications.Add(("EXPIRING_EXCEPTION","Excepcion proxima a vencer"));if(pendingProposals>0)notifications.Add(("PENDING_PROPOSAL","Propuesta pendiente de aprobacion"));notifications.Add(("PUBLISHED_CHANGE","Novedad sobre programacion publicada"));
+        foreach(var n in notifications){await using var cmd=new NpgsqlCommand("insert into notification_items(target_type,target_key,title,body,status,source_module,deduplication_key) values('ROLE','OPERACIONES',@title,@body,'UNREAD','SCHEDULING',@key) on conflict(deduplication_key) where deduplication_key is not null do nothing",cn,tx);cmd.Parameters.AddWithValue("title",n.Item2);cmd.Parameters.AddWithValue("body",$"Version {versionId}; novedad {result.TriggerType}:{result.TriggerId}.");cmd.Parameters.AddWithValue("key",$"SCHEDULING:{versionId}:{result.TriggerType}:{result.TriggerId}:{n.Item1}");await cmd.ExecuteNonQueryAsync(ct);}
+        await InsertAuditLogAsync(cn,tx,actorId,actor,"SCHEDULE_REPLANNED","SCHEDULE_VERSION",versionId.ToString(),"jsonb_build_object('triggerType',@type,'triggerId',@trigger)",c=>{c.Parameters.AddWithValue("type",result.TriggerType);c.Parameters.AddWithValue("trigger",result.TriggerId);},ct);await tx.CommitAsync(ct);return result;
+    }
+
+    private async Task<ScheduleWorkflowResponse> TransitionScheduleAsync(long id,int expected,string from,string to,string eventType,long actorId,string actor,CancellationToken ct)
+    { await using var cn=new NpgsqlConnection(_connectionString);await cn.OpenAsync(ct);await using var tx=await cn.BeginTransactionAsync(ct);var current=await RequireScheduleStateAsync(cn,tx,id,expected,from,ct);var evidence=await RequireEveryRuleDecidedAsync(cn,tx,id,ct);if(to=="PUBLICADA"){await using var replace=new NpgsqlCommand("update schedule_versions set status='REEMPLAZADA' where schedule_id=@s and status='PUBLICADA'",cn,tx);replace.Parameters.AddWithValue("s",current.ScheduleId);await replace.ExecuteNonQueryAsync(ct);}var sql=to=="APROBADA"?"update schedule_versions set status='APROBADA',approved_by=@a,approved_at=now() where id=@id":"update schedule_versions set status='PUBLICADA',published_by=@a,published_at=now() where id=@id";await using(var cmd=new NpgsqlCommand(sql,cn,tx)){cmd.Parameters.AddWithValue("a",actor);cmd.Parameters.AddWithValue("id",id);await cmd.ExecuteNonQueryAsync(ct);}var self=to=="PUBLICADA"&&current.CreatedBy==actor&&current.ApprovedBy==actor;await InsertAuditLogAsync(cn,tx,actorId,actor,eventType,"SCHEDULE_VERSION",id.ToString(),"jsonb_build_object('from',@from,'to',@to,'selfManaged',@self,'simulated',@simulated,'ruleProfileId',@profile,'ruleProfileVersion',@profileVersion,'evaluations',@evaluations,'decidedExceptions',@decided)",c=>{c.Parameters.AddWithValue("from",from);c.Parameters.AddWithValue("to",to);c.Parameters.AddWithValue("self",self);c.Parameters.AddWithValue("simulated",evidence.Simulated);c.Parameters.AddWithValue("profile",evidence.RuleProfileId);c.Parameters.AddWithValue("profileVersion",evidence.RuleProfileVersion);c.Parameters.AddWithValue("evaluations",evidence.Evaluations);c.Parameters.AddWithValue("decided",evidence.DecidedExceptions);},ct);await tx.CommitAsync(ct);return(await GetScheduleVersionAsync(id,ct))!; }
+
+    private async Task<ScheduleWorkflowResponse> RequireScheduleStateAsync(NpgsqlConnection cn,NpgsqlTransaction tx,long id,int expected,string status,CancellationToken ct)
+    { await using var cmd=new NpgsqlCommand("select sv.id,sv.schedule_id,s.project_id,sv.version_number,sv.status,s.period_start,s.period_end,sv.coverage_percent,sv.vacancy_count,sv.exception_count,coalesce((sv.source_snapshot->>'acceptedVacancy')::boolean,false),sv.created_by,sv.approved_by,sv.published_by from schedule_versions sv join schedules s on s.id=sv.schedule_id where sv.id=@id for update of sv",cn,tx);cmd.Parameters.AddWithValue("id",id);await using var rd=await cmd.ExecuteReaderAsync(ct);if(!await rd.ReadAsync(ct))throw new KeyNotFoundException("La propuesta no existe.");var item=ReadScheduleWorkflow(rd);if(item.VersionNumber!=expected)throw new DBConcurrencyException("La version esperada no coincide.");if(item.Status!=status)throw new InvalidOperationException($"La transicion requiere estado {status}.");return item; }
+
+    // Editing an assignment changes the facts the rules were decided on, so a fresh evaluation
+    // would derive a different scopeHash and the persisted one no longer describes this shift.
+    // Both scheduling_rule_evaluations and rule-bound schedule_exceptions are append-only by
+    // trigger: an approval that happened is a historical fact and is never rewritten. Staleness
+    // is therefore derived, not stored - an evaluation is superseded exactly when its assignment
+    // was touched after it was evaluated. That single predicate is what stops a superseded
+    // decision from counting in the summary and from admitting a new one.
+    private const string SupersededDecisionPredicate=
+        "exists(select 1 from scheduling_rule_evaluations e join schedule_assignments a on a.id=e.assignment_id "+
+        "where e.id=x.evaluation_id and a.updated_at>e.evaluated_at)";
+
+    private static async Task<int> CountStandingAssignmentDecisionsAsync(
+        NpgsqlConnection cn,NpgsqlTransaction tx,long versionId,long assignmentId,CancellationToken ct)
+    {
+        await using var cmd=new NpgsqlCommand(@"select count(*) from schedule_exceptions x
+join scheduling_rule_evaluations e on e.id=x.evaluation_id
+join schedule_assignments a on a.id=e.assignment_id
+where x.schedule_version_id=@version and e.assignment_id=@assignment and a.updated_at<=e.evaluated_at",cn,tx);
+        cmd.Parameters.AddWithValue("version",versionId);cmd.Parameters.AddWithValue("assignment",assignmentId);
+        return (int)(long)(await cmd.ExecuteScalarAsync(ct)??0L);
+    }
+
+    private async Task RefreshScheduleMetricsAsync(NpgsqlConnection cn,NpgsqlTransaction tx,long id,CancellationToken ct)
+    { await using var cmd=new NpgsqlCommand("update schedule_versions sv set vacancy_count=(select count(*) from schedule_assignments where schedule_version_id=sv.id and status='VACANTE'),exception_count=(select count(*) from schedule_exceptions x where x.schedule_version_id=sv.id and not "+SupersededDecisionPredicate+"),coverage_percent=coalesce((select round(100.0*count(*) filter(where status='ASIGNADA')/nullif(count(*),0),2) from schedule_assignments where schedule_version_id=sv.id),0) where sv.id=@id",cn,tx);cmd.Parameters.AddWithValue("id",id);await cmd.ExecuteNonQueryAsync(ct); }
+
+    private async Task<ScheduleWorkflowResponse?> QueryScheduleAsync(string filter,long id,DateOnly? period,CancellationToken ct)
+    { await using var cn=new NpgsqlConnection(_connectionString);await cn.OpenAsync(ct);await using var cmd=new NpgsqlCommand($"select sv.id,sv.schedule_id,s.project_id,sv.version_number,sv.status,s.period_start,s.period_end,sv.coverage_percent,sv.vacancy_count,sv.exception_count,coalesce((sv.source_snapshot->>'acceptedVacancy')::boolean,false),sv.created_by,sv.approved_by,sv.published_by from schedule_versions sv join schedules s on s.id=sv.schedule_id where {filter}",cn);cmd.Parameters.AddWithValue("id",id);if(period.HasValue)cmd.Parameters.AddWithValue("period",period.Value);await using var rd=await cmd.ExecuteReaderAsync(ct);return await rd.ReadAsync(ct)?ReadScheduleWorkflow(rd):null; }
+    private static ScheduleWorkflowResponse ReadScheduleWorkflow(NpgsqlDataReader r){var created=r.GetString(11);var approved=r.IsDBNull(12)?null:r.GetString(12);var published=r.IsDBNull(13)?null:r.GetString(13);return new(r.GetInt64(0),r.GetInt64(1),r.GetInt64(2),r.GetInt32(3),r.GetString(4),r.GetFieldValue<DateOnly>(5).ToString("yyyy-MM-dd"),r.GetFieldValue<DateOnly>(6).ToString("yyyy-MM-dd"),r.GetDecimal(7),r.GetInt32(8),r.GetInt32(9),r.GetBoolean(10),created,approved,published,published is not null&&created==approved&&approved==published);}
+
+    private async Task<bool> UpdateSchedulingConfigurationAsync(string sql, string eventType, string entityType, long id, Action<NpgsqlCommand> addParameters, long actorUserId, string actorUsername, CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("id", id);
+        addParameters(command);
+        var updated = await command.ExecuteScalarAsync(cancellationToken) is not null;
+        if (!updated) { await transaction.RollbackAsync(cancellationToken); return false; }
+        await InsertAuditLogAsync(connection, transaction, actorUserId, actorUsername, eventType, entityType, id.ToString(), "'{}'::jsonb", null, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
+    private Task<bool> InactivateSchedulingConfigurationAsync(string table, string eventType, string entityType, long id, long actorUserId, string actorUsername, CancellationToken cancellationToken) =>
+        UpdateSchedulingConfigurationAsync($"update {table} set status='INACTIVO',updated_at=now() where id=@id returning id", eventType, entityType, id, _ => { }, actorUserId, actorUsername, cancellationToken);
+
+    private async Task<long> InsertSchedulingConfigurationAsync(
+        string insertSql,
+        string eventType,
+        string entityType,
+        Action<NpgsqlCommand> addParameters,
+        long actorUserId,
+        string actorUsername,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(insertSql, connection, transaction);
+        addParameters(command);
+        var id = (long)(await command.ExecuteScalarAsync(cancellationToken)
+            ?? throw new InvalidOperationException("No fue posible guardar la configuracion I9."));
+        await InsertAuditLogAsync(connection, transaction, actorUserId, actorUsername, eventType, entityType,
+            id.ToString(System.Globalization.CultureInfo.InvariantCulture), "'{}'::jsonb", null, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return id;
     }
 
     private static void AddTrainingRequirementTypeParameters(NpgsqlCommand command, UpsertTrainingRequirementTypeRequest request)

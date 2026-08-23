@@ -1,0 +1,39 @@
+using DocumentFormat.OpenXml;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Spreadsheet;
+using Npgsql;
+using System.Text;
+
+namespace Sg.SuperApp.Api.Services;
+
+public interface ISchedulingExportService { byte[] BuildPdf(ScheduleExportModel model); byte[] BuildXlsx(ScheduleExportModel model); }
+public sealed record ScheduleExportRow(long AssignmentId,long PositionId,long? EmployeeId,string Date,string StartsAt,string EndsAt,string Status);
+public sealed record ScheduleExportModel(long VersionId,int VersionNumber,string Client,string Project,string Period,string Status,string GeneratedAt,string Responsible,bool Simulated,long RuleProfileId,int RuleProfileVersion,IReadOnlyList<ScheduleExportRow> Rows);
+
+public sealed class SchedulingExportService : ISchedulingExportService
+{
+    private readonly string connectionString;
+    public SchedulingExportService(IConfiguration configuration)=>connectionString=configuration.GetConnectionString("Postgres")??throw new InvalidOperationException("Postgres not configured.");
+    public async Task<ScheduleExportModel?> LoadAsync(long versionId,long? positionId,long? employeeId,string actor,CancellationToken ct)
+    {await using var cn=new NpgsqlConnection(connectionString);await cn.OpenAsync(ct);await using var cmd=new NpgsqlCommand(@"select sv.version_number,c.name,p.name,s.period_start,s.period_end,sv.status,a.id,r.position_id,a.employee_id,r.shift_date,r.starts_at,r.ends_at,a.status,sv.simulated,coalesce(sv.rule_profile_id,0),coalesce(sv.rule_profile_version,0) from schedule_versions sv join schedules s on s.id=sv.schedule_id join service_projects p on p.id=s.project_id join clients c on c.id=p.client_id left join schedule_assignments a on a.schedule_version_id=sv.id left join required_shifts r on r.id=a.required_shift_id where sv.id=@v and sv.status='PUBLICADA' and (@p is null or r.position_id=@p) and (@e is null or a.employee_id=@e) order by r.shift_date,r.starts_at,a.id",cn);cmd.Parameters.AddWithValue("v",versionId);cmd.Parameters.Add("p",NpgsqlTypes.NpgsqlDbType.Bigint).Value=positionId.HasValue?positionId.Value:DBNull.Value;cmd.Parameters.Add("e",NpgsqlTypes.NpgsqlDbType.Bigint).Value=employeeId.HasValue?employeeId.Value:DBNull.Value;await using var rd=await cmd.ExecuteReaderAsync(ct);if(!await rd.ReadAsync(ct))return null;var rows=new List<ScheduleExportRow>();var version=rd.GetInt32(0);var client=rd.GetString(1);var project=rd.GetString(2);var period=$"{rd.GetFieldValue<DateOnly>(3):yyyy-MM-dd} a {rd.GetFieldValue<DateOnly>(4):yyyy-MM-dd}";var status=rd.GetString(5);var simulated=rd.GetBoolean(13);var ruleProfileId=rd.GetInt64(14);var ruleProfileVersion=rd.GetInt32(15);do{if(!rd.IsDBNull(6))rows.Add(new(rd.GetInt64(6),rd.GetInt64(7),rd.IsDBNull(8)?null:rd.GetInt64(8),rd.GetFieldValue<DateOnly>(9).ToString("yyyy-MM-dd"),rd.GetFieldValue<TimeOnly>(10).ToString("HH:mm"),rd.GetFieldValue<TimeOnly>(11).ToString("HH:mm"),rd.GetString(12)));}while(await rd.ReadAsync(ct));return new(versionId,version,client,project,period,status,DateTimeOffset.UtcNow.ToString("O"),actor,simulated,ruleProfileId,ruleProfileVersion,rows);}
+    public async Task AuditAsync(long versionId,string actor,string format,long? positionId,long? employeeId,CancellationToken ct){await using var cn=new NpgsqlConnection(connectionString);await cn.OpenAsync(ct);await using var cmd=new NpgsqlCommand("insert into audit_log(actor_username,event_type,entity_type,entity_id,result,detail) select @a,'SCHEDULE_EXPORTED','SCHEDULE_VERSION',@v,'SUCCESS',jsonb_build_object('format',@f,'positionId',@p,'employeeId',@e,'simulated',sv.simulated,'ruleProfileId',coalesce(sv.rule_profile_id,0),'ruleProfileVersion',coalesce(sv.rule_profile_version,0)) from schedule_versions sv where sv.id=@versionId",cn);cmd.Parameters.AddWithValue("a",actor);cmd.Parameters.AddWithValue("v",versionId.ToString());cmd.Parameters.AddWithValue("versionId",versionId);cmd.Parameters.AddWithValue("f",format);cmd.Parameters.Add("p",NpgsqlTypes.NpgsqlDbType.Bigint).Value=positionId.HasValue?positionId.Value:DBNull.Value;cmd.Parameters.Add("e",NpgsqlTypes.NpgsqlDbType.Bigint).Value=employeeId.HasValue?employeeId.Value:DBNull.Value;await cmd.ExecuteNonQueryAsync(ct);}
+    public byte[] BuildPdf(ScheduleExportModel m){var lines=Header(m).Concat(m.Rows.Select(r=>$"{r.Date} {r.StartsAt}-{r.EndsAt} | Puesto {r.PositionId} | Guarda {r.EmployeeId?.ToString()??"VACANTE"} | {r.Status}"));var text=string.Join("\n",lines).Replace("\\","\\\\").Replace("(","\\(").Replace(")","\\)");var stream=$"BT /F1 9 Tf 45 790 Td ({text.Replace("\n",") Tj 0 -13 Td (")}) Tj ET";var objects=new[]{"<< /Type /Catalog /Pages 2 0 R >>","<< /Type /Pages /Kids [3 0 R] /Count 1 >>","<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",$"<< /Length {Encoding.ASCII.GetByteCount(stream)} >>\nstream\n{stream}\nendstream","<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"};var b=new StringBuilder("%PDF-1.4\n");var offsets=new List<int>{0};for(var i=0;i<objects.Length;i++){offsets.Add(Encoding.ASCII.GetByteCount(b.ToString()));b.Append($"{i+1} 0 obj\n{objects[i]}\nendobj\n");}var x=Encoding.ASCII.GetByteCount(b.ToString());b.Append($"xref\n0 {objects.Length+1}\n0000000000 65535 f \n");foreach(var o in offsets.Skip(1))b.Append($"{o:0000000000} 00000 n \n");b.Append($"trailer << /Size {objects.Length+1} /Root 1 0 R >>\nstartxref\n{x}\n%%EOF");return Encoding.ASCII.GetBytes(b.ToString());}
+    public byte[] BuildXlsx(ScheduleExportModel m){using var ms=new MemoryStream();using(var d=SpreadsheetDocument.Create(ms,SpreadsheetDocumentType.Workbook,true)){var wb=d.AddWorkbookPart();wb.Workbook=new Workbook();var ws=wb.AddNewPart<WorksheetPart>();var data=new SheetData();ws.Worksheet=new Worksheet(data);foreach(var values in Header(m).Select(x=>new[]{x}).Concat(new[]{new[]{"Fecha","Inicio","Fin","Puesto","Guarda","Estado"}}).Concat(m.Rows.Select(r=>new[]{r.Date,r.StartsAt,r.EndsAt,r.PositionId.ToString(),r.EmployeeId?.ToString()??"VACANTE",r.Status})))data.Append(new Row(values.Select(v=>new Cell{DataType=CellValues.String,CellValue=new CellValue(v)})));wb.Workbook.Append(new Sheets(new Sheet{Id=wb.GetIdOfPart(ws),SheetId=1,Name="Programacion"}));wb.Workbook.Save();}return ms.ToArray();}
+    // One header feeds both the PDF and the spreadsheet, so the origin appears on either face.
+    // A version with no versioned profile says so rather than staying silent, because silence on
+    // an exported document reads as an ordinary roster.
+    // Two independent facts, and the first version of this conflated them: it branched on Simulated
+    // and its false arm asserted something about the profile, so a version carrying a versioned
+    // profile without the simulated mark - a shape the schema permits - printed "sin perfil de
+    // reglas versionado", which is false. Each clause now speaks only for itself.
+    private static string Origin(ScheduleExportModel m)
+    {
+        var origin = m.Simulated ? "DATOS SIMULADOS - MVP" : "origen no marcado como simulado";
+        var profile = m.RuleProfileId > 0
+            ? $"perfil {m.RuleProfileId} version {m.RuleProfileVersion}"
+            : "sin perfil de reglas versionado";
+        return $"Origen: {origin} ({profile})";
+    }
+
+    private static IEnumerable<string> Header(ScheduleExportModel m)=>new[]{$"Cliente: {m.Client}",$"Proyecto: {m.Project}",$"Periodo: {m.Period}",$"Version: {m.VersionNumber}",$"Estado: {m.Status}",$"Generado: {m.GeneratedAt}",$"Responsable: {m.Responsible}",Origin(m)};
+}

@@ -1,0 +1,536 @@
+# Execution Log I9 - Gate 0 - Programacion Asistida De Turnos
+
+> Tipo: **Execution log documental de Gate 0**
+> Estado general: **Gate 0 cerrado - Tasks 2 a 12 completadas - Task 13 en ejecucion**
+> Gate 0: **Cerrado**
+> Fecha de apertura: 2026-07-29
+> SPEC: `docs/specs/2026-07-29-sg-superapp-spec-i9-programacion-turnos.md`
+> Plan tecnico: `docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`
+> Hito: SPEC aprobada el 2026-07-29 por el usuario, patrocinador funcional.
+
+## Alcance Del Log
+
+Este artefacto registra la apertura documental de I9. No sustituye el plan
+tecnico exacto
+`docs/superpowers/plans/2026-07-29-sg-programacion-turnos-implementation-plan.md`.
+Estado del plan tecnico: **APROBADO COMO HOJA DE RUTA DOCUMENTAL**.
+Estado de ejecucion: **TASK 12 COMPLETADA - TASK 13 EN EJECUCION**.
+
+Las tres condiciones de Gate 0 estan satisfechas desde el 2026-07-29: SPEC
+aprobada, catalogo aprobado para parametrizacion y cierre ejecutivo explicito.
+El catalogo no es ejecutable por el motor mientras sus campos obligatorios
+permanezcan incompletos o sin validar.
+
+El catalogo conserva estado `APROBADO_PARA_PARAMETRIZACION`; las decisiones constan como
+`Aprobada`. Gate 0 permanece cerrado; Tasks 2, 3, 4, 5, 6 y 7 estan
+completadas junto con Tasks 8, 9, 10, 11 y 12. Task 13 esta en ejecucion.
+
+## Ruta De Validacion Del Catalogo
+
+La fuente aportada por el usuario es el organigrama S&G codigo `GH-DE-01`, fecha
+`24/07/2025`, version 4. El organigrama identifica como roles relevantes al
+Director de Operaciones, Director de Talento Humano y Asesor Juridico, pero no
+constituye aprobacion ni firma y no soporta inferir nombres o decisiones.
+
+La validacion se registra en
+`docs/operations/2026-07-29-i9-acta-validacion-gate0.md`. Jorge Guzman valida
+Operaciones; Carolina Rodriguez Russi valida Talento Humano y Juridica; Camilo
+Piedrahita, Gerente General, realiza el cierre ejecutivo.
+
+## Estado De Gates
+
+| Gate / Retake | Estado | Condiciones cumplidas / proxima condicion |
+|---|---|---|
+| Gate 0 - autoridad documental | Cerrado | Catalogo aprobado para parametrizacion y firmado; no ejecutable; cierre ejecutivo registrado |
+| Gate 1 / Tasks 2-4 - persistencia/configuracion | Completado | Persistencia, ciclos y CRUD de configuracion verificados bajo SDD/TDD |
+| Gate 2 - reglas/motor | Bloqueado | Proxima condicion: completar y validar parametros de las 7 reglas |
+| Gate 3 - workflow/seguridad | Bloqueado | Proxima condicion: cerrar Gate 2 |
+| Gate 4 - exportaciones/UI | Bloqueado | Proxima condicion: cerrar Gate 3 |
+| Gate 5 - piloto/cierre | Bloqueado | Proxima condicion: cerrar Gate 4 |
+
+## Task 1 - Gate 0 Documental
+
+Estado: **Cerrado**.
+
+- [x] Verificador documental creado y RED observado.
+- [x] Constitucion, Arquitectura, Tecnologia y Design alineados con I9.
+- [x] SPEC formal creada.
+- [x] SPEC aprobada el 2026-07-29 por el usuario/patrocinador funcional.
+- [x] Catalogo juridico-operativo `APROBADO_PARA_PARAMETRIZACION`.
+- [x] Validacion Operaciones: Jorge Guzman.
+- [x] Validacion Talento Humano y Juridica: Carolina Rodriguez Russi.
+- [x] Cierre ejecutivo: Camilo Piedrahita, Gerente General.
+
+## Avance Tecnico Autorizado
+
+Tasks 2, 3 y 4 se completaron con sus verificaciones. El usuario aprobo el
+2026-08-11 la enmienda del modelo persistente requerida para coberturas,
+disponibilidad y requisitos de puesto. La Task 4 fue completada con CRUD,
+permisos y auditoria; Task 5 fue completada con elegibilidad explicable. Esta
+actualizacion no habilita reglas normativas ni inicia Task 6.
+
+## Evidencia TDD Documental
+
+- RED esperado: `I9 DOCS FAIL` por decisiones y artefactos ausentes.
+- GREEN requerido: `I9 DOCS PASS` con estados documentales coherentes.
+- Verificador: `scripts/dev/Verify-SgSuperAppI9Docs.ps1`.
+
+### Replay RED reproducible con verificador final
+
+Base verificada: commit `baaf482`. Se uso `git archive`; no se creo ni modifico
+ningun worktree registrado.
+
+```powershell
+$redRoot = Join-Path $env:TEMP ('sg-i9-red-baaf482-' + [guid]::NewGuid().ToString('N'))
+$archivePath = "$redRoot.zip"
+New-Item -ItemType Directory -Path $redRoot
+git archive --format=zip --output=$archivePath baaf482
+Expand-Archive -LiteralPath $archivePath -DestinationPath $redRoot
+powershell -ExecutionPolicy Bypass -File scripts/dev/Verify-SgSuperAppI9Docs.ps1 -RepositoryRoot $redRoot
+```
+
+Resultado observado el 2026-07-29: `I9 DOCS FAIL`, exit code `1`, **38
+faltantes exactos**:
+
+1. `CONSTITUTION`: tabla I9.
+2. `CONSTITUTION`: control humano.
+3. `CONSTITUTION`: prohibicion de aprobacion/publicacion autonoma.
+4. `CONSTITUTION`: jerarquia de `docs/operations/`.
+5. `CONSTITUTION`: subordinacion del catalogo a las autoridades SDD.
+6. `CONSTITUTION`: catalogo como fuente de parametros operativos, no ejecutable
+   hasta completar y validar sus campos obligatorios.
+7. `CONSTITUTION`: prohibicion de contradecir autoridades superiores.
+8. `CONSTITUTION`: enlace al plan tecnico exacto.
+9. `CONSTITUTION`: plan aprobado como hoja de ruta documental.
+10. `CONSTITUTION`: separacion entre autorizacion y comienzo de Task 2.
+11. `CONSTITUTION`: trazabilidad de las tres condiciones de Gate 0.
+12. `CONSTITUTION`: retake tecnico autorizado y no iniciado.
+13. `ARCHITECTURE`: modulo Programacion asistida de turnos.
+14. `ARCHITECTURE`: `PlantillaDeTurno`.
+15. `ARCHITECTURE`: `VersionDeProgramacion`.
+16. `ARCHITECTURE`: `ExcepcionDeProgramacion`.
+17. `ARCHITECTURE`: integracion I2-I3-I5-I6-I7.
+18. `TECNOLOGIA`: motor heuristico deterministico.
+19. `TECNOLOGIA`: `.NET 6`.
+20. `TECNOLOGIA`: MVP sin dependencia externa.
+21. `DESIGN`: Enterprise Sentinel.
+22. `DESIGN`: referencia `Prototipos/stitch_ecosistema_digital_unificado/sentinel_enterprise/DESIGN.md`.
+23. `DESIGN`: `#003366`.
+24. `DESIGN`: `#FFC700`.
+25. `DESIGN`: `#F8F9FA`.
+26. `DESIGN`: `#FFFFFF`.
+27. `DESIGN`: `#E1E4E8`.
+28. `DESIGN`: radios 4px-8px.
+29. `DESIGN`: Montserrat/sans para jerarquia.
+30. `DESIGN`: Arial/Inter-compatible para datos.
+31. `DESIGN`: prohibicion de landing/decoracion sin valor operativo.
+32. `DESIGN`: matriz mensual.
+33. `DESIGN`: plantillas.
+34. `DESIGN`: comparacion.
+35. `DESIGN`: excepciones.
+36. SPEC I9 ausente.
+37. Execution log I9 ausente.
+38. Catalogo de reglas I9 ausente.
+
+La copia usada para esta observacion fue
+`C:\Users\jmep2\AppData\Local\Temp\sg-i9-red-baaf482-ba354d86c487418c992c1186b721c7e0`.
+
+### Pruebas negativas del estado GREEN
+
+Se crearon tres copias temporales independientes del estado GREEN y se ejecuto
+el verificador final con `-RepositoryRoot` despues de una mutacion por caso:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/dev/Verify-SgSuperAppI9Docs.ps1 -RepositoryRoot <raiz-caso>
+```
+
+Resultados reales observados el 2026-07-29:
+
+| Caso mutado | Raiz temporal | Resultado | Exit | Controles activados |
+|---|---|---|---:|---:|
+| Task 2 iniciada prematuramente | Copia temporal aislada | `I9 DOCS FAIL` | 1 | 1 |
+| Gate 0 revertido a abierto | Copia temporal aislada | `I9 DOCS FAIL` | 1 | 1 |
+| Catalogo en borrador o inconsistente | Copia temporal aislada | `I9 DOCS FAIL` | 1 | 1 |
+| Mapeo o evidencia documental alterados | Copia temporal aislada | `I9 DOCS FAIL` | 1 | 1 |
+| Regla incompleta marcada `APROBADO_EJECUTABLE` | Copia temporal aislada | `I9 DOCS FAIL` | 1 | 2 |
+
+Las mutaciones no tocaron el repositorio ni crearon worktrees registrados.
+
+## Retake
+
+Task 6 queda completada con persistencia de propuestas, versiones, turnos
+requeridos, asignaciones, excepciones y corridas. Una version `PUBLICADA` y sus
+asignaciones son inmutables; solo puede existir una version publicada por
+proyecto y periodo. El commit tecnico es `d1cfa8f` y la verificacion hermetica
+termino con `I9 PERSISTENCE PASS` en Windows PowerShell 5.1 y PowerShell 7.
+
+### Cierre Task 7
+
+Task 7 queda completada con motor heuristico deterministico, score ponderado,
+desempate estable por empleado, actualizacion acumulada de carga, vacantes
+explicitas y razones de ranking. La corrida persiste estados, snapshots y
+asignaciones; el reintento con la misma clave retorna la corrida existente.
+El commit tecnico es `0759678`. El dataset fijo produjo seis resultados, cinco
+asignaciones y una vacante con `I9 RECOMMENDATIONS PASS`; el build termino con
+cero advertencias y cero errores.
+
+### Cierre Task 8
+
+Task 8 queda completada con workflow transaccional de propuesta, ajuste manual,
+excepcion documentada, aprobacion, publicacion, reemplazo controlado y auditoria.
+El commit tecnico es `ef77715`. La prueba aislada verifico `I9 WORKFLOW PASS` e
+`I9 SECURITY PASS`, incluido rechazo 401/403, conflicto por version esperada,
+vacante aceptada preservada y detalle `selfManaged`. Persistencia termino con
+`I9 PERSISTENCE PASS`; el build concluyo con cero advertencias y cero errores.
+
+### Cierre Task 9
+
+Task 9 queda completada con reprogramacion deterministica `MINIMUM_IMPACT` y
+`GLOBAL`, metricas comparables, persistencia idempotente y cuatro categorias de
+notificacion deduplicadas segun condiciones existentes. El commit tecnico es
+`6a31fad`. El verificador aislado y la compilacion terminaron en verde; la
+regresion disponible registro `I9 PERSISTENCE PASS`.
+
+### Cierre Task 10
+
+Task 10 queda completada con exportaciones de versiones publicadas a PDF y
+Excel, filtros por puesto y guarda, nombres trazables y auditoria
+`SCHEDULE_EXPORTED`. El commit tecnico es `7e3313a`. La prueba integral aislada
+valido cabecera y cierre del PDF, estructura OpenXML del XLSX, metadatos de
+cliente, proyecto, periodo, version, estado y responsable, y dos eventos de
+auditoria; termino con `I9 EXPORTS PASS`. El build concluyo con cero
+advertencias y cero errores.
+
+### Cierre Task 11
+
+Task 11 queda completada con contratos TypeScript de programacion, cliente API
+para capacidades, configuracion, workflow, reprogramacion y exportaciones, y un
+endpoint backend que calcula capacidades desde permisos persistidos, sin
+inferirlas por rol. El commit tecnico es `f62b047`. El verificador termino con
+`I9 FRONTEND API PASS`; los builds Vite y .NET concluyeron sin errores y el
+backend sin advertencias.
+
+### Cierre Task 12
+
+Task 12 queda completada con la ruta de programacion, plantillas 2x2, 4x2 y
+6x1, matriz semantica D/N/X/VACANTE, detalle explicable, comparacion de
+escenarios, excepciones con motivo obligatorio, acciones por capacidades y
+presentacion responsive Sentinel. El commit tecnico es `6f1ed01`. El ciclo TDD
+registro RED por componentes ausentes y GREEN `I9 UI PASS`; el contrato de API
+frontend termino `I9 FRONTEND API PASS` y el build Vite concluyo sin errores.
+
+El modo demostrativo esta identificado y no representa datos reales. El
+recorrido autenticado en navegador quedo pendiente para Task 13: la API local
+respondio, pero el navegador integrado reporto `Failed to fetch` al iniciar
+sesion y no permitio verificar visualmente los cuatro viewports. Esta limitacion
+no se presenta como evidencia visual superada.
+
+Task 13 esta en ejecucion y no cerrada. Gate 2 continua bloqueado hasta
+completar y validar los parametros del catalogo; esta implementacion no vuelve
+ejecutables las siete reglas normativas pendientes. Los verificadores nominales
+I6/I7 del plan no existen en este checkout; esta ausencia preexistente queda
+registrada y no se reemplaza por evidencia inferida. `graphify update .` no se
+ejecuto porque el comando no esta instalado en el entorno.
+
+### Apertura Task 13
+
+Task 13 queda **EN EJECUCION - NO CERRADA** desde el 2026-08-12. Se prepararon
+el checklist de demostracion y la linea base sin inventar valores. La primera
+suite integral obtuvo ocho verificadores I9 en PASS y cuatro en FAIL. Tras
+aplicar las migraciones locales faltantes, los retakes continuaron bloqueados
+por fixtures/estado operativo: exportacion sin version publicada (404),
+reprogramacion sin version elegible (409), generacion de seguridad con error
+500 y workflow sin snapshot esperado.
+
+Gate 5 permanece abierto. Los cuatro recorridos tecnicos requerian un retake
+hermetico; adicionalmente, se deben ejecutar los viewports y aportar el historico
+anonimizado para medir la linea base. No se crea handoff de MVP cerrado mientras
+estas condiciones sigan pendientes.
+
+### Retake Tecnico Task 13
+
+El 2026-08-12 se incorporo y ejecuto una suite hermetica sobre un esquema
+PostgreSQL temporal y una API local aislada. Configuracion, elegibilidad,
+recomendaciones, ciclos, workflow, seguridad, reprogramacion y exportaciones
+terminaron en PASS; tambien pasaron documentos, contrato frontend, persistencia
+aislada, interfaz y las compilaciones .NET/Vite. La suite verifico deduplicacion
+de notificaciones y auditoria de PDF/Excel, y elimino los datos anonimizados de
+prueba al finalizar.
+
+Con este retake quedan resueltos los cuatro bloqueos tecnicos de fixtures/estado
+operativo registrados al abrir la tarea. Task 13 continua **EN EJECUCION - NO
+CERRADA**: faltan el recorrido visual humano en 320, 768, 1024 y 1440 px, el
+historico anonimizado y la medicion de la linea base. Tampoco se consideran
+ejecutables las siete reglas normativas mientras sus parametros no hayan sido
+completados y validados. `graphify update .` fue intentado y agoto 30 segundos
+sin producir salida; el grafo no se declara actualizado.
+
+### Historico Simulado Y Aprobacion Visual
+
+El 2026-08-13 el usuario aprobo expresamente la validacion visual y aporto
+`BOTANIKA JULIO.pdf` y `BOTANIKA AGOSTO.pdf` como historico con datos simulados.
+La aprobacion se registra como evidencia humana, no como medicion automatizada.
+
+Los PDF tienen contenido visual identico y ambos estan rotulados julio de 2026;
+ademas, el encabezado declara 15 guardas mientras la grilla contiene 16 filas.
+Por trazabilidad solo se consolido un periodo: 496 celdas, 157 turnos D, 156 N,
+165 descansos X, 8 ausencias A, 8 incapacidades INC, una vacacion V y un turno
+adicional TA. No se reprodujeron nombres del documento fuente.
+
+Task 13 permanece **EN EJECUCION - NO CERRADA**. La validacion visual y la
+recepcion del historico simulado ya no son pendientes; faltan confirmar las
+inconsistencias de fuente, ejecutar la propuesta I9 sobre datos estructurados,
+comparar sus metricas y completar/validar los parametros de las siete reglas
+antes de declararlas ejecutables. En esta actualizacion se intento nuevamente
+`graphify update .`, pero el comando no esta instalado o disponible en PATH.
+
+### Parametrizacion I9-R01
+
+El 2026-08-13 el usuario aprobo I9-R01 Jornada maxima con condicion juridica.
+Quedaron definidos 8 horas diarias y 42 semanales como jornada ordinaria, y
+maximos sectoriales de 12 horas diarias y 60 semanales sujetos a acuerdo escrito.
+El usuario definio despues que toda jornada superior a 10 y hasta 12 horas
+requiere aprobacion: no bloquea generar la propuesta, pero impide aprobarla o
+publicarla mientras la excepcion este pendiente. Este criterio es una decision
+del usuario y no un concepto juridico aportado. El usuario confirmo al Director
+de Operaciones como aprobador mediante `SCHEDULING/APPROVE_EXCEPTION`. La regla
+aplica a todos los proyectos de vigilancia gestionados por I9, sin un valor
+distinto por proyecto o contrato. Permanece no ejecutable hasta validar
+fuente y vigencia juridicas. Para jornadas superiores a 8 horas basta marcar la
+existencia del acuerdo escrito, conservando responsable y fecha; los soportes o
+referencias son opcionales y su ausencia no bloquea por si sola. La
+aprobacion de I9-R01 no aprueba I9-R02 a I9-R07.
+
+### Parametrizacion I9-R02
+
+El 2026-08-13 el usuario aprobo I9-R02 con un umbral preventivo S&G de 12
+horas, sin convertirlo en bloqueo de generacion. Un intervalo menor crea una
+excepcion pendiente: la propuesta puede generarse, pero no aprobarse ni
+publicarse hasta contar con motivo y aprobacion auditada de una persona con
+permiso `SCHEDULING/APPROVE_EXCEPTION`. El usuario confirmo que aplica a todos
+los proyectos de vigilancia, que el Director de Operaciones es el aprobador y
+que la autorizacion solo cubre el turno y excepcion evaluados. El motivo es
+obligatorio y proviene de un catalogo configurable. El usuario aprobo como
+catalogo inicial: reemplazo urgente por ausencia o
+incapacidad, continuidad temporal del servicio, contingencia operativa,
+emergencia o fuerza mayor, solicitud excepcional del cliente y Otro con
+descripcion obligatoria. El catalogo debe versionarse y su seleccion no
+sustituye la aprobacion. Durante el desarrollo queda desactivada o en modo
+advertencia. I9-R02 permanece
+no ejecutable hasta completar mensajes, pruebas de borde y evidencia
+institucional. Esta decision no
+aprueba I9-R03 a I9-R07.
+
+#### Propuesta De Mensajes Y Pruebas I9-R02
+
+Se preparo `docs/operations/2026-08-13-i9-r02-mensajes-pruebas.md` con siete
+mensajes funcionales y dieciseis casos de prueba que cubren las fronteras de 12
+horas, datos obligatorios, permisos, aprobacion, rechazo, reutilizacion,
+solapamiento e integracion con I9-R05. Su estado es
+`APROBADO_FUNCIONALMENTE_NO_EJECUTABLE` por confirmacion explicita del usuario.
+La aprobacion funcional no activa la regla ni cierra Gate 2; faltan su
+implementacion TDD, ejecucion satisfactoria y evidencia institucional.
+
+### Parametrizacion I9-R03
+
+El 2026-08-13 el usuario aprobo I9-R03 con tratamiento mixto. El solapamiento
+temporal real del mismo guarda es bloqueo absoluto sin excepcion. La frontera
+adyacente no es solapamiento; cuando intervienen puestos distintos, un posible
+conflicto de traslado genera excepcion pendiente y no permite aprobar/publicar
+hasta validar I9-R05 y obtener aprobacion auditada. I9-R03 permanece no
+ejecutable hasta completar sus pruebas e integracion con I9-R05. Esta decision
+no aprueba I9-R04 a I9-R07.
+
+El usuario confirmo despues que I9-R03 aplica a todos los proyectos y puestos,
+comparando borradores vigentes y programaciones aprobadas del mismo guarda. Los
+intervalos son semiabiertos `[inicio, fin)`, los cambios manuales revalidan la
+regla y ninguna excepcion de traslado puede eludir un solapamiento. Durante el
+desarrollo permanece desactivada o en validacion simulada.
+
+#### Propuesta De Mensajes Y Pruebas I9-R03
+
+Se preparo `docs/operations/2026-08-13-i9-r03-mensajes-pruebas.md` con siete
+mensajes y quince casos que cubren intervalos adyacentes, solapamientos
+parciales/totales, nocturnos, cambios de mes/ano, borradores, programaciones
+aprobadas, edicion manual y precedencia sobre I9-R05. Su estado es
+`APROBADO_FUNCIONALMENTE_NO_EJECUTABLE` por confirmacion explicita del usuario.
+No activa I9-R03 ni cierra Gate 2; faltan implementacion TDD, ejecucion
+satisfactoria, integracion validada con I9-R05 y evidencia institucional.
+
+### Parametrizacion I9-R04
+
+El 2026-08-13 el usuario aprobo la clasificacion de novedades de I9-R04.
+Incapacidad, vacaciones, licencias/calamidad, suspension/retiro y ausencia
+confirmada vigentes son bloqueos absolutos. Ausencia pendiente, induccion o
+capacitacion coincidente y turno adicional son excepciones aprobables. Disponible
+no bloquea; descuento o sancion son informativos salvo indisponibilidad formal.
+La regla permanece no ejecutable hasta mapear los codigos reales, completar
+mensajes, pruebas y evidencia institucional. Esta decision no aprueba I9-R05 a
+I9-R07.
+
+El usuario aprobo despues el mapeo inicial visible en el historico simulado:
+`INC` incapacidad bloqueante, `V` vacaciones bloqueantes, `A` ausencia cuyo
+estado determina bloqueo o excepcion, y `TA` turno adicional como excepcion
+sujeta a I9-R01/I9-R02. `D`, `N` y `X` son codigos de programacion, no
+novedades. Un codigo desconocido solo genera advertencia. El Director de
+Operaciones aprueba excepciones y el alcance cubre todos los proyectos I9. La
+regla sigue no ejecutable hasta completar los codigos institucionales restantes,
+fuente/version, mensajes, pruebas y evidencia.
+
+#### Contrato Desacoplado De Novedades I9-R04
+
+El usuario aprobo el contrato interno
+`docs/operations/2026-08-13-i9-r04-contrato-categorias-novedad.md`. Define doce
+categorias canonicas independientes del sistema fuente, validacion en la
+frontera, version unica activa, auditoria y `UNKNOWN` como resultado seguro para
+codigos no mapeados. El contrato es aditivo y no reutiliza identificadores. Su
+aprobacion funcional permite continuar el desarrollo sin inventar codigos
+institucionales, pero no activa I9-R04 ni cierra Gate 2.
+
+#### Propuesta De Mensajes Y Pruebas I9-R04
+
+Se preparo `docs/operations/2026-08-13-i9-r04-mensajes-pruebas.md` con nueve
+mensajes y veinticuatro casos de prueba para las categorias canonicas,
+prioridades, vigencias, datos incompletos, `UNKNOWN`, codigos D/N/X, permisos,
+no reutilizacion, snapshots y dependencias con I9-R01/I9-R02/I9-R03. Su estado
+es `APROBADO_FUNCIONALMENTE_NO_EJECUTABLE` por confirmacion explicita del
+usuario. No activa I9-R04 ni cierra Gate 2; faltan codigos institucionales,
+fuente/version, implementacion TDD, ejecucion satisfactoria y evidencia.
+
+### Parametrizacion I9-R05
+
+El 2026-08-13 el usuario aprobo I9-R05 con una matriz versionada de traslados
+por proyecto o contrato, sin definir tiempos universales. El intervalo
+disponible debe cubrir el tiempo requerido; si es insuficiente o falta el valor,
+se crea una excepcion pendiente que no bloquea la propuesta, pero impide su
+aprobacion/publicacion hasta ser autorizada y auditada. Una combinacion
+expresamente prohibida es bloqueo absoluto. Trafico en tiempo real y rutas
+dinamicas quedan fuera del MVP. I9-R05 permanece no ejecutable hasta cargar y
+validar la matriz real, completar pruebas e integrarla con I9-R03. Esta decision
+no aprueba I9-R06 ni I9-R07.
+
+#### Propuesta De Parametros, Mensajes Y Pruebas I9-R05
+
+Se preparo
+`docs/operations/2026-08-13-i9-r05-parametros-mensajes-pruebas.md` con diez
+parametros, nueve mensajes y veinte casos de prueba. La propuesta explicita el
+rol aprobador, minutos enteros, filas direccionales, versiones vigentes,
+excepciones no reutilizables, tratamiento del mismo puesto, fronteras y
+prioridad frente a I9-R03. El usuario aprobo explicitamente estos parametros,
+mensajes y casos de prueba. Su estado es
+`APROBADO_FUNCIONALMENTE_NO_EJECUTABLE`: no activa I9-R05 ni cierra Gate 2;
+continuan pendientes la matriz institucional real, fuente/version,
+implementacion TDD y evidencia.
+
+### Parametrizacion I9-R06
+
+El 2026-08-13 el usuario aprobo I9-R06 como regla no bloqueante para generar
+propuestas. Un requisito faltante, vencido o no verificado produce una excepcion
+pendiente: la programacion no puede aprobarse ni publicarse hasta obtener
+aprobacion auditada. Los requisitos subsanables pueden ser informativos solo por
+configuracion explicita y versionada, y la falta de datos nunca acredita
+cumplimiento. I9-R06 permanece no ejecutable hasta mapear los catalogos reales
+de I3/I5, completar responsables, mensajes y pruebas. Esta decision no aprueba
+I9-R07.
+
+#### Parametros, Mensajes Y Pruebas I9-R06 Aprobados
+
+El 2026-08-14 se preparo
+`docs/operations/2026-08-14-i9-r06-parametros-mensajes-pruebas.md` con diez
+parametros, nueve mensajes y veintitres casos de prueba. La propuesta distingue
+la validacion de Talento Humano de la aprobacion del Director de Operaciones,
+exige vigencia durante todo el turno, evita periodos de gracia inferidos y
+delimita las excepciones como no reutilizables. El usuario aprobo explicitamente
+estas decisiones, mensajes y casos. Su estado es
+`APROBADO_FUNCIONALMENTE_NO_EJECUTABLE`: no activa I9-R06 ni cierra Gate 2;
+continuan pendientes los catalogos reales I3/I5, mapeos institucionales,
+fuente/version, implementacion TDD y evidencia.
+
+#### Formato Institucional WP-I9-E Preparado
+
+El 2026-08-14 se preparo
+`docs/operations/2026-08-14-i9-wp-e-formato-requisitos-puesto-r06.md` con estado
+`LISTO_PARA_DILIGENCIAMIENTO_PENDIENTE_TH_OPERACIONES_NO_EJECUTABLE`. El
+formato controla el contrato I3/I5, el mapeo de codigos y estados, evidencia,
+vigencias, subsanabilidad, responsables, fechas limite, validacion de Talento
+Humano y aprobacion del Director de Operaciones. Todos los valores
+institucionales permanecen `PENDIENTE`; su preparacion no completa WP-I9-E, no
+autoriza implementacion y no activa I9-R06. Task 13 continua abierta y Gate 2
+continua bloqueado.
+
+Controles canonicos: `TECHNICAL_IMPLEMENTATION_AUTHORIZED=NO`,
+`I9_R06_ACTIVE=NO`, `TASK_13_STATUS=OPEN` y `GATE_2_STATUS=BLOCKED`.
+
+### Parametrizacion I9-R07
+
+El 2026-08-13 el usuario aprobo I9-R07 con plantilla obligatoria por defecto.
+Toda diferencia frente a la version seleccionada, incluida una edicion manual,
+genera una excepcion pendiente: no bloquea la propuesta, pero impide aprobarla
+o publicarla hasta contar con autorizacion auditada. La evidencia conserva los
+valores anterior y propuesto, celdas, motivo y aprobador; ninguna excepcion de
+plantilla puede eludir bloqueos absolutos. Los cambios de plantilla solo afectan
+borradores futuros. I9-R07 permanece no ejecutable hasta completar motivos,
+responsables, mensajes, pruebas y evidencia institucional.
+
+#### Propuesta De Parametros, Mensajes Y Pruebas I9-R07
+
+El 2026-08-14 se preparo
+`docs/operations/2026-08-14-i9-r07-parametros-mensajes-pruebas.md` con diez
+parametros, nueve mensajes y veintitres casos de prueba. La propuesta define al
+Director de Operaciones como aprobador, un catalogo inicial de motivos,
+agrupacion controlada por guarda y snapshot, no reutilizacion, comparacion
+deterministica e inmutabilidad de programaciones publicadas. El usuario aprobo
+explicitamente los parametros, seis motivos, nueve mensajes y veintitres casos.
+Su estado es `APROBADO_FUNCIONALMENTE_NO_EJECUTABLE`: no activa I9-R07 ni
+cierra Gate 2; continuan pendientes el catalogo institucional de motivos,
+fuente/version, implementacion TDD y evidencia.
+
+### Apertura Subgate 2A - Matriz De Parametrizacion
+
+El 2026-08-13, luego de la aprobacion funcional individual de I9-R01 a I9-R07,
+se abrio el Subgate 2A para diligenciar valores, fuentes, vigencias, alcances,
+responsables, mensajes y pruebas. Su artefacto rector de trabajo es
+`docs/operations/2026-08-13-i9-matriz-parametrizacion-reglas.md`, con estado
+`BORRADOR_PARA_DILIGENCIAMIENTO_NO_EJECUTABLE`.
+
+La apertura no activa reglas ni cierra Gate 2. Para I9-R01 ya se definio que
+toda jornada superior a 10 y hasta 12 horas requiere aprobacion, pero faltan su
+fuente y vigencia juridicas; el Director de Operaciones fue confirmado
+como rol aprobador y el alcance comprende todos los proyectos de vigilancia
+gestionados por I9. En paralelo pueden recopilarse los catalogos de
+novedades y requisitos, la matriz de traslados y los motivos de excepcion, sin
+convertir datos ausentes en valores por defecto.
+
+#### Propuesta De Cierre De Brechas Del Subgate 2A
+
+El 2026-08-14 se consolido
+`docs/operations/2026-08-14-i9-plan-cierre-brechas-subgate2a.md`. La propuesta
+organiza cinco paquetes institucionales, seis tareas tecnicas posteriores y
+cuatro checkpoints. Su estado es
+`APROBADO_COMO_RUTA_NO_AUTORIZA_IMPLEMENTACION` por confirmacion explicita del
+usuario: no completa fuentes, catalogos ni matrices, no activa reglas y no
+cierra Gate 2. La recopilacion documental puede continuar; cada tarea tecnica
+requiere una autorizacion SDD posterior y su dependencia institucional
+satisfecha.
+
+### Propuesta Juridica No Bloqueante I9-R01
+
+El 2026-08-13 se preparo la propuesta
+`docs/operations/2026-08-13-i9-propuesta-juridica-jornada.md` a partir de fuentes
+oficiales colombianas para revision de Juridica. La revision no bloquea el
+desarrollo de interfaz, persistencia, auditoria, permisos, mensajes y pruebas.
+I9-R01 permanece no ejecutable en produccion y su configuracion debe estar
+desactivada o en modo advertencia hasta resolver la armonizacion entre el
+articulo 7 de la Ley 1920 de 2018 y el articulo 167A del Codigo Sustantivo del
+Trabajo modificado por la Ley 2466 de 2025. La marca I9 de existencia del acuerdo
+no sustituye el escrito ni las firmas requeridas legalmente.
+
+## Registro de ejecucion — MVP de reglas versionadas (2026-08-23)
+
+El cierre de brechas R01 a R07 se ejecuto segun
+`docs/superpowers/plans/2026-08-17-sg-i9-cierre-mvp-reglas-plan.md`, tareas 18 a 28. La evidencia
+observada, las decisiones de diseno y los puntos abiertos estan en
+[`docs/reports/2026-08-17-sg-superapp-i9-mvp-closure.md`](../reports/2026-08-17-sg-superapp-i9-mvp-closure.md).
+
+La advertencia de este plan sobre la armonizacion normativa no cambia: la regla afectada permanece
+en el perfil simulado y ninguna decision de este MVP afirma politica institucional.

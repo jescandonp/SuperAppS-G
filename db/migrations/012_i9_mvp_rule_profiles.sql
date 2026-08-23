@@ -1,0 +1,454 @@
+\set ON_ERROR_STOP on
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS scheduling_rule_profiles ();
+CREATE TABLE IF NOT EXISTS scheduling_rule_profile_entries ();
+CREATE TABLE IF NOT EXISTS scheduling_rule_evaluations ();
+
+ALTER TABLE scheduling_rule_profiles
+ ADD COLUMN IF NOT EXISTS id BIGSERIAL,
+ ADD COLUMN IF NOT EXISTS profile_code VARCHAR(80),
+ ADD COLUMN IF NOT EXISTS version INTEGER,
+ ADD COLUMN IF NOT EXISTS origin VARCHAR(20),
+ ADD COLUMN IF NOT EXISTS environment_scope VARCHAR(20),
+ ADD COLUMN IF NOT EXISTS scope_code VARCHAR(120),
+ ADD COLUMN IF NOT EXISTS effective_from DATE,
+ ADD COLUMN IF NOT EXISTS effective_to DATE,
+ ADD COLUMN IF NOT EXISTS status VARCHAR(20),
+ ADD COLUMN IF NOT EXISTS checksum CHAR(64),
+ ADD COLUMN IF NOT EXISTS created_by VARCHAR(80),
+ ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ,
+ ADD COLUMN IF NOT EXISTS activated_by VARCHAR(80),
+ ADD COLUMN IF NOT EXISTS activated_at TIMESTAMPTZ,
+ ADD COLUMN IF NOT EXISTS approval_evidence JSONB;
+
+ALTER TABLE scheduling_rule_profile_entries
+ ADD COLUMN IF NOT EXISTS id BIGSERIAL,
+ ADD COLUMN IF NOT EXISTS rule_profile_id BIGINT,
+ ADD COLUMN IF NOT EXISTS rule_code VARCHAR(20),
+ ADD COLUMN IF NOT EXISTS parameters JSONB,
+ ADD COLUMN IF NOT EXISTS catalog_snapshot JSONB,
+ ADD COLUMN IF NOT EXISTS enabled BOOLEAN,
+ ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ;
+
+ALTER TABLE scheduling_rule_evaluations
+ ADD COLUMN IF NOT EXISTS id BIGSERIAL,
+ ADD COLUMN IF NOT EXISTS schedule_version_id BIGINT,
+ ADD COLUMN IF NOT EXISTS assignment_id BIGINT,
+ ADD COLUMN IF NOT EXISTS rule_profile_id BIGINT,
+ ADD COLUMN IF NOT EXISTS rule_code VARCHAR(20),
+ ADD COLUMN IF NOT EXISTS outcome VARCHAR(30),
+ ADD COLUMN IF NOT EXISTS severity VARCHAR(20),
+ ADD COLUMN IF NOT EXISTS message_code VARCHAR(80),
+ ADD COLUMN IF NOT EXISTS explanation VARCHAR(1000),
+ ADD COLUMN IF NOT EXISTS parameters_snapshot JSONB,
+ ADD COLUMN IF NOT EXISTS facts_snapshot JSONB,
+ ADD COLUMN IF NOT EXISTS scope_hash CHAR(64),
+ ADD COLUMN IF NOT EXISTS exception_allowed BOOLEAN,
+ ADD COLUMN IF NOT EXISTS exception_status VARCHAR(20),
+ ADD COLUMN IF NOT EXISTS correlation_id VARCHAR(80),
+ ADD COLUMN IF NOT EXISTS evaluated_at TIMESTAMPTZ,
+ ADD COLUMN IF NOT EXISTS audit_actor VARCHAR(80);
+
+ALTER TABLE schedule_versions
+ ADD COLUMN IF NOT EXISTS rule_profile_id BIGINT,
+ ADD COLUMN IF NOT EXISTS rule_profile_version INTEGER,
+ ADD COLUMN IF NOT EXISTS simulated BOOLEAN;
+
+ALTER TABLE schedule_exceptions
+ ADD COLUMN IF NOT EXISTS rule_code VARCHAR(20),
+ ADD COLUMN IF NOT EXISTS evaluation_id BIGINT,
+ ADD COLUMN IF NOT EXISTS scope_hash CHAR(64),
+ ADD COLUMN IF NOT EXISTS motive_code VARCHAR(50),
+ ADD COLUMN IF NOT EXISTS decision VARCHAR(20),
+ ADD COLUMN IF NOT EXISTS decided_by VARCHAR(80),
+ ADD COLUMN IF NOT EXISTS decided_at TIMESTAMPTZ,
+ ADD COLUMN IF NOT EXISTS decision_detail JSONB;
+
+DO $$
+DECLARE
+    r RECORD;
+    actual_type TEXT;
+BEGIN
+    FOR r IN SELECT * FROM (VALUES
+      ('scheduling_rule_profiles','id','bigint'),('scheduling_rule_profiles','profile_code','character varying(80)'),('scheduling_rule_profiles','version','integer'),('scheduling_rule_profiles','origin','character varying(20)'),('scheduling_rule_profiles','environment_scope','character varying(20)'),('scheduling_rule_profiles','scope_code','character varying(120)'),('scheduling_rule_profiles','effective_from','date'),('scheduling_rule_profiles','effective_to','date'),('scheduling_rule_profiles','status','character varying(20)'),('scheduling_rule_profiles','checksum','character(64)'),('scheduling_rule_profiles','created_by','character varying(80)'),('scheduling_rule_profiles','created_at','timestamp with time zone'),('scheduling_rule_profiles','activated_by','character varying(80)'),('scheduling_rule_profiles','activated_at','timestamp with time zone'),('scheduling_rule_profiles','approval_evidence','jsonb'),
+      ('scheduling_rule_profile_entries','id','bigint'),('scheduling_rule_profile_entries','rule_profile_id','bigint'),('scheduling_rule_profile_entries','rule_code','character varying(20)'),('scheduling_rule_profile_entries','parameters','jsonb'),('scheduling_rule_profile_entries','catalog_snapshot','jsonb'),('scheduling_rule_profile_entries','enabled','boolean'),('scheduling_rule_profile_entries','created_at','timestamp with time zone'),
+      ('scheduling_rule_evaluations','id','bigint'),('scheduling_rule_evaluations','schedule_version_id','bigint'),('scheduling_rule_evaluations','assignment_id','bigint'),('scheduling_rule_evaluations','rule_profile_id','bigint'),('scheduling_rule_evaluations','rule_code','character varying(20)'),('scheduling_rule_evaluations','outcome','character varying(30)'),('scheduling_rule_evaluations','severity','character varying(20)'),('scheduling_rule_evaluations','message_code','character varying(80)'),('scheduling_rule_evaluations','explanation','character varying(1000)'),('scheduling_rule_evaluations','parameters_snapshot','jsonb'),('scheduling_rule_evaluations','facts_snapshot','jsonb'),('scheduling_rule_evaluations','scope_hash','character(64)'),('scheduling_rule_evaluations','exception_allowed','boolean'),('scheduling_rule_evaluations','exception_status','character varying(20)'),('scheduling_rule_evaluations','correlation_id','character varying(80)'),('scheduling_rule_evaluations','evaluated_at','timestamp with time zone'),('scheduling_rule_evaluations','audit_actor','character varying(80)'),
+      ('schedule_versions','rule_profile_id','bigint'),('schedule_versions','rule_profile_version','integer'),('schedule_versions','simulated','boolean'),
+      ('schedule_exceptions','rule_code','character varying(20)'),('schedule_exceptions','evaluation_id','bigint'),('schedule_exceptions','scope_hash','character(64)'),('schedule_exceptions','motive_code','character varying(50)'),('schedule_exceptions','decision','character varying(20)'),('schedule_exceptions','decided_by','character varying(80)'),('schedule_exceptions','decided_at','timestamp with time zone'),('schedule_exceptions','decision_detail','jsonb')
+    ) expected(t,c,expected_type)
+    LOOP
+        SELECT format_type(a.atttypid,a.atttypmod) INTO actual_type
+        FROM pg_attribute a
+        WHERE a.attrelid=r.t::regclass AND a.attname=r.c AND NOT a.attisdropped;
+        IF actual_type <> r.expected_type THEN
+            BEGIN
+                EXECUTE format('ALTER TABLE %I ALTER COLUMN %I TYPE %s USING %I::%s',r.t,r.c,r.expected_type,r.c,r.expected_type);
+            EXCEPTION WHEN OTHERS THEN
+                RAISE EXCEPTION 'I9_MVP_PARTIAL_SCHEMA_INCOMPATIBLE: %.% cannot converge from % to %: %',
+                    r.t,r.c,actual_type,r.expected_type,SQLERRM;
+            END;
+        END IF;
+    END LOOP;
+END $$;
+
+ALTER TABLE scheduling_rule_profiles
+ ALTER COLUMN status SET DEFAULT 'DRAFT',
+ ALTER COLUMN created_at SET DEFAULT NOW(),
+ ALTER COLUMN approval_evidence SET DEFAULT '{}'::jsonb;
+ALTER TABLE scheduling_rule_profile_entries
+ ALTER COLUMN catalog_snapshot SET DEFAULT '{}'::jsonb,
+ ALTER COLUMN enabled SET DEFAULT TRUE,
+ ALTER COLUMN created_at SET DEFAULT NOW();
+ALTER TABLE scheduling_rule_evaluations
+ ALTER COLUMN parameters_snapshot SET DEFAULT '{}'::jsonb,
+ ALTER COLUMN facts_snapshot SET DEFAULT '{}'::jsonb,
+ ALTER COLUMN exception_allowed SET DEFAULT FALSE,
+ ALTER COLUMN exception_status SET DEFAULT 'NOT_REQUIRED',
+ ALTER COLUMN evaluated_at SET DEFAULT NOW();
+ALTER TABLE schedule_versions ALTER COLUMN simulated SET DEFAULT FALSE;
+ALTER TABLE schedule_exceptions ALTER COLUMN decision_detail SET DEFAULT '{}'::jsonb;
+
+UPDATE schedule_versions SET simulated=FALSE WHERE simulated IS NULL;
+UPDATE schedule_exceptions SET decision_detail='{}'::jsonb WHERE decision_detail IS NULL;
+
+DO $$
+DECLARE
+    r RECORD;
+    null_count BIGINT;
+BEGIN
+    FOR r IN SELECT * FROM (VALUES
+      ('scheduling_rule_profiles','id'),('scheduling_rule_profiles','profile_code'),('scheduling_rule_profiles','version'),('scheduling_rule_profiles','origin'),('scheduling_rule_profiles','environment_scope'),('scheduling_rule_profiles','scope_code'),('scheduling_rule_profiles','effective_from'),('scheduling_rule_profiles','status'),('scheduling_rule_profiles','checksum'),('scheduling_rule_profiles','created_by'),('scheduling_rule_profiles','created_at'),('scheduling_rule_profiles','approval_evidence'),
+      ('scheduling_rule_profile_entries','id'),('scheduling_rule_profile_entries','rule_profile_id'),('scheduling_rule_profile_entries','rule_code'),('scheduling_rule_profile_entries','parameters'),('scheduling_rule_profile_entries','catalog_snapshot'),('scheduling_rule_profile_entries','enabled'),('scheduling_rule_profile_entries','created_at'),
+      ('scheduling_rule_evaluations','id'),('scheduling_rule_evaluations','rule_profile_id'),('scheduling_rule_evaluations','rule_code'),('scheduling_rule_evaluations','outcome'),('scheduling_rule_evaluations','severity'),('scheduling_rule_evaluations','message_code'),('scheduling_rule_evaluations','explanation'),('scheduling_rule_evaluations','parameters_snapshot'),('scheduling_rule_evaluations','facts_snapshot'),('scheduling_rule_evaluations','scope_hash'),('scheduling_rule_evaluations','exception_allowed'),('scheduling_rule_evaluations','exception_status'),('scheduling_rule_evaluations','correlation_id'),('scheduling_rule_evaluations','evaluated_at'),('scheduling_rule_evaluations','audit_actor'),
+      ('schedule_versions','simulated'),('schedule_exceptions','decision_detail')
+    ) required(t,c)
+    LOOP
+        EXECUTE format('SELECT count(*) FROM %I WHERE %I IS NULL',r.t,r.c) INTO null_count;
+        IF null_count > 0 THEN
+            RAISE EXCEPTION 'I9_MVP_PARTIAL_SCHEMA_INCOMPATIBLE: %.% contains % NULL values',r.t,r.c,null_count;
+        END IF;
+        EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET NOT NULL',r.t,r.c);
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    table_name TEXT;
+    sequence_name TEXT;
+    maximum_id BIGINT;
+BEGIN
+    FOREACH table_name IN ARRAY ARRAY['scheduling_rule_profiles','scheduling_rule_profile_entries','scheduling_rule_evaluations']
+    LOOP
+        sequence_name := pg_get_serial_sequence(format('%I.%I',current_schema(),table_name),'id');
+        IF sequence_name IS NULL THEN
+            sequence_name := format('%I.%I',current_schema(),table_name || '_id_seq');
+            IF to_regclass(sequence_name) IS NULL THEN EXECUTE format('CREATE SEQUENCE %s AS BIGINT',sequence_name); END IF;
+            EXECUTE format('ALTER TABLE %I ALTER COLUMN id SET DEFAULT nextval(%L::regclass)',table_name,sequence_name);
+            EXECUTE format('ALTER SEQUENCE %s OWNED BY %I.id',sequence_name,table_name);
+        END IF;
+        EXECUTE format('SELECT coalesce(max(id),0) FROM %I',table_name) INTO maximum_id;
+        IF maximum_id > 0 THEN PERFORM setval(sequence_name::regclass,maximum_id,TRUE); ELSE PERFORM setval(sequence_name::regclass,1,FALSE); END IF;
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION pg_temp.i9_mvp_constraint(t TEXT,n TEXT,k "char",d TEXT)
+RETURNS VOID LANGUAGE plpgsql AS $$
+DECLARE existing RECORD;
+BEGIN
+ SELECT contype,pg_get_constraintdef(oid) AS definition INTO existing
+ FROM pg_constraint WHERE conrelid=t::regclass AND conname=n;
+ IF FOUND AND existing.contype=k
+    AND regexp_replace(lower(existing.definition),'\s+','','g')=regexp_replace(lower(d),'\s+','','g') THEN RETURN; END IF;
+ IF FOUND THEN EXECUTE format('ALTER TABLE %I DROP CONSTRAINT %I',t,n); END IF;
+ EXECUTE format('ALTER TABLE %I ADD CONSTRAINT %I %s',t,n,d);
+END $$;
+
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_profiles','scheduling_rule_profiles_pkey','p','PRIMARY KEY(id)');
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_profiles','uq_scheduling_rule_profiles_code_version','u','UNIQUE(profile_code,version)');
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_profiles','ck_scheduling_rule_profiles_values','c',$d$CHECK (btrim(profile_code)<>'' AND version>0 AND origin IN('SIMULATED','INSTITUTIONAL') AND environment_scope IN('MVP_TEST','PRODUCTION') AND btrim(scope_code)<>'' AND status IN('DRAFT','ACTIVE','RETIRED') AND (effective_to IS NULL OR effective_to>=effective_from))$d$);
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_profiles','ck_scheduling_rule_profiles_environment','c',$d$CHECK (origin<>'SIMULATED' OR environment_scope='MVP_TEST')$d$);
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_profiles','ck_scheduling_rule_profiles_json','c',$d$CHECK (jsonb_typeof(approval_evidence)='object' AND checksum ~ '^[0-9a-f]{64}$')$d$);
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_profiles','ck_scheduling_rule_profiles_activation','c',$d$CHECK (status<>'ACTIVE' OR (activated_by IS NOT NULL AND activated_at IS NOT NULL))$d$);
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_profile_entries','scheduling_rule_profile_entries_pkey','p','PRIMARY KEY(id)');
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_profile_entries','scheduling_rule_profile_entries_profile_fkey','f','FOREIGN KEY(rule_profile_id) REFERENCES scheduling_rule_profiles(id) ON DELETE RESTRICT');
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_profile_entries','uq_scheduling_rule_profile_entries_rule','u','UNIQUE(rule_profile_id,rule_code)');
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_profile_entries','ck_scheduling_rule_profile_entries_values','c',$d$CHECK (rule_code ~ '^I9-R0[1-7]$' AND jsonb_typeof(parameters)='object' AND jsonb_typeof(catalog_snapshot)='object')$d$);
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_evaluations','scheduling_rule_evaluations_pkey','p','PRIMARY KEY(id)');
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_evaluations','uq_scheduling_rule_evaluations_identity','u','UNIQUE(id,rule_code,scope_hash)');
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_evaluations','scheduling_rule_evaluations_profile_fkey','f','FOREIGN KEY(rule_profile_id) REFERENCES scheduling_rule_profiles(id) ON DELETE RESTRICT');
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_evaluations','scheduling_rule_evaluations_schedule_version_fkey','f','FOREIGN KEY(schedule_version_id) REFERENCES schedule_versions(id) ON DELETE RESTRICT');
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_evaluations','scheduling_rule_evaluations_assignment_fkey','f','FOREIGN KEY(assignment_id) REFERENCES schedule_assignments(id) ON DELETE RESTRICT');
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_evaluations','ck_scheduling_rule_evaluations_values','c',$d$CHECK (rule_code ~ '^I9-R0[1-7]$' AND outcome IN('COMPLIANT','BLOCKED','EXCEPTION_REQUIRED','WARNING','NOT_APPLICABLE') AND severity IN('INFO','WARNING','ERROR','BLOCKING') AND btrim(message_code)<>'' AND btrim(explanation)<>'' AND jsonb_typeof(parameters_snapshot)='object' AND jsonb_typeof(facts_snapshot)='object' AND scope_hash ~ '^[0-9a-f]{64}$' AND btrim(correlation_id)<>'' AND btrim(audit_actor)<>'' AND exception_status IN('NOT_REQUIRED','PENDING','APPROVED','REJECTED','EXPIRED','STALE') AND (exception_allowed OR exception_status='NOT_REQUIRED'))$d$);
+SELECT pg_temp.i9_mvp_constraint('schedule_versions','schedule_versions_rule_profile_fkey','f','FOREIGN KEY(rule_profile_id) REFERENCES scheduling_rule_profiles(id) ON DELETE RESTRICT');
+SELECT pg_temp.i9_mvp_constraint('schedule_versions','schedule_versions_rule_profile_audit_check','c',$d$CHECK ((rule_profile_id IS NULL AND rule_profile_version IS NULL AND NOT simulated) OR (rule_profile_id IS NOT NULL AND rule_profile_version>0))$d$);
+SELECT pg_temp.i9_mvp_constraint('schedule_exceptions','schedule_exceptions_evaluation_fkey','f','FOREIGN KEY(evaluation_id) REFERENCES scheduling_rule_evaluations(id) ON DELETE RESTRICT');
+DO $$
+BEGIN
+ IF EXISTS(
+  SELECT 1 FROM schedule_exceptions
+  WHERE num_nonnulls(evaluation_id,rule_code,scope_hash,motive_code) NOT IN (0,4)
+ ) THEN
+  RAISE EXCEPTION 'I9_MVP_PARTIAL_SCHEMA_INCOMPATIBLE: schedule_exceptions contains a partial evaluation/rule/scope/motive identity';
+ END IF;
+ IF EXISTS(
+  SELECT 1
+  FROM schedule_exceptions e
+  JOIN scheduling_rule_evaluations v ON v.id=e.evaluation_id
+  WHERE e.evaluation_id IS NOT NULL
+    AND (e.rule_code IS DISTINCT FROM v.rule_code OR e.scope_hash IS DISTINCT FROM v.scope_hash)
+ ) THEN
+  RAISE EXCEPTION 'I9_MVP_PARTIAL_SCHEMA_INCOMPATIBLE: schedule_exceptions rule_code/scope_hash does not match evaluation_id';
+ END IF;
+ IF EXISTS(
+  SELECT 1 FROM schedule_exceptions
+  WHERE evaluation_id IS NOT NULL
+  GROUP BY evaluation_id,rule_code,scope_hash,motive_code
+  HAVING count(*)>1
+ ) THEN
+  RAISE EXCEPTION 'I9_MVP_PARTIAL_SCHEMA_INCOMPATIBLE: schedule_exceptions contains duplicate evaluation/rule/scope/motive identities';
+ END IF;
+END $$;
+SELECT pg_temp.i9_mvp_constraint('schedule_exceptions','schedule_exceptions_evaluation_identity_fkey','f','FOREIGN KEY(evaluation_id,rule_code,scope_hash) REFERENCES scheduling_rule_evaluations(id,rule_code,scope_hash) ON DELETE RESTRICT');
+SELECT pg_temp.i9_mvp_constraint('schedule_exceptions','uq_schedule_exceptions_evaluation_rule_scope_motive','u','UNIQUE(evaluation_id,rule_code,scope_hash,motive_code)');
+SELECT pg_temp.i9_mvp_constraint('schedule_exceptions','schedule_exceptions_rule_audit_check','c',$d$CHECK (((num_nonnulls(evaluation_id,rule_code,scope_hash,motive_code)=0) OR (num_nonnulls(evaluation_id,rule_code,scope_hash,motive_code)=4 AND rule_code ~ '^I9-R0[1-7]$' AND scope_hash ~ '^[0-9a-f]{64}$' AND btrim(motive_code)<>'')) AND jsonb_typeof(decision_detail)='object' AND ((decision IS NULL AND decided_by IS NULL AND decided_at IS NULL) OR (decision IN('APPROVED','REJECTED','CANCELLED') AND btrim(decided_by)<>'' AND decided_at IS NOT NULL)))$d$);
+
+CREATE OR REPLACE FUNCTION i9_mvp_canonical_number(value_text TEXT)
+RETURNS TEXT LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE AS $$
+DECLARE
+ normalized_sign TEXT := '';
+ unsigned_value TEXT;
+ exponent_position INTEGER;
+ mantissa TEXT;
+ exponent_value INTEGER := 0;
+ decimal_position INTEGER;
+ fractional_digits INTEGER;
+ digits TEXT;
+ number_scale INTEGER;
+ canonical TEXT;
+BEGIN
+ IF length(value_text)>1016 OR value_text!~'^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$' THEN
+  RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='I9 canonical number has unsupported form or length';
+ END IF;
+ IF left(value_text,1)='-' THEN normalized_sign:='-'; unsigned_value:=substring(value_text FROM 2); ELSE unsigned_value:=value_text; END IF;
+ exponent_position:=strpos(lower(unsigned_value),'e');
+ IF exponent_position>0 THEN
+  mantissa:=left(unsigned_value,exponent_position-1);
+  BEGIN exponent_value:=substring(unsigned_value FROM exponent_position+1)::INTEGER;
+  EXCEPTION WHEN numeric_value_out_of_range THEN
+   RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='I9 canonical number exponent is unsupported';
+  END;
+ ELSE mantissa:=unsigned_value; END IF;
+ decimal_position:=strpos(mantissa,'.');
+ fractional_digits:=CASE WHEN decimal_position=0 THEN 0 ELSE length(mantissa)-decimal_position END;
+ digits:=replace(mantissa,'.','');
+ IF digits!~'^[0-9]+$' THEN RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='I9 canonical number is unsupported'; END IF;
+ digits:=ltrim(digits,'0');
+ IF digits='' THEN RETURN '0'; END IF;
+ BEGIN number_scale:=fractional_digits-exponent_value;
+ EXCEPTION WHEN numeric_value_out_of_range THEN
+  RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='I9 canonical number scale is unsupported';
+ END;
+ WHILE right(digits,1)='0' LOOP digits:=left(digits,length(digits)-1); number_scale:=number_scale-1; END LOOP;
+ IF length(digits)>1000 OR number_scale < -1000 OR number_scale > 1000 THEN
+  RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='I9 canonical number exceeds supported digits or scale';
+ END IF;
+ IF number_scale<=0 THEN canonical:=digits||repeat('0',-number_scale);
+ ELSIF number_scale>=length(digits) THEN canonical:='0.'||repeat('0',number_scale-length(digits))||digits;
+ ELSE canonical:=overlay(digits PLACING '.' FROM length(digits)-number_scale+1 FOR 0); END IF;
+ RETURN normalized_sign||canonical;
+END $$;
+
+CREATE OR REPLACE FUNCTION i9_mvp_canonical_jsonb(value JSONB)
+RETURNS TEXT LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE AS $$
+DECLARE canonical TEXT;
+BEGIN
+ CASE jsonb_typeof(value)
+  WHEN 'object' THEN
+   SELECT '{'||coalesce(string_agg(to_jsonb(item.key)::TEXT||': '||i9_mvp_canonical_jsonb(item.value),', '
+          ORDER BY octet_length(convert_to(item.key,'UTF8')),convert_to(item.key,'UTF8')),'')||'}'
+     INTO canonical FROM jsonb_each(value) AS item;
+  WHEN 'array' THEN
+   SELECT '['||coalesce(string_agg(i9_mvp_canonical_jsonb(item.value),', ' ORDER BY item.ordinality),'')||']'
+     INTO canonical FROM jsonb_array_elements(value) WITH ORDINALITY AS item(value,ordinality);
+  WHEN 'number' THEN canonical:=i9_mvp_canonical_number(value::TEXT);
+  WHEN 'string' THEN canonical:=value::TEXT;
+  WHEN 'boolean' THEN canonical:=value::TEXT;
+  WHEN 'null' THEN canonical:='null';
+  ELSE RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='I9 canonical JSONB type is unsupported';
+ END CASE;
+ RETURN canonical;
+END $$;
+
+DO $$
+BEGIN
+ IF EXISTS(SELECT 1 FROM scheduling_rule_profile_entries
+           WHERE octet_length(convert_to(parameters::TEXT,'UTF8'))>65536
+              OR octet_length(convert_to(catalog_snapshot::TEXT,'UTF8'))>262144) THEN
+  RAISE EXCEPTION 'I9_MVP_PARTIAL_SCHEMA_INCOMPATIBLE: rule profile JSON payload exceeds UTF8 limits';
+ END IF;
+ IF EXISTS(SELECT 1 FROM scheduling_rule_profile_entries GROUP BY rule_profile_id HAVING count(*)>7) THEN
+  RAISE EXCEPTION 'I9_MVP_PARTIAL_SCHEMA_INCOMPATIBLE: rule profile exceeds seven R01-R07 entries';
+ END IF;
+END $$;
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_profile_entries','ck_scheduling_rule_profile_entries_payload_size','c',
+ $d$CHECK (octet_length(convert_to(parameters::TEXT,'UTF8'))<=65536 AND octet_length(convert_to(catalog_snapshot::TEXT,'UTF8'))<=262144)$d$);
+
+CREATE OR REPLACE FUNCTION enforce_rule_profile_entry_limit()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+ PERFORM pg_advisory_xact_lock(NEW.rule_profile_id);
+ IF (SELECT count(*) FROM scheduling_rule_profile_entries
+     WHERE rule_profile_id=NEW.rule_profile_id AND id<>coalesce(NEW.id,-1))>=7 THEN
+  RAISE EXCEPTION USING ERRCODE='23514',MESSAGE='rule profile cannot exceed seven R01-R07 entries';
+ END IF;
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS scheduling_rule_profile_entries_max_count ON scheduling_rule_profile_entries;
+CREATE TRIGGER scheduling_rule_profile_entries_max_count BEFORE INSERT OR UPDATE OF rule_profile_id
+ ON scheduling_rule_profile_entries FOR EACH ROW EXECUTE FUNCTION enforce_rule_profile_entry_limit();
+
+CREATE OR REPLACE FUNCTION enforce_single_active_rule_profile()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+ IF NEW.status='ACTIVE' THEN
+  PERFORM pg_advisory_xact_lock(hashtext(NEW.profile_code||'|'||NEW.scope_code||'|'||NEW.environment_scope));
+  IF EXISTS(SELECT 1 FROM scheduling_rule_profiles p WHERE p.id<>coalesce(NEW.id,-1)
+    AND p.profile_code=NEW.profile_code AND p.scope_code=NEW.scope_code
+    AND p.environment_scope=NEW.environment_scope AND p.status='ACTIVE'
+    AND daterange(p.effective_from,coalesce(p.effective_to+1,'infinity'::date),'[)')
+        && daterange(NEW.effective_from,coalesce(NEW.effective_to+1,'infinity'::date),'[)')) THEN
+   RAISE EXCEPTION USING ERRCODE='23000',MESSAGE='overlapping ACTIVE rule profile';
+  END IF;
+ END IF;
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS scheduling_rule_profiles_active_overlap ON scheduling_rule_profiles;
+CREATE TRIGGER scheduling_rule_profiles_active_overlap BEFORE INSERT OR UPDATE ON scheduling_rule_profiles FOR EACH ROW EXECUTE FUNCTION enforce_single_active_rule_profile();
+
+CREATE OR REPLACE FUNCTION reject_active_rule_profile_change()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+ IF OLD.status='ACTIVE' THEN
+  IF TG_OP='UPDATE'
+     AND NEW.status='RETIRED'
+     AND NEW.effective_to IS NOT NULL
+     AND NEW.effective_to>=OLD.effective_from
+     AND (OLD.effective_to IS NULL OR NEW.effective_to<=OLD.effective_to)
+     AND NEW.id IS NOT DISTINCT FROM OLD.id
+     AND NEW.profile_code IS NOT DISTINCT FROM OLD.profile_code
+     AND NEW.version IS NOT DISTINCT FROM OLD.version
+     AND NEW.origin IS NOT DISTINCT FROM OLD.origin
+     AND NEW.environment_scope IS NOT DISTINCT FROM OLD.environment_scope
+     AND NEW.scope_code IS NOT DISTINCT FROM OLD.scope_code
+     AND NEW.effective_from IS NOT DISTINCT FROM OLD.effective_from
+     AND NEW.checksum IS NOT DISTINCT FROM OLD.checksum
+     AND NEW.created_by IS NOT DISTINCT FROM OLD.created_by
+     AND NEW.created_at IS NOT DISTINCT FROM OLD.created_at
+     AND NEW.activated_by IS NOT DISTINCT FROM OLD.activated_by
+     AND NEW.activated_at IS NOT DISTINCT FROM OLD.activated_at
+     AND NEW.approval_evidence IS NOT DISTINCT FROM OLD.approval_evidence THEN
+   RETURN NEW;
+  END IF;
+  RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='ACTIVE rule profile is immutable except for controlled retirement';
+ END IF;
+ RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
+END $$;
+DROP TRIGGER IF EXISTS scheduling_rule_profiles_immutable_active ON scheduling_rule_profiles;
+CREATE TRIGGER scheduling_rule_profiles_immutable_active BEFORE UPDATE OR DELETE ON scheduling_rule_profiles FOR EACH ROW EXECUTE FUNCTION reject_active_rule_profile_change();
+
+CREATE OR REPLACE FUNCTION reject_active_rule_profile_entry_change()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+ IF TG_OP IN('UPDATE','DELETE')
+    AND EXISTS(SELECT 1 FROM scheduling_rule_profiles WHERE id=OLD.rule_profile_id AND status IN('ACTIVE','RETIRED')) THEN
+  RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='ACTIVE and RETIRED rule profile entries are immutable';
+ END IF;
+ IF TG_OP IN('INSERT','UPDATE')
+    AND EXISTS(SELECT 1 FROM scheduling_rule_profiles WHERE id=NEW.rule_profile_id AND status IN('ACTIVE','RETIRED')) THEN
+  RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='ACTIVE and RETIRED rule profile entries are immutable';
+ END IF;
+ RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
+END $$;
+DROP TRIGGER IF EXISTS scheduling_rule_profile_entries_immutable_active ON scheduling_rule_profile_entries;
+CREATE TRIGGER scheduling_rule_profile_entries_immutable_active BEFORE INSERT OR UPDATE OR DELETE ON scheduling_rule_profile_entries FOR EACH ROW EXECUTE FUNCTION reject_active_rule_profile_entry_change();
+
+CREATE OR REPLACE FUNCTION reject_rule_evaluation_change()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='rule evaluation history is immutable'; END $$;
+DROP TRIGGER IF EXISTS scheduling_rule_evaluations_immutable ON scheduling_rule_evaluations;
+CREATE TRIGGER scheduling_rule_evaluations_immutable BEFORE UPDATE OR DELETE ON scheduling_rule_evaluations FOR EACH ROW EXECUTE FUNCTION reject_rule_evaluation_change();
+
+CREATE OR REPLACE FUNCTION reject_i9_schedule_exception_change()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+ IF (TG_OP='DELETE' AND OLD.evaluation_id IS NOT NULL)
+    OR (TG_OP='UPDATE' AND (OLD.evaluation_id IS NOT NULL OR NEW.evaluation_id IS NOT NULL)) THEN
+  RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='I9 schedule exception history is immutable';
+ END IF;
+ RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
+END $$;
+DROP TRIGGER IF EXISTS schedule_exceptions_i9_immutable ON schedule_exceptions;
+CREATE TRIGGER schedule_exceptions_i9_immutable BEFORE UPDATE OR DELETE ON schedule_exceptions FOR EACH ROW EXECUTE FUNCTION reject_i9_schedule_exception_change();
+
+DROP INDEX IF EXISTS idx_scheduling_rule_profiles_active_lookup;
+CREATE INDEX idx_scheduling_rule_profiles_active_lookup ON scheduling_rule_profiles(profile_code,scope_code,environment_scope,effective_from,effective_to) WHERE status='ACTIVE';
+DROP INDEX IF EXISTS idx_scheduling_rule_evaluations_version_rule;
+CREATE INDEX idx_scheduling_rule_evaluations_version_rule ON scheduling_rule_evaluations(schedule_version_id,rule_code,evaluated_at);
+DROP INDEX IF EXISTS idx_scheduling_rule_evaluations_scope_hash;
+CREATE INDEX idx_scheduling_rule_evaluations_scope_hash ON scheduling_rule_evaluations(scope_hash);
+DROP INDEX IF EXISTS idx_schedule_exceptions_evaluation;
+CREATE INDEX idx_schedule_exceptions_evaluation ON schedule_exceptions(evaluation_id) WHERE evaluation_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS scheduling_rule_hr_validations ();
+ALTER TABLE scheduling_rule_hr_validations
+ ADD COLUMN IF NOT EXISTS id BIGSERIAL,
+ ADD COLUMN IF NOT EXISTS evaluation_id BIGINT,
+ ADD COLUMN IF NOT EXISTS rule_code VARCHAR(20),
+ ADD COLUMN IF NOT EXISTS scope_hash CHAR(64),
+ ADD COLUMN IF NOT EXISTS evidence_id VARCHAR(80),
+ ADD COLUMN IF NOT EXISTS status VARCHAR(20),
+ ADD COLUMN IF NOT EXISTS validator_user_id BIGINT,
+ ADD COLUMN IF NOT EXISTS validator_username VARCHAR(80),
+ ADD COLUMN IF NOT EXISTS validated_at TIMESTAMPTZ,
+ ADD COLUMN IF NOT EXISTS audit_detail JSONB;
+ALTER TABLE scheduling_rule_hr_validations
+ ALTER COLUMN status SET DEFAULT 'VALIDATED',
+ ALTER COLUMN validated_at SET DEFAULT NOW(),
+ ALTER COLUMN audit_detail SET DEFAULT '{}'::jsonb;
+ALTER TABLE scheduling_rule_hr_validations
+ ALTER COLUMN evaluation_id SET NOT NULL, ALTER COLUMN rule_code SET NOT NULL,
+ ALTER COLUMN scope_hash SET NOT NULL, ALTER COLUMN evidence_id SET NOT NULL,
+ ALTER COLUMN status SET NOT NULL, ALTER COLUMN validator_user_id SET NOT NULL,
+ ALTER COLUMN validator_username SET NOT NULL, ALTER COLUMN validated_at SET NOT NULL,
+ ALTER COLUMN audit_detail SET NOT NULL;
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_hr_validations','scheduling_rule_hr_validations_pkey','p','PRIMARY KEY(id)');
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_hr_validations','uq_scheduling_rule_hr_validation_evidence','u','UNIQUE(evaluation_id,rule_code,scope_hash,evidence_id)');
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_hr_validations','scheduling_rule_hr_validation_evaluation_fkey','f','FOREIGN KEY(evaluation_id,rule_code,scope_hash) REFERENCES scheduling_rule_evaluations(id,rule_code,scope_hash) ON DELETE RESTRICT');
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_hr_validations','scheduling_rule_hr_validation_user_fkey','f','FOREIGN KEY(validator_user_id) REFERENCES app_users(id) ON DELETE RESTRICT');
+SELECT pg_temp.i9_mvp_constraint('scheduling_rule_hr_validations','ck_scheduling_rule_hr_validation_values','c',$d$CHECK(rule_code='I9-R06' AND scope_hash~'^[0-9a-f]{64}$' AND btrim(evidence_id)<>'' AND status='VALIDATED' AND btrim(validator_username)<>'' AND jsonb_typeof(audit_detail)='object')$d$);
+
+CREATE OR REPLACE FUNCTION enforce_i9_hr_validation_scope()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+ IF NOT EXISTS(
+  SELECT 1 FROM scheduling_rule_evaluations e
+  JOIN scheduling_rule_profiles p ON p.id=e.rule_profile_id
+  JOIN schedule_versions sv ON sv.id=e.schedule_version_id
+  WHERE e.id=NEW.evaluation_id AND e.rule_code=NEW.rule_code AND e.scope_hash=NEW.scope_hash
+    AND e.rule_code='I9-R06' AND e.outcome='EXCEPTION_REQUIRED'
+    AND p.origin='SIMULATED' AND p.environment_scope='MVP_TEST' AND sv.simulated=true
+    AND EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(e.facts_snapshot->'requirementEvaluations','[]'::jsonb)) f
+               WHERE f->>'evidenceId'=NEW.evidence_id)
+ ) THEN RAISE EXCEPTION USING ERRCODE='23514',MESSAGE='TH validation must match persisted SIMULATED/MVP_TEST R06 evidence'; END IF;
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS scheduling_rule_hr_validation_scope ON scheduling_rule_hr_validations;
+CREATE TRIGGER scheduling_rule_hr_validation_scope BEFORE INSERT ON scheduling_rule_hr_validations FOR EACH ROW EXECUTE FUNCTION enforce_i9_hr_validation_scope();
+CREATE OR REPLACE FUNCTION reject_i9_hr_validation_change()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='TH validation history is immutable'; END $$;
+DROP TRIGGER IF EXISTS scheduling_rule_hr_validations_immutable ON scheduling_rule_hr_validations;
+CREATE TRIGGER scheduling_rule_hr_validations_immutable BEFORE UPDATE OR DELETE ON scheduling_rule_hr_validations FOR EACH ROW EXECUTE FUNCTION reject_i9_hr_validation_change();
+CREATE INDEX IF NOT EXISTS idx_scheduling_rule_hr_validations_evaluation ON scheduling_rule_hr_validations(evaluation_id,evidence_id);
+
+COMMIT;
