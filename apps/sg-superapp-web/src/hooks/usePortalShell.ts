@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   PortalApiError,
   evaluateSchedulingRules,
-  fetchActiveSchedulingRuleProfile,
+  fetchSchedulingRuleProfiles,
   fetchCurrentUser,
   fetchModules,
   fetchNotifications,
@@ -13,9 +13,11 @@ import { mockCurrentUser, mockNotifications, modulesByRole } from "../mock/sessi
 import type { AppModule, CurrentUser, LoginRequest, NotificationItem } from "../types/portal";
 import type {
   PreEvaluateSchedulingRulesRequest,
+  SchedulingEnvironmentScope,
   SchedulingRuleEvaluationState,
   SchedulingRuleProblem,
-  SchedulingRuleProfileState
+  SchedulingRuleProfileState,
+  SchedulingRuleRevalidationState
 } from "../types/portal";
 
 const SESSION_USER_KEY = "sg.superapp.currentUser";
@@ -34,7 +36,8 @@ interface PortalShellState {
   // shell does not decide whether a schedule may be approved, nor infer a permission from a role.
   ruleProfile: SchedulingRuleProfileState;
   ruleEvaluation: SchedulingRuleEvaluationState;
-  loadRuleProfile: (projectCode: string, period: string, environmentScope: string) => Promise<void>;
+  ruleRevalidation: SchedulingRuleRevalidationState;
+  loadRuleProfile: (projectCode: string, period: string, environmentScope: SchedulingEnvironmentScope) => Promise<void>;
   loadRuleEvaluations: (scheduleVersionId: number) => Promise<void>;
   revalidateRules: (
     scheduleVersionId: number,
@@ -82,6 +85,7 @@ export function usePortalShell(): PortalShellState {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [ruleProfile, setRuleProfile] = useState<SchedulingRuleProfileState>({ status: "IDLE" });
   const [ruleEvaluation, setRuleEvaluation] = useState<SchedulingRuleEvaluationState>({ status: "IDLE" });
+  const [ruleRevalidation, setRuleRevalidation] = useState<SchedulingRuleRevalidationState>({ status: "IDLE" });
 
   const logout = useCallback(() => {
     sessionStorage.removeItem(SESSION_USER_KEY);
@@ -150,20 +154,35 @@ export function usePortalShell(): PortalShellState {
   }, []);
 
   const loadRuleProfile = useCallback(
-    async (projectCode: string, period: string, environmentScope: string) => {
+    async (projectCode: string, period: string, environmentScope: SchedulingEnvironmentScope) => {
       setRuleProfile({ status: "LOADING" });
       try {
-        const profile = await fetchActiveSchedulingRuleProfile(projectCode, period, environmentScope);
-        // No active profile is not an empty rule set. Saying so plainly keeps the panel from
-        // rendering a clean schedule for a scope nobody has configured.
-        setRuleProfile(
-          profile
-            ? { status: "READY", profile }
-            : {
-                status: "UNCONFIGURED",
-                message: "No hay un perfil de reglas vigente para este proyecto y periodo."
-              }
-        );
+        // The route returns every profile it has for the scope, in any status. An empty result, or
+        // one with nothing ACTIVE, means nobody configured this scope - which is not the same as a
+        // schedule with no rules to worry about, and must not render as one.
+        const active = (await fetchSchedulingRuleProfiles(projectCode, period, environmentScope))
+          .filter(profile => profile.status === "ACTIVE");
+
+        if (active.length === 1) {
+          setRuleProfile({ status: "READY", profile: active[0] });
+        } else if (active.length === 0) {
+          setRuleProfile({
+            status: "UNCONFIGURED",
+            message: "No hay un perfil de reglas vigente para este proyecto y periodo."
+          });
+        } else {
+          // The database permits one active profile per scope. More than one means the guarantee
+          // the decisions rest on is broken, so nothing here can be trusted to describe them.
+          setRuleProfile({
+            status: "FAILED",
+            problem: {
+              status: 0,
+              code: null,
+              title: null,
+              message: "Hay mas de un perfil de reglas vigente para el mismo alcance."
+            }
+          });
+        }
       } catch (error) {
         setRuleProfile({ status: "FAILED", problem: toProblem(error) });
       }
@@ -174,7 +193,7 @@ export function usePortalShell(): PortalShellState {
   const loadRuleEvaluations = useCallback(async (scheduleVersionId: number) => {
     setRuleEvaluation({ status: "LOADING" });
     try {
-      setRuleEvaluation({ status: "READY", batch: await fetchSchedulingRuleEvaluations(scheduleVersionId) });
+      setRuleEvaluation({ status: "READY", evaluations: await fetchSchedulingRuleEvaluations(scheduleVersionId) });
     } catch (error) {
       setRuleEvaluation({ status: "FAILED", problem: toProblem(error) });
     }
@@ -188,12 +207,18 @@ export function usePortalShell(): PortalShellState {
       assignmentId: number | null,
       request: PreEvaluateSchedulingRulesRequest
     ) => {
+      // The verdicts on screen described the schedule before the edit, so they are put back into
+      // LOADING rather than left standing while the re-evaluation runs.
       setRuleEvaluation({ status: "LOADING" });
+      setRuleRevalidation({ status: "LOADING" });
       try {
         const batch = await evaluateSchedulingRules(scheduleVersionId, assignmentId, request);
-        setRuleEvaluation({ status: "READY", batch });
+        setRuleRevalidation({ status: "READY", batch });
+        setRuleEvaluation({ status: "READY", evaluations: await fetchSchedulingRuleEvaluations(scheduleVersionId) });
       } catch (error) {
-        setRuleEvaluation({ status: "FAILED", problem: toProblem(error) });
+        const problem = toProblem(error);
+        setRuleRevalidation({ status: "FAILED", problem });
+        setRuleEvaluation({ status: "FAILED", problem });
       }
     },
     []
@@ -211,6 +236,7 @@ export function usePortalShell(): PortalShellState {
       logout,
       ruleProfile,
       ruleEvaluation,
+      ruleRevalidation,
       loadRuleProfile,
       loadRuleEvaluations,
       revalidateRules
@@ -226,6 +252,7 @@ export function usePortalShell(): PortalShellState {
       logout,
       ruleProfile,
       ruleEvaluation,
+      ruleRevalidation,
       loadRuleProfile,
       loadRuleEvaluations,
       revalidateRules

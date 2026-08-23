@@ -31,6 +31,7 @@ $types = Text 'apps/sg-superapp-web/src/types/portal.ts'
 $api = Text 'apps/sg-superapp-web/src/services/portalApi.ts'
 $hook = Text 'apps/sg-superapp-web/src/hooks/usePortalShell.ts'
 $endpoints = Text 'apps/sg-superapp-api/Endpoints/PortalEndpoints.cs'
+$endpointsRules = Text 'apps/sg-superapp-api/Endpoints/SchedulingRuleEndpoints.cs'
 
 Q ($types.Length -gt 0 -and $api.Length -gt 0 -and $hook.Length -gt 0) 'FE-T01 the three client files exist'
 
@@ -42,6 +43,20 @@ $apiCodes = [regex]::Matches($endpoints, 'RULE_[A-Z_]+') | ForEach-Object { $_.V
 $clientCodes = [regex]::Matches($types, '"(RULE_[A-Z_]+)"') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
 Q ($apiCodes.Count -ge 6) 'FE-T02 the API declares its rule gate vocabulary'
 Q (($apiCodes -join ',') -eq ($clientCodes -join ',')) "FE-T02 the client vocabulary matches the API exactly (api=$($apiCodes -join '|') client=$($clientCodes -join '|'))"
+# The type union is erased at runtime. What decides whether a code survives readProblem is the
+# RULE_GATE_CODES array, and emptying that array kept this verifier green while every gate refusal
+# silently normalised to code: null - the exact discard Task 24 existed to stop.
+$runtimeCodes = ''
+$runtimeMatch = [regex]::Match($api, '(?s)RULE_GATE_CODES: readonly SchedulingRuleGateCode\[\] = \[(.*?)\];')
+if ($runtimeMatch.Success) {
+    # Line comments are stripped first: a commented-out entry is still text, and matching it would
+    # let someone disable a code while this assertion kept reporting the full vocabulary.
+    $liveArray = ($runtimeMatch.Groups[1].Value -split "`n" |
+        Where-Object { $_.Trim() -notmatch '^//' }) -join "`n"
+    $runtimeCodes = ([regex]::Matches($liveArray, '"(RULE_[A-Z_]+)"') |
+        ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique) -join ','
+}
+Q ($runtimeMatch.Success -and $runtimeCodes -eq ($apiCodes -join ',')) "FE-T02 the runtime allowlist matches the API exactly (runtime=$runtimeCodes)"
 
 # --- the outcomes the evaluator can produce -----------------------------------------------------
 foreach ($outcome in @('COMPLIANT', 'BLOCKED', 'EXCEPTION_REQUIRED', 'WARNING', 'NOT_APPLICABLE')) {
@@ -78,8 +93,21 @@ Q ($hook -match 'status: "UNCONFIGURED"') 'FE-T06 the shell distinguishes an unc
 # It is what separates an MVP_TEST scenario from a real one. If the client drops it, the UI cannot
 # label the screen and a simulated schedule becomes indistinguishable from an institutional one.
 Q ($types -match '(?s)interface SchedulingRuleProfile \{.*?simulated: boolean;.*?\}') 'FE-T12 the rule profile carries the simulated mark'
-Q ($types -match '(?s)interface SchedulingRuleEvaluationBatch \{.*?simulated: boolean;.*?\}') 'FE-T12 the evaluation batch carries the simulated mark'
+Q ($types -match '(?s)interface PersistedSchedulingRuleBatch \{.*?simulated: boolean;.*?\}') 'FE-T12 the re-evaluation batch carries the simulated mark'
 Q ($hook -match 'ruleProfile') 'FE-T12 the shell exposes the rule profile it loaded'
+
+# --- each route is modelled with the shape it really returns -------------------------------------
+# Typing a list route as a single object is how UNCONFIGURED became unreachable, and typing a bare
+# verdict list as a batch is how reading a summary threw. getJson casts blindly, so tsc cannot see
+# either mistake; these assertions are the only thing that can.
+Q ($endpointsRules -match '(?s)MapGet\("/api/portal/scheduling/rule-profiles",.*?Results\.Ok\(profiles\.Select') 'FE-T13 the profiles route returns a list'
+Q ($api -match 'fetchSchedulingRuleProfiles[\s\S]{0,400}?Promise<SchedulingRuleProfile\[\]>') 'FE-T13 the client models the profiles route as a list'
+Q ($api -notmatch 'error\.status === 404') 'FE-T13 the client does not treat a missing profile as a 404 the route never sends'
+Q ($endpointsRules -match '(?s)MapGet\("/api/portal/scheduling/rules/evaluations",.*?Results\.Ok\(\(await httpRepository\.LoadEvaluationsAsync') 'FE-T13 the evaluations route returns a list'
+Q ($api -match 'fetchSchedulingRuleEvaluations[\s\S]{0,400}?Promise<SchedulingRuleEvaluation\[\]>') 'FE-T13 the client models the evaluations route as a list with no summary'
+Q ($api -match 'evaluateSchedulingRules[\s\S]{0,600}?Promise<PersistedSchedulingRuleBatch>') 'FE-T13 only the re-evaluation is modelled as a batch'
+Q ($types -match '(?s)interface PersistedSchedulingRuleBatch \{.*?summary: SchedulingRuleSummary;.*?\}') 'FE-T13 the summary lives only on the re-evaluation batch'
+Q ($types -notmatch 'READY"; batch: SchedulingRuleEvaluationBatch') 'FE-T13 the persisted verdicts are not presented as a batch'
 
 # --- the client reaches the versioned rule endpoints --------------------------------------------
 Q ($api -match 'rule-profiles') 'FE-T07 the client reads rule-profiles'
@@ -104,7 +132,7 @@ if (-not (Test-Path -LiteralPath $node -PathType Leaf) -or -not (Test-Path -Lite
         # Compiles: the contracts used as intended, including an exhaustive switch that returns
         # never for an unhandled code.
         @'
-import type { SchedulingRuleGateCode, SchedulingRuleEvaluationBatch, SchedulingRuleProfileState } from "../types/portal";
+import type { SchedulingRuleGateCode, PersistedSchedulingRuleBatch, SchedulingRuleProfileState } from "../types/portal";
 
 export function describe(code: SchedulingRuleGateCode): string {
   switch (code) {
@@ -121,7 +149,7 @@ export function describe(code: SchedulingRuleGateCode): string {
   }
 }
 
-export function canApprove(batch: SchedulingRuleEvaluationBatch): boolean {
+export function canApprove(batch: PersistedSchedulingRuleBatch): boolean {
   return batch.summary.canApproveOrPublish;
 }
 
@@ -136,15 +164,22 @@ export function label(state: SchedulingRuleProfileState): string {
         Pop-Location
         Q ($positiveExit -eq 0) "FE-T09 the contracts compile as intended ($($positive -join ' '))"
 
-        # Must NOT compile: an invented gate code, an invented outcome, and a summary decision
-        # recomputed as a string. If any of these type-checks, the unions are just strings.
+        # Must NOT compile. One file per case, because tsc reports the widened type for several of
+        # these and a message-text assertion could not tell them apart - an earlier version matched
+        # any line naming the probe file and passed while the approval decision accepted a string.
+        # A filename is unambiguous: each of the three must appear in the errors on its own.
         @'
-import type { SchedulingRuleGateCode, SchedulingRuleOutcome, SchedulingRuleSummary } from "../types/portal";
-
+import type { SchedulingRuleGateCode } from "../types/portal";
 export const invented: SchedulingRuleGateCode = "RULE_DEFINITELY_NOT_A_STATE";
+'@ | Set-Content -LiteralPath (Join-Path $probeDir 'reject-gate-code.ts') -Encoding UTF8
+        @'
+import type { SchedulingRuleOutcome } from "../types/portal";
 export const bogus: SchedulingRuleOutcome = "PROBABLY_FINE";
-export const wrong: SchedulingRuleSummary["canApproveOrPublish"] = "yes";
-'@ | Set-Content -LiteralPath (Join-Path $probeDir 'negative.ts') -Encoding UTF8
+'@ | Set-Content -LiteralPath (Join-Path $probeDir 'reject-outcome.ts') -Encoding UTF8
+        @'
+import type { SchedulingRuleSummary } from "../types/portal";
+export const wrong: SchedulingRuleSummary["canApproveOrPublish"] = "quizas";
+'@ | Set-Content -LiteralPath (Join-Path $probeDir 'reject-approval-as-text.ts') -Encoding UTF8
 
         Push-Location $web
         $negative = & $node $tsc -p tsconfig.app.json --noEmit 2>&1
@@ -152,9 +187,9 @@ export const wrong: SchedulingRuleSummary["canApproveOrPublish"] = "yes";
         Pop-Location
         $negativeText = $negative -join "`n"
         Q ($negativeExit -ne 0) 'FE-T10 the types reject a state that does not exist'
-        Q ($negativeText -match 'RULE_DEFINITELY_NOT_A_STATE') 'FE-T10 an invented gate code is rejected'
-        Q ($negativeText -match 'PROBABLY_FINE') 'FE-T10 an invented outcome is rejected'
-        Q ($negativeText -match 'negative\.ts.*?3[0-9]?|Type .string. is not assignable to type .boolean.') 'FE-T10 the approval decision cannot be restated as a string'
+        Q ($negativeText -match 'reject-gate-code\.ts') 'FE-T10 an invented gate code is rejected'
+        Q ($negativeText -match 'reject-outcome\.ts') 'FE-T10 an invented outcome is rejected'
+        Q ($negativeText -match 'reject-approval-as-text\.ts') 'FE-T10 the approval decision cannot be restated as a string'
     }
     finally {
         if (Test-Path -LiteralPath $probeDir) { Remove-Item -LiteralPath $probeDir -Recurse -Force }
@@ -177,8 +212,8 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 
-if ($passed -ne 40) {
-    Write-Output "I9 MVP FRONTEND API FAIL: expected 40 assertions, ran $passed"
+if ($passed -ne 49) {
+    Write-Output "I9 MVP FRONTEND API FAIL: expected 49 assertions, ran $passed"
     exit 1
 }
 

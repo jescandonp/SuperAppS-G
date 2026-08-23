@@ -1,7 +1,7 @@
 import { API_BASE_URL } from "../config";
 import type { AnnulCertificateRequest, AppModule, CertificatePreview, CertificatePreviewRequest, CertificateSigner, CertificateSignerRequest, CertificateSignerStatus, CertificateStatus, CertificateType, CreatePositionAssignmentRequest, CreateTrainingRecordRequest, CurrentUser, EmployeeDetail, EmployeeSummary, FinalizePositionAssignmentRequest, ImportBatchError, ImportBatchRow, ImportBatchSummary, ImportColumnMapping, ImportPrevalidationResponse, ImportRowClassification, LaborCertificate, LaborCertificateHistoryItem, LoginRequest, LoginResponse, NotificationItem, PositionAssignment, RoleCode, ServicePosition, ServicePositionRequest, ServicePositionStatus, TrainingComplianceDetail, TrainingComplianceStatus, TrainingComplianceSummary, TrainingRecord, TrainingRequirementCategory, TrainingRequirementStatus, TrainingRequirementType, TrainingServiceEnablement, TrainingServiceEnablementStatus, UpsertTrainingRequirementTypeRequest } from "../types/portal";
 import type { ScheduleComparison, ScheduleProposal, SchedulingCapabilities, SchedulingProject, ShiftTemplate } from "../types/portal";
-import type { PreEvaluateSchedulingRulesRequest, SchedulingRuleEvaluationBatch, SchedulingRuleGateCode, SchedulingRuleProblem, SchedulingRuleProfile } from "../types/portal";
+import type { PersistedSchedulingRuleBatch, PreEvaluateSchedulingRulesRequest, SchedulingEnvironmentScope, SchedulingRuleEvaluation, SchedulingRuleGateCode, SchedulingRuleProblem, SchedulingRuleProfile } from "../types/portal";
 
 const SESSION_TOKEN_KEY = "sg.superapp.sessionToken";
 
@@ -501,49 +501,46 @@ export async function prevalidateEmployeeCsv(file: File, uploadedBy: string): Pr
 
 
 // --- I9 MVP versioned rules ------------------------------------------------------------------
-// These read the server's verdicts; none of them derives one. `fetchActiveSchedulingRuleProfile`
-// returns null when the scope has no active profile, which the caller must render as incomplete
-// configuration rather than as "no rules apply".
+// Each function returns the shape its route actually returns. None of them derives an approval
+// decision: whether a transition will succeed is the server's answer to the transition itself.
 
-export async function fetchActiveSchedulingRuleProfile(
+// The route answers 200 with a list and never 404s, so "no active profile for this scope" is an
+// empty result, not an error. The list is unfiltered by status, so the caller must select.
+export async function fetchSchedulingRuleProfiles(
   projectCode: string,
   period: string,
-  environmentScope: string
-): Promise<SchedulingRuleProfile | null> {
+  environmentScope: SchedulingEnvironmentScope
+): Promise<SchedulingRuleProfile[]> {
   const query = new URLSearchParams({ projectCode, period, environmentScope });
-  try {
-    return await getJson<SchedulingRuleProfile>(`/portal/scheduling/rule-profiles?${query.toString()}`);
-  } catch (error) {
-    if (error instanceof PortalApiError && error.status === 404) {
-      return null;
-    }
-
-    throw error;
-  }
+  return getJson<SchedulingRuleProfile[]>(`/portal/scheduling/rule-profiles?${query.toString()}`);
 }
 
 export async function fetchSchedulingRuleProfile(id: number): Promise<SchedulingRuleProfile> {
   return getJson<SchedulingRuleProfile>(`/portal/scheduling/rule-profiles/${id}`);
 }
 
+// Persisted verdicts, with no summary: this route has none. Reading an approval decision from here
+// is what threw before, and the UI does not need one.
 export async function fetchSchedulingRuleEvaluations(
   scheduleVersionId: number
-): Promise<SchedulingRuleEvaluationBatch> {
+): Promise<SchedulingRuleEvaluation[]> {
   const query = new URLSearchParams({ scheduleVersionId: String(scheduleVersionId) });
-  return getJson<SchedulingRuleEvaluationBatch>(`/portal/scheduling/rules/evaluations?${query.toString()}`);
+  return getJson<SchedulingRuleEvaluation[]>(`/portal/scheduling/rules/evaluations?${query.toString()}`);
 }
 
+// The only response that carries the server's summary, because it is the only one that evaluated
+// anything. It also writes, so it belongs to an explicit revalidation, never to a page load.
 export async function evaluateSchedulingRules(
   scheduleVersionId: number,
   assignmentId: number | null,
   request: PreEvaluateSchedulingRulesRequest
-): Promise<SchedulingRuleEvaluationBatch> {
+): Promise<PersistedSchedulingRuleBatch> {
   const query = new URLSearchParams({ scheduleVersionId: String(scheduleVersionId) });
   if (assignmentId !== null) {
     query.set("assignmentId", String(assignmentId));
   }
 
-  return sendJson<SchedulingRuleEvaluationBatch>(
+  return sendJson<PersistedSchedulingRuleBatch>(
     `/portal/scheduling/rules/evaluate?${query.toString()}`,
     "POST",
     request

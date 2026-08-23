@@ -546,12 +546,27 @@ export interface SchedulingRuleSummary {
   canApproveOrPublish: boolean;
 }
 
-export interface SchedulingRuleEvaluationBatch {
+// The API answers with three different shapes and the client models all three, because modelling
+// one of them everywhere is how UNCONFIGURED became dead code and how reading a summary from the
+// wrong route threw. GET /rule-profiles returns a LIST, and never 404s. GET /rules/evaluations
+// returns a LIST of verdicts with no summary. Only POST /rules/evaluate returns a batch, and its
+// rows carry an evaluationId instead of the snapshots the persisted rows have.
+export interface PersistedSchedulingRuleEvaluation {
+  evaluationId: number;
+  ruleCode: SchedulingRuleCode;
+  outcome: SchedulingRuleOutcome;
+  severity: SchedulingRuleSeverity;
+  messageCode: string;
+  explanation: string;
+  scopeHash: string;
+  exceptionAllowed: boolean;
+}
+
+export interface PersistedSchedulingRuleBatch {
   ruleProfileId: number;
-  profileCode: string;
   profileVersion: number;
   simulated: boolean;
-  evaluations: SchedulingRuleEvaluation[];
+  evaluations: PersistedSchedulingRuleEvaluation[];
   summary: SchedulingRuleSummary;
 }
 
@@ -574,10 +589,19 @@ export type SchedulingRuleProfileState =
   | { status: "UNCONFIGURED"; message: string }
   | { status: "FAILED"; problem: SchedulingRuleProblem };
 
+// Reading what is persisted gives verdicts and nothing else. There is no approval decision here,
+// and the UI must not manufacture one: it renders these and lets the server refuse the transition.
 export type SchedulingRuleEvaluationState =
   | { status: "IDLE" }
   | { status: "LOADING" }
-  | { status: "READY"; batch: SchedulingRuleEvaluationBatch }
+  | { status: "READY"; evaluations: SchedulingRuleEvaluation[] }
+  | { status: "FAILED"; problem: SchedulingRuleProblem };
+
+// A re-evaluation is the only response that carries the server's summary.
+export type SchedulingRuleRevalidationState =
+  | { status: "IDLE" }
+  | { status: "LOADING" }
+  | { status: "READY"; batch: PersistedSchedulingRuleBatch }
   | { status: "FAILED"; problem: SchedulingRuleProblem };
 
 export interface PreEvaluateSchedulingRulesRequest {
