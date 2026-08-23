@@ -109,6 +109,12 @@ VALUES ('CC','I9-CLOSE-EMP','Guarda anonimizado de cierre','ACTIVO','Vigilante',
     $notificationState = Invoke-Psql "SELECT count(*) || '|' || count(DISTINCT deduplication_key) FROM notification_items WHERE source_module='SCHEDULING' AND deduplication_key LIKE 'SCHEDULING:%'"
     if ($notificationState -ne "4|4") { throw "Scheduling notifications are not complete and deduplicated: $notificationState" }
     Invoke-Verifier "Verify-SgSuperAppI9Exports.ps1" @("-ApiBaseUrl",$ApiBaseUrl,"-VersionId",$publishedVersionId,"-PositionId",$positionId,"-OutputDirectory",$exportDirectory)
+    # The MVP rule engine stands up its own schema and its own API, so these run outside this one's
+    # fixture rather than against it. Running them here keeps a rule-engine regression from passing
+    # the closure suite unnoticed: Verify-SgSuperAppI9MvpRules.ps1 is the static and focused gate,
+    # and Verify-SgSuperAppI9MvpIntegration.ps1 is the hermetic end-to-end one.
+    Invoke-Verifier "Verify-SgSuperAppI9MvpIntegration.ps1" @()
+    Invoke-Verifier "Verify-SgSuperAppI9MvpRules.ps1" @()
     $exportAuditCount = Invoke-Psql "SELECT count(*) FROM audit_log WHERE event_type='SCHEDULE_EXPORTED' AND entity_id='$publishedVersionId'"
     if ($exportAuditCount -ne "2") { throw "Expected two scheduling export audit events, found $exportAuditCount." }
     Write-Output "I9 INTEGRATION PASS"
