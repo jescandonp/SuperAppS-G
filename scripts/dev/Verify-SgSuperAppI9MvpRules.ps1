@@ -688,7 +688,7 @@ $focused = @(
     @{ R='MVP generation verifier'; P='scripts/dev/Verify-SgSuperAppI9MvpGeneration.ps1'; Pass='I9 MVP GENERATION PASS 13' },
     # Stands the API up against its own schema, so it also carries the eligibility, replanning and
     # pre-MVP workflow verifiers, none of which can run without one.
-    @{ R='MVP workflow verifier'; P='scripts/dev/Verify-SgSuperAppI9MvpWorkflow.ps1'; Pass='I9 MVP WORKFLOW PASS 52' },
+    @{ R='MVP workflow verifier'; P='scripts/dev/Verify-SgSuperAppI9MvpWorkflow.ps1'; Pass='I9 MVP WORKFLOW PASS 57' },
     # Type-checks the client against the API vocabulary, including a probe that must fail to compile.
     @{ R='MVP frontend API verifier'; P='scripts/dev/Verify-SgSuperAppI9MvpFrontendApi.ps1'; Pass='I9 MVP FRONTEND API PASS 40' }
 )

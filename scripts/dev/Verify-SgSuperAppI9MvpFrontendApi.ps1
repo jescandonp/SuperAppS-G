@@ -161,9 +161,9 @@ export const wrong: SchedulingRuleSummary["canApproveOrPublish"] = "yes";
         # tsc in build mode would rewrite the tracked tsconfig.app.tsbuildinfo; -p with --noEmit does
         # not, but the guard stays so a future change cannot dirty the working tree unnoticed.
         Push-Location $repoRoot
-        $dirty = & git status --porcelain -- 'apps/sg-superapp-web/tsconfig.app.tsbuildinfo'
+        $dirty = & git status --porcelain -- 'apps/sg-superapp-web/tsconfig.app.tsbuildinfo' 2>&1; $gitExit = $LASTEXITCODE
         Pop-Location
-        if (-not [string]::IsNullOrWhiteSpace(($dirty -join ''))) {
+        if ($gitExit -ne 0 -or -not [string]::IsNullOrWhiteSpace(($dirty -join ''))) {
             $failures.Add('FE-T11 the type check modified a tracked build artifact')
         } else {
             $passed++

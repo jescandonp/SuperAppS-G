@@ -3239,7 +3239,7 @@ where exists(select 1 from schedule_versions sv join scheduling_rule_profiles rp
     // EXCEPTION_REQUIRED needs an approved decision bound to its exact evaluation, rule and scope,
     // and BLOCKED or WARNING never pass - an unverified rule accredits nothing.
     //
-    // Two things this gate learned the hard way. First, it judges only the CURRENT verdict for each
+    // Three things this gate learned the hard way. First, it judges only the CURRENT verdict for each
     // subject, not the whole table: scheduling_rule_evaluations is append-only, so re-evaluating a
     // corrected schedule adds a row rather than replacing one, and aggregating the history would
     // leave an old BLOCKED - or an evaluation the edit outran - condemning the version for ever,
@@ -3247,6 +3247,20 @@ where exists(select 1 from schedule_versions sv join scheduling_rule_profiles rp
     // counts assignments, not only evaluations: an assignment nothing ever evaluated is invisible to
     // any aggregate over the evaluation rows, and a version-level verdict must not be read as
     // vouching for guards it never looked at. That is the unknown this module refuses to presume on.
+    //
+    // Third, a BLOCKED is not cleared by re-asserting facts. Every verdict is computed from facts the
+    // caller supplies, so if the newest evaluation simply replaced the previous one, whoever wanted
+    // the approval could post a clean fact set and walk a recorded hard block out of the way with no
+    // second authority involved - which an independent review demonstrated end to end. A block
+    // therefore stands until the assignment it was decided on is edited after it; only then does a
+    // later evaluation describe something that actually changed. Recovery stays possible, and it
+    // costs an edit that is itself permissioned and audited. A version-level block has no assignment
+    // to edit and so cannot be cleared this way at all, which is the fail-closed side of the trade.
+    //
+    // I9-R06 is admitted into `decided` with exception_allowed false because
+    // CreateScheduleExceptionAsync deliberately carves it out: its evidence is validated by Talento
+    // Humano rather than by the requesting actor, so the flag is never set on that path. Without the
+    // carve-out an approved R06 decision could never satisfy the gate.
     private static async Task<SchedulingTransitionEvidence> RequireEveryRuleDecidedAsync(
         NpgsqlConnection cn,NpgsqlTransaction tx,long versionId,CancellationToken ct)
     {
@@ -3258,7 +3272,7 @@ where exists(select 1 from schedule_versions sv join scheduling_rule_profiles rp
   order by coalesce(e.assignment_id,0),e.rule_code,e.evaluated_at desc,e.id desc),
 decided as (
   select c.id from current c
-  where c.outcome='EXCEPTION_REQUIRED' and c.exception_allowed and exists(
+  where c.outcome='EXCEPTION_REQUIRED' and (c.exception_allowed or c.rule_code='I9-R06') and exists(
     select 1 from schedule_exceptions x
     where x.evaluation_id=c.id and x.rule_code=c.rule_code and x.scope_hash=c.scope_hash
       and x.decision='APPROVED'))
@@ -3266,7 +3280,10 @@ select sv.simulated,coalesce(sv.rule_profile_id,0),coalesce(sv.rule_profile_vers
 (select count(*) from current),
 (select count(*) from current c join schedule_assignments a on a.id=c.assignment_id
    where a.updated_at>c.evaluated_at),
-(select count(*) from current c where c.outcome='BLOCKED'),
+(select count(*) from scheduling_rule_evaluations b
+   left join schedule_assignments ba on ba.id=b.assignment_id
+ where b.schedule_version_id=sv.id and b.outcome='BLOCKED'
+   and coalesce(ba.updated_at<=b.evaluated_at,true)),
 (select count(*) from current c where c.outcome='WARNING'),
 (select count(*) from current c where c.outcome='EXCEPTION_REQUIRED' and c.id not in(select id from decided)),
 (select count(*) from decided),
