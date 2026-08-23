@@ -973,3 +973,25 @@ textarea {
   .scheduling-mobile-list button { display: flex; justify-content: space-between; gap: 1rem; min-height: 40px; align-items: center; border: 0; border-radius: 4px; background: var(--surface-alt); color: #fff; padding: 0.55rem 0.7rem; }
   .assignment-detail { position: static; }
 }
+
+/* I9 MVP versioned rule panel. Outcome colours carry no meaning on their own: every row states its
+   outcome in words and says what to do about it, so the panel reads the same without colour. */
+.schedule-badge.is-simulated { color: #ffd98a; border-color: #c9962f; background: rgba(201,150,47,.14); }
+.schedule-alert.is-warning { border: 1px solid #c9962f; background: rgba(201,150,47,.14); color: #ffe6b3; }
+.rule-profile-state { margin: 0.75rem 0; color: var(--text-muted); font-size: 0.86rem; }
+.rule-list { display: grid; gap: 0.6rem; margin-top: 0.75rem; }
+.rule-row { display: grid; gap: 0.35rem; padding: 0.75rem 0.9rem; border: 1px solid var(--border); border-left-width: 4px; border-radius: 6px; }
+.rule-row-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.rule-row p { margin: 0; font-size: 0.88rem; }
+.rule-row.is-blocked { border-left-color: #ba5454; }
+.rule-row.is-exception { border-left-color: #c9962f; }
+.rule-row.is-warning { border-left-color: #c9962f; }
+.rule-row.is-compliant { border-left-color: #2fa578; }
+.rule-row.is-neutral { border-left-color: var(--border); }
+.rule-action { color: var(--text-muted); }
+.rule-scope { display: block; color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.74rem; }
+.rule-link { justify-self: start; padding: 0.3rem 0.6rem; background: none; border: 1px solid var(--sentinel-yellow); border-radius: 4px; color: var(--sentinel-yellow); cursor: pointer; font-size: 0.78rem; }
+.rule-link:focus-visible { outline: 2px solid var(--sentinel-yellow); outline-offset: 2px; }
+.rule-summary { margin: 0.75rem 0 0; color: var(--text-muted); font-size: 0.84rem; }
+.summary-reasons { display: grid; gap: 0.2rem; margin-top: 0.5rem; }
+.summary-reasons small { color: var(--text-muted); font-size: 0.76rem; }

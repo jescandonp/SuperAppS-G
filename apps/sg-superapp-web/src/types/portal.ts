@@ -45,6 +45,13 @@ export interface ScheduleException {
   responsible: string;
   resolutionDate: string;
   status: "REGISTRADA" | "APROBADA" | "RECHAZADA" | "CANCELADA";
+  // A decision binds to the rule and the exact snapshot it was taken on. Optional because rows
+  // predating the versioned regime carry none, and a decision with no scope must be shown as such
+  // rather than rendered as though it covered anything.
+  ruleCode?: string;
+  scopeHash?: string;
+  motiveCode?: string;
+  decision?: "APPROVED" | "REJECTED" | "CANCELLED";
 }
 
 export interface ScheduleProposal {
