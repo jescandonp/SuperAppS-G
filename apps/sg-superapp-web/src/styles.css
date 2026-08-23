@@ -146,6 +146,32 @@ textarea {
   padding: 1.25rem;
   display: grid;
   gap: 1rem;
+  /* A grid item defaults to min-width:auto, so the 1fr track could not shrink below the intrinsic
+     width of its contents and the whole page scrolled sideways from 961px up to about 1100px.
+     Wide content still scrolls inside its own container; the page itself no longer does. */
+  min-width: 0;
+}
+
+.shell > *,
+.content > * {
+  min-width: 0;
+}
+
+/* The top bar packs a title and a user block on one line; below roughly 1100px they no longer fit,
+   and without wrapping they pushed the page sideways instead of stacking. */
+.topbar {
+  flex-wrap: wrap;
+}
+
+/* Same reason inside the scheduling workspace: its sections are grid items, so their intrinsic
+   width won the layout and the hero spilled past the viewport at 1024. Wide content - the shift
+   matrix - still scrolls inside .scheduling-table-scroll, which is where scrolling belongs. */
+.scheduling-workspace > * {
+  min-width: 0;
+}
+
+.scheduling-hero {
+  flex-wrap: wrap;
 }
 
 .topbar,
@@ -995,3 +1021,5 @@ textarea {
 .rule-summary { margin: 0.75rem 0 0; color: var(--text-muted); font-size: 0.84rem; }
 .summary-reasons { display: grid; gap: 0.2rem; margin-top: 0.5rem; }
 .summary-reasons small { color: var(--text-muted); font-size: 0.76rem; }
+
+.rule-heading-actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }

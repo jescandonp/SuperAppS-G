@@ -3050,6 +3050,56 @@ where e.schedule_version_id=@version", cn, tx);
         return runId;
     }
 
+    // The scheduling screen cannot open without these two listings, and neither route existed: the
+    // client asked for a list of projects and got 405 because only POST was mapped, and asked for
+    // the shift templates and got 404. Every verifier asserted the client functions were declared;
+    // none asked whether the routes they call are there.
+    public async Task<IReadOnlyList<SchedulingProjectResponse>> GetSchedulingProjectsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            "select id,client_id,code,name,effective_from,effective_to,status from service_projects where status='ACTIVO' order by name", connection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var projects = new List<SchedulingProjectResponse>();
+        while (await reader.ReadAsync(cancellationToken))
+            projects.Add(new SchedulingProjectResponse(reader.GetInt64(0), reader.GetInt64(1), reader.GetString(2), reader.GetString(3),
+                reader.GetFieldValue<DateOnly>(4).ToString("yyyy-MM-dd"),
+                reader.IsDBNull(5) ? null : reader.GetFieldValue<DateOnly>(5).ToString("yyyy-MM-dd"), reader.GetString(6)));
+        return projects;
+    }
+
+    public async Task<IReadOnlyList<ShiftTemplateResponse>> GetShiftTemplatesAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(@"select t.id,t.code,t.name,t.version,t.mandatory_by_default,t.status,
+coalesce(s.step_order,0),coalesce(s.shift_code,'')
+from shift_templates t left join shift_template_steps s on s.template_id=t.id
+where t.status='ACTIVO' order by t.code,s.step_order", connection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var templates = new Dictionary<long, (ShiftTemplateResponse Template, List<ShiftTemplateStepResponse> Steps)>();
+        var order = new List<long>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var id = reader.GetInt64(0);
+            if (!templates.ContainsKey(id))
+            {
+                order.Add(id);
+                templates[id] = (new ShiftTemplateResponse(id, reader.GetString(1), reader.GetString(2), reader.GetInt32(3),
+                    reader.GetBoolean(4), reader.GetString(5), Array.Empty<ShiftTemplateStepResponse>()),
+                    new List<ShiftTemplateStepResponse>());
+            }
+
+            var stepOrder = reader.GetInt32(6);
+            var shiftCode = reader.GetString(7).Trim();
+            if (stepOrder > 0 && shiftCode.Length > 0)
+                templates[id].Steps.Add(new ShiftTemplateStepResponse(stepOrder, shiftCode));
+        }
+
+        return order.Select(id => templates[id].Template with { Steps = templates[id].Steps }).ToArray();
+    }
+
     public async Task<SchedulingProjectResponse?> GetSchedulingProjectAsync(long id, CancellationToken cancellationToken = default)
     {
         await using var connection = new NpgsqlConnection(_connectionString);

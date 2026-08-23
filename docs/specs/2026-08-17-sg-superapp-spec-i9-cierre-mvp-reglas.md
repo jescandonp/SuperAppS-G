@@ -315,3 +315,18 @@ cuando las areas entreguen ajustes durante las pruebas.
 
 La implementacion solo comienza despues de la aprobacion explicita de esta SPEC
 y del plan tecnico asociado.
+
+## Resultados reales de la implementacion
+
+Ejecutado el 2026-08-23 sobre la rama `codex/i9-scheduling-gate0`. La evidencia por verificador,
+las decisiones de diseno que sostienen el MVP y los puntos abiertos estan en
+[`docs/reports/2026-08-17-sg-superapp-i9-mvp-closure.md`](../reports/2026-08-17-sg-superapp-i9-mvp-closure.md).
+
+La puerta global `Verify-SgSuperAppI9MvpRules.ps1` reporta `I9 MVP RULES PASS`, y la suite hermetica
+`Verify-SgSuperAppI9MvpIntegration.ps1` reporta `I9 MVP INTEGRATION PASS 34` cubriendo las siete
+reglas evaluadas por HTTP, el rechazo de `PRODUCTION`, la doble ejecucion, la precedencia y la
+invalidacion por edicion.
+
+Esta SPEC sigue describiendo un alcance `SIMULATED` / `MVP_TEST`. El cierre del MVP no se declara
+aqui: depende de la autorizacion explicita del usuario y de los puntos abiertos del reporte de
+cierre.

@@ -85,3 +85,13 @@ piloto, pero no cierran Task 13 ni Gate 5. Aun se requiere:
    declararlas ejecutables.
 
 Este documento no autoriza reglas incompletas ni publicacion productiva.
+
+## Actualizacion 2026-08-23 — MVP de reglas versionadas
+
+Las siete reglas R01 a R07 ya se evaluan y persisten con perfil versionado, `scopeHash` e
+invalidacion derivada, en alcance `SIMULATED` / `MVP_TEST`. Los resultados observados estan en
+[`2026-08-17-sg-superapp-i9-mvp-closure.md`](2026-08-17-sg-superapp-i9-mvp-closure.md).
+
+Lo que este documento decia sigue vigente en lo esencial: no autoriza reglas incompletas ni
+publicacion productiva. Un perfil simulado se rechaza en produccion con HTTP 409 y sin persistir
+nada, lo cual quedo verificado en ejecucion.

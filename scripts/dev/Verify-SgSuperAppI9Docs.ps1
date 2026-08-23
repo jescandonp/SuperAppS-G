@@ -1149,6 +1149,32 @@ if (Test-Path -LiteralPath $validationActFullPath -PathType Leaf) {
     }
 }
 
+# --- MVP closure evidence ------------------------------------------------------------------------
+# The closure report must keep saying what is not done. A report that lost its open points, or that
+# declared the MVP closed on its own, would be the document quietly outrunning the work.
+$closurePath = Join-Path $repoRoot 'docs/reports/2026-08-17-sg-superapp-i9-mvp-closure.md'
+if (-not (Test-Path -LiteralPath $closurePath)) {
+    $failures.Add('docs/reports/2026-08-17-sg-superapp-i9-mvp-closure.md is missing')
+} else {
+    $closure = Get-Content -LiteralPath $closurePath -Raw
+    foreach ($required in @(
+        @{ Label = 'states it does not close the MVP'; Pattern = 'Este documento no cierra el MVP' },
+        @{ Label = 'keeps the open points'; Pattern = '(?s)## 4\. Puntos abiertos' },
+        @{ Label = 'leaves closure to the user'; Pattern = 'autorizaci(o|ó)n expl(i|í)cita del usuario' },
+        @{ Label = 'keeps the simulated scope explicit'; Pattern = 'SIMULATED.*MVP_TEST' },
+        @{ Label = 'states the production limit'; Pattern = 'no afirma pol(i|í)tica institucional ni opera en producci(o|ó)n' },
+        @{ Label = 'records the executed verifiers'; Pattern = 'I9 MVP RULES PASS' },
+        @{ Label = 'marks the review debt'; Pattern = 'sin revisi(o|ó)n independiente' })) {
+        if ($closure -notmatch $required.Pattern) {
+            $failures.Add("MVP closure report no longer $($required.Label)")
+        }
+    }
+    # The gate row for the user's authorisation may not be ticked by a document.
+    if ($closure -match '(?m)^\|\s*El usuario autoriza expl(i|í)citamente el cierre\s*\|\s*S(i|í)') {
+        $failures.Add('MVP closure report marks the user authorisation as granted; only the user can do that')
+    }
+}
+
 if ($failures.Count -gt 0) {
     Write-Host 'I9 DOCS FAIL'
     $failures | ForEach-Object { Write-Host " - $_" }

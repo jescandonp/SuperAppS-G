@@ -524,3 +524,13 @@ desactivada o en modo advertencia hasta resolver la armonizacion entre el
 articulo 7 de la Ley 1920 de 2018 y el articulo 167A del Codigo Sustantivo del
 Trabajo modificado por la Ley 2466 de 2025. La marca I9 de existencia del acuerdo
 no sustituye el escrito ni las firmas requeridas legalmente.
+
+## Registro de ejecucion — MVP de reglas versionadas (2026-08-23)
+
+El cierre de brechas R01 a R07 se ejecuto segun
+`docs/superpowers/plans/2026-08-17-sg-i9-cierre-mvp-reglas-plan.md`, tareas 18 a 28. La evidencia
+observada, las decisiones de diseno y los puntos abiertos estan en
+[`docs/reports/2026-08-17-sg-superapp-i9-mvp-closure.md`](../reports/2026-08-17-sg-superapp-i9-mvp-closure.md).
+
+La advertencia de este plan sobre la armonizacion normativa no cambia: la regla afectada permanece
+en el perfil simulado y ninguna decision de este MVP afirma politica institucional.

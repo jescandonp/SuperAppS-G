@@ -15,6 +15,7 @@ interface Props {
   revalidation: SchedulingRuleRevalidationState;
   gateProblem: SchedulingRuleProblem | null;
   onOpenExceptions: () => void;
+  onReload: () => void;
 }
 
 // The remedy differs per outcome, so each one says what to do rather than leaving the reader to
@@ -65,10 +66,13 @@ function RuleRow({ evaluation, onOpenExceptions }: { evaluation: SchedulingRuleE
   );
 }
 
-export function RuleEvaluationPanel({ profile, evaluation, revalidation, gateProblem, onOpenExceptions }: Props) {
+export function RuleEvaluationPanel({ profile, evaluation, revalidation, gateProblem, onOpenExceptions, onReload }: Props) {
   // Rendered in every state, including while loading and after a failure: the reader must never be
-  // left looking at this screen without knowing the data behind it is a simulated MVP scenario.
-  const simulatedBadge = <span className="schedule-badge is-simulated">DATOS SIMULADOS - MVP</span>;
+  // left looking at this screen without being told what the data behind it is. It does not overclaim
+  // either - until a profile has said the origin is simulated, it says the origin is unconfirmed,
+  // which is the same standard the module applies to every other unknown.
+  const confirmedSimulated = profile.status === "READY" && profile.profile.simulated;
+  const simulatedBadge = <span className="schedule-badge is-simulated">{confirmedSimulated ? "DATOS SIMULADOS - MVP" : "ORIGEN DE REGLAS SIN CONFIRMAR"}</span>;
   const unexpectedOrigin = profile.status === "READY" && !profile.profile.simulated;
 
   return (
@@ -78,7 +82,13 @@ export function RuleEvaluationPanel({ profile, evaluation, revalidation, gatePro
           <p className="eyebrow">Reglas versionadas</p>
           <h2 id="rules-title">Evaluación de reglas</h2>
         </div>
-        {simulatedBadge}
+        <div className="rule-heading-actions">
+          {simulatedBadge}
+          {/* The verdicts are persisted, so they can change without this screen doing anything -
+              somebody else re-evaluates, or a decision is approved. Reading them again must not
+              require regenerating the proposal, which would create a new version. */}
+          <button type="button" className="rule-link" onClick={onReload}>Actualizar evaluaciones</button>
+        </div>
       </div>
 
       {unexpectedOrigin && (

@@ -73,6 +73,10 @@ public static class PortalEndpoints
             }
         });
 
+        app.MapGet("/api/portal/scheduling/projects", async (PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken ct) =>
+        {var denied=await authorization.RequireAsync("SCHEDULING","VIEW",ct);if(denied is not null)return denied;return Results.Ok(await repository.GetSchedulingProjectsAsync(ct));});
+        app.MapGet("/api/portal/scheduling/shift-templates", async (PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken ct) =>
+        {var denied=await authorization.RequireAsync("SCHEDULING","VIEW",ct);if(denied is not null)return denied;return Results.Ok(await repository.GetShiftTemplatesAsync(ct));});
         app.MapGet("/api/portal/scheduling/capabilities", async (PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken ct) =>
         {
             if (userContext.User is null) return Results.Unauthorized();

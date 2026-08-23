@@ -38,9 +38,15 @@ Q ($panel.Length -gt 0 -and $page.Length -gt 0) 'UI-T01 the rule panel and the s
 # Not a conditional: a reader must never be looking at this screen without knowing the data behind
 # it is a simulated MVP scenario, least of all while it is loading or after it failed.
 Q ($panel -match 'DATOS SIMULADOS - MVP') 'UI-T02 the panel carries the simulated label'
-$badgeLine = ([regex]::Match($panel, '(?m)^.*DATOS SIMULADOS - MVP.*$')).Value
-Q ($badgeLine -notmatch '\?' -and $badgeLine -notmatch '&&') 'UI-T02 the simulated label is not rendered conditionally'
-Q ($panel -match 'const simulatedBadge') 'UI-T02 the label is defined once and reused across states'
+Q ($panel -match 'ORIGEN DE REGLAS SIN CONFIRMAR') 'UI-T02 the panel says so when the origin is not yet confirmed'
+# Two different things, and only one of them may vary. The badge ELEMENT is rendered unconditionally,
+# so it can never disappear while loading or after a failure - that is what the criterion protects.
+# Its TEXT does vary, because claiming the data is simulated before a profile has said so would be
+# the same overclaim the module refuses everywhere else. The element is built outside the JSX and
+# placed with a bare {simulatedBadge}, so a conditional around it would fail this.
+Q ($panel -match 'const simulatedBadge = <span') 'UI-T02 the badge element is built unconditionally'
+Q ($panel -match '(?m)^\s*\{simulatedBadge\}\s*$') 'UI-T02 the badge is placed without a condition around it'
+Q ($panel -match 'confirmedSimulated \? "DATOS SIMULADOS - MVP" : "ORIGEN DE REGLAS SIN CONFIRMAR"') 'UI-T02 only the wording follows what the profile confirmed'
 Q ($styles -match '\.schedule-badge\.is-simulated') 'UI-T02 the simulated badge is styled distinctly'
 
 # The marker is on the page itself, not only inside the panel: a reader on the Matriz tab is looking
@@ -102,6 +108,20 @@ Q (([regex]::Matches($panel, 'aria-live=|role="status"')).Count -ge 3) 'UI-T09 t
 Q ($panel -match 'role="alert"') 'UI-T09 failures are announced as alerts'
 Q ($styles -match '\.rule-link:focus-visible') 'UI-T09 the panel action is reachable and visible by keyboard'
 
+# --- the gaps the real walkthrough exposed ------------------------------------------------------
+# A profile is scoped to a project AND a period, so the panel described the wrong period until the
+# period change reloaded it. Verdicts are persisted and can change without this screen acting, so
+# reading them again must not require regenerating the proposal - that would create a new version.
+Q ($page -match 'function reloadProfileFor') 'UI-T11 changing the period reloads the governing profile'
+Q ($page -match 'reloadProfileFor\(event\.target\.value\)') 'UI-T11 the period input triggers the reload'
+Q ($panel -match 'Actualizar evaluaciones') 'UI-T11 the verdicts can be re-read on demand'
+Q ($page -match 'onReload=\{\(\) => \{ if \(proposal\) void loadRuleState') 'UI-T11 the refresh reads the same version, it does not regenerate'
+# The page overflowed sideways from 961px up: grid and flex children default to min-width auto, so
+# their intrinsic width beat the track and the whole document scrolled instead of the matrix.
+Q ($styles -match '(?s)\.shell > \*,\s*\.content > \* \{\s*min-width: 0;') 'UI-T12 the shell columns can shrink below their content'
+Q ($styles -match '(?s)\.scheduling-workspace > \* \{\s*min-width: 0;') 'UI-T12 the workspace sections can shrink below their content'
+Q ($styles -match '\.scheduling-table-scroll \{ max-width: 100%; overflow-x: auto;') 'UI-T12 wide content scrolls inside the matrix, not the page'
+
 # --- the page compiles ---------------------------------------------------------------------------
 if (-not (Test-Path -LiteralPath $node -PathType Leaf) -or -not (Test-Path -LiteralPath $tsc -PathType Leaf)) {
     $failures.Add('UI-T10 BLOCKED: the web toolchain is not installed; run npm install in apps/sg-superapp-web')
@@ -118,8 +138,8 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 
-if ($passed -ne 43) {
-    Write-Output "I9 MVP UI FAIL: expected 43 assertions, ran $passed"
+if ($passed -ne 52) {
+    Write-Output "I9 MVP UI FAIL: expected 52 assertions, ran $passed"
     exit 1
 }
 
