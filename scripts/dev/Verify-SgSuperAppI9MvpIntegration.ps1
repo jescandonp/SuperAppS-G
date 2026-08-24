@@ -185,7 +185,7 @@ INSERT INTO schedule_assignments(schedule_version_id,required_shift_id,employee_
     }
     Q ($batch.simulated -eq $true) 'MI-T02 the batch is marked SIMULATED'
     Q ($batch.profileVersion -gt 0) 'MI-T02 the batch declares the profile version it came from'
-    Q (@($batch.evaluations | Where-Object { $_.scopeHash -notmatch '^[0-9a-f]{64}$' }).Count -eq 0) 'MI-T02 every verdict carries a well formed scope'
+    Q (@($batch.evaluations | Where-Object { $_.scopeHash -cnotmatch '^[0-9a-f]{64}\z' }).Count -eq 0) 'MI-T02 every verdict carries a well formed scope'
     Q ([int](Scalar "select count(*) from scheduling_rule_evaluations where schedule_version_id=$evaluatedVersion") -eq 7) 'MI-T02 the seven verdicts are persisted'
     # Counting rows let every rule silently degrade to its unavailable-evaluator fallback while the
     # suite still read as covering seven rules. Under fail-closed that is the one state to shout

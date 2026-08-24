@@ -1186,11 +1186,20 @@ if (-not (Test-Path -LiteralPath $closurePath)) {
     # green because eight minus two is still above seven. Points can be dropped without being
     # resolved under a floor. The number is now pinned, so resolving one is a change to the report
     # AND to this line, deliberately, and both show up in the same diff.
-    $expectedOpenItems = 10
+    $expectedOpenItems = 11
     $openSection = [regex]::Match($closure, '(?s)## 4\. Puntos abiertos.*?(?=\n## )')
     $openItems = if ($openSection.Success) { ([regex]::Matches($openSection.Value, '(?m)^\d+\.\s')).Count } else { 0 }
     if ($openItems -ne $expectedOpenItems) {
         $failures.Add("MVP closure report lists $openItems open points; this gate is pinned to $expectedOpenItems. Resolving or adding one means changing both.")
+    }
+    # Pinning the count stops points being deleted, not gutted. A review replaced point 9 with
+    # "9. Nada." and this stayed green, which is the same evasion the floor allowed one level down.
+    # Every real point here runs to several lines; a stub does not.
+    $stubs = @([regex]::Matches($openSection.Value, '(?ms)^(?<n>\d+)\.\s(?<body>.*?)(?=^\d+\.\s|\z)') |
+        Where-Object { $_.Groups['body'].Value.Trim().Length -lt 120 } |
+        ForEach-Object { $_.Groups['n'].Value })
+    if ($stubs.Count -gt 0) {
+        $failures.Add("MVP closure report has open points reduced to a stub: $($stubs -join ', '). A point is resolved by removing it and the pin, not by emptying it.")
     }
 
     # A document may not declare the closure it exists to withhold.

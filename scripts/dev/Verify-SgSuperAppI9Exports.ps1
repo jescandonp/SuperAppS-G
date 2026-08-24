@@ -36,7 +36,7 @@ try {
     foreach ($label in @('Cliente:','Proyecto:','Periodo:','Version:','PUBLICADA','Responsable: operaciones.sg')) { if ($sheetXml -notmatch [regex]::Escape($label)) { throw "XLSX missing $label" } }
 } finally { $zip.Dispose() }
 if (-not [string]::IsNullOrWhiteSpace($VerificationSchema)) {
-    if ($VerificationSchema -notmatch '^sg_i9_export_[0-9]+_[0-9]{17}$') { throw 'Unsafe verification schema.' }
+    if ($VerificationSchema -cnotmatch '^sg_i9_export_[0-9]+_[0-9]{17}\z') { throw 'Unsafe verification schema.' }
     $oldPassword=$env:PGPASSWORD; $oldOptions=$env:PGOPTIONS
     try {
         $env:PGPASSWORD=$AppPassword; $env:PGOPTIONS="-c search_path=$VerificationSchema,public"

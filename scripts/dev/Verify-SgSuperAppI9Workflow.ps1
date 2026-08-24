@@ -14,7 +14,7 @@ $h=Login "operaciones.sg" "Operaciones123"
 $p1=Call Post "$ApiBaseUrl/portal/scheduling/projects/$ProjectId/proposals" $h @{periodStart=$PeriodStart;periodEnd=$PeriodEnd;acceptedVacancy=$true}
 if($p1.Status-eq 404){throw "I9 workflow endpoint is missing (HTTP 404)."};if($p1.Status-ne 201-or$p1.Body.status-ne"PROPUESTA"-or-not$p1.Body.acceptedVacancy){throw "Proposal/vacancy snapshot failed."}
 if(-not[string]::IsNullOrWhiteSpace($VerificationSchema)){
-  if($VerificationSchema-notmatch'^sg_i9_workflow_[0-9]+_[0-9]{17}$'){throw "Unsafe verification schema."}
+  if($VerificationSchema-cnotmatch '^sg_i9_workflow_[0-9]+_[0-9]{17}\z'){throw "Unsafe verification schema."}
   $oldPassword=$env:PGPASSWORD;$oldOptions=$env:PGOPTIONS
   try{$env:PGPASSWORD=$AppPassword;$env:PGOPTIONS="-c search_path=$VerificationSchema,public";$psql='C:\Program Files\PostgreSQL\18\bin\psql.exe'
     $assignment=& $psql -X -q -t -A -h localhost -p 5432 -U sg_app -d $Database -c "with p as (insert into service_positions(code,name,project_id) values('WF-POS','Workflow Position',$ProjectId) returning id),r as (insert into required_shifts(schedule_version_id,position_id,shift_date,starts_at,ends_at) select $($p1.Body.versionId),id,'2026-09-01','06:00','18:00' from p returning id) insert into schedule_assignments(schedule_version_id,required_shift_id,status,reasons) select $($p1.Body.versionId),id,'VACANTE','[]' from r returning id";if($LASTEXITCODE-ne 0){throw "Could not prepare assignment fixture."}

@@ -66,7 +66,7 @@ $second = Invoke-Recommendation
 if ($second.Status -ne 200 -or $first.Json -cne $second.Json) { throw "Identical runs must return deterministic JSON." }
 
 if ($ScheduleVersionId.HasValue) {
-    if ([string]::IsNullOrWhiteSpace($VerificationSchema) -or $VerificationSchema -notmatch '^sg_i9_recommend_[0-9]+_[0-9]{17}$') {
+    if ([string]::IsNullOrWhiteSpace($VerificationSchema) -or $VerificationSchema -cnotmatch '^sg_i9_recommend_[0-9]+_[0-9]{17}\z') {
         throw "A safe verification schema is required for persistence assertions."
     }
     if ($null -eq $first.Body.runId -or $first.Body.runId -ne $second.Body.runId) { throw "Idempotent retry did not return the existing run." }

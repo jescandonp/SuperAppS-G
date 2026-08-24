@@ -19,7 +19,7 @@ $previousOptions = $env:PGOPTIONS
 $apiUri = [Uri]$ApiBaseUrl
 $listenUrl = "{0}://{1}:{2}" -f $apiUri.Scheme, $apiUri.Host, $apiUri.Port
 
-if ($schema -notmatch '^sg_i9_close_[0-9]+_[0-9]{17}$') { throw "Unsafe integration schema." }
+if ($schema -cnotmatch '^sg_i9_close_[0-9]+_[0-9]{17}\z') { throw "Unsafe integration schema." }
 if (-not (Test-Path -LiteralPath $psql)) { throw "psql not found." }
 if (-not (Test-Path -LiteralPath $dotnet)) { throw "dotnet runtime not found." }
 if ($apiUri.Host -notin @("localhost", "127.0.0.1")) { throw "Integration API must use a local host." }

@@ -103,7 +103,7 @@ $env:PGOPTIONS = $null
 # nombre con punto y coma, comillas o espacios.
 # -cnotmatch y no -notmatch: los operadores de comparacion de PowerShell ignoran mayusculas por
 # defecto, de modo que 'SG_I9_PRUEBAS' pasaba la validacion y en SQL plegaba sobre el esquema real.
-if ($Esquema -cnotmatch '^sg_i9_[a-z0-9_]+$') {
+if ($Esquema -cnotmatch '^sg_i9_[a-z0-9_]+\z') {
     Mal "El esquema '$Esquema' no es un esquema de pruebas valido."
     Mal '   Debe empezar por sg_i9_ y llevar solo minusculas, digitos o guion bajo.'
     Write-Host ''
@@ -132,7 +132,17 @@ if ($Reset -and $existe -eq 't') {
 $sello = 'entorno de pruebas I9 sembrado por completo'
 $completo = $false
 if ($existe -eq 't') {
-    $completo = (SqlValor "select coalesce(obj_description(to_regnamespace('$Esquema'),'pg_namespace'),'')") -eq $sello
+    # La consulta devuelve siempre algo cuando la base responde, de modo que una respuesta vacia
+    # significa que no se pudo preguntar y no que falte el sello. Sin esta distincion, un hipido de
+    # PostgreSQL declaraba incompleto un esquema sano y mandaba al usuario a -Reset, que lo destruye.
+    $marca = SqlValor "select coalesce(obj_description(to_regnamespace('$Esquema'),'pg_namespace'),'(sin sello)')"
+    if ([string]::IsNullOrWhiteSpace($marca)) {
+        Mal 'No fue posible comprobar el estado del esquema. Revise que PostgreSQL siga arriba.'
+        Write-Host ''
+        Read-Host '  Pulse Enter para cerrar'
+        exit 2
+    }
+    $completo = $marca -eq $sello
     if (-not $completo) {
         # Rehacerlo aqui por iniciativa propia destruiria lo que el usuario tuviera dentro, que es
         # justo el dano que este bloque existe para evitar. Se rehusa arrancar y se le deja la

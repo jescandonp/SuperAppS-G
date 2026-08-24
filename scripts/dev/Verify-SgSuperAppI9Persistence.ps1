@@ -19,12 +19,12 @@ $originalPassword = $env:PGPASSWORD
 $originalPgOptions = $env:PGOPTIONS
 
 if (-not (Test-Path $psqlExe)) { throw "psql not found: $psqlExe" }
-if ($schemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}$') { throw "Unsafe verification schema name." }
-if ($partialSchemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_partial$') { throw "Unsafe partial verification schema name." }
-if ($constraintSchemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_constraint$') { throw "Unsafe constraint verification schema name." }
-if ($incompatibleSchemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_incompatible$') { throw "Unsafe incompatible verification schema name." }
-if ($sequenceSchemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_sequence$') { throw "Unsafe sequence verification schema name." }
-if ($typeErrorSchemaName -notmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_type_error$') { throw "Unsafe type-error verification schema name." }
+if ($schemaName -cnotmatch '^sg_i9_verify_[0-9]+_[0-9]{17}\z') { throw "Unsafe verification schema name." }
+if ($partialSchemaName -cnotmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_partial\z') { throw "Unsafe partial verification schema name." }
+if ($constraintSchemaName -cnotmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_constraint\z') { throw "Unsafe constraint verification schema name." }
+if ($incompatibleSchemaName -cnotmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_incompatible\z') { throw "Unsafe incompatible verification schema name." }
+if ($sequenceSchemaName -cnotmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_sequence\z') { throw "Unsafe sequence verification schema name." }
+if ($typeErrorSchemaName -cnotmatch '^sg_i9_verify_[0-9]+_[0-9]{17}_type_error\z') { throw "Unsafe type-error verification schema name." }
 
 function Invoke-PsqlFile([string]$Path) {
     & $psqlExe -X -q -h $HostName -p $Port -U $AppUser -d $Database -f $Path

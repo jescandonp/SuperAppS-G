@@ -103,6 +103,16 @@ Q ($page -notmatch 'actionState\([^)]*(&&|\|\||\?[^.])') 'UI-T05 nothing is comb
 # nothing about SchedulingRuleSeverity, whose BLOCKING value is a decision route of its own - which
 # is precisely the value the surviving mutant used.
 Q ($page -notmatch 'COMPLIANT|BLOCKED|EXCEPTION_REQUIRED|NOT_APPLICABLE|WARNING|BLOCKING') 'UI-T05 the page never names a rule outcome or a blocking severity'
+# Pinning the call sites was still not enough. A third review defeated this gate again without
+# touching them: rename the state to grantedCapabilities and derive a local `capabilities` above,
+# folding the rule check into that. Both call sites stay byte-identical, && lives outside the
+# parentheses so [^)]* never reaches it, and exceptionAllowed is not one of the named outcomes.
+# Chasing the variant is how this gate has been beaten three times, so these close the class: the
+# permissions the buttons read must be the ones the server sent, unshadowed, and the page cannot
+# build a gate out of verdicts it never reads.
+Q ($page -match 'const \[capabilities, setCapabilities\] = useState\(emptyCapabilities\)') 'UI-T05 the buttons read the capabilities the server sent'
+Q ($page -notmatch 'const capabilities\s*=') 'UI-T05 the granted capabilities are never shadowed by a derived copy'
+Q ($page -notmatch 'ruleEvaluation\.') 'UI-T05 the page never reads into the verdicts it renders'
 Q ($page -match 'setGateProblem\(toProblem\(caught\)\)') 'UI-T05 a refusal is taken from the server, not predicted'
 Q (([regex]::Matches($page, 'setGateProblem\(toProblem\(caught\)\)')).Count -eq 2) 'UI-T05 both approve and publish surrender the decision to the server'
 
@@ -169,8 +179,8 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 
-if ($passed -ne 63) {
-    Write-Output "I9 MVP UI FAIL: expected 63 assertions, ran $passed"
+if ($passed -ne 66) {
+    Write-Output "I9 MVP UI FAIL: expected 66 assertions, ran $passed"
     exit 1
 }
 

@@ -696,7 +696,7 @@ $focused = @(
     @{ R='MVP workflow verifier'; P='scripts/dev/Verify-SgSuperAppI9MvpWorkflow.ps1'; Pass='I9 MVP WORKFLOW PASS 65' },
     # Type-checks the client against the API vocabulary, including a probe that must fail to compile.
     @{ R='MVP frontend API verifier'; P='scripts/dev/Verify-SgSuperAppI9MvpFrontendApi.ps1'; Pass='I9 MVP FRONTEND API PASS 51' },
-    @{ R='MVP UI verifier'; P='scripts/dev/Verify-SgSuperAppI9MvpUi.ps1'; Pass='I9 MVP UI PASS 63' },
+    @{ R='MVP UI verifier'; P='scripts/dev/Verify-SgSuperAppI9MvpUi.ps1'; Pass='I9 MVP UI PASS 66' },
     # The only runtime coverage of POST /rules/evaluate: every other fixture is seeded with psql.
     @{ R='MVP integration suite'; P='scripts/dev/Verify-SgSuperAppI9MvpIntegration.ps1'; Pass='I9 MVP INTEGRATION PASS 44' }
 )
