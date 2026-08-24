@@ -91,7 +91,18 @@ Q ($actionBlock -notmatch 'BLOCKED|EXCEPTION_REQUIRED|WARNING|evaluations') 'UI-
 # and the page must not mention a rule outcome anywhere - the outcomes belong to the panel.
 Q ($page -match 'disabled=\{approveAction\.disabled\}') 'UI-T05 the approve button is disabled only by actionState'
 Q ($page -match 'disabled=\{publishAction\.disabled\}') 'UI-T05 the publish button is disabled only by actionState'
-Q ($page -notmatch 'BLOCKED|EXCEPTION_REQUIRED|NOT_APPLICABLE') 'UI-T05 the page never names a rule outcome'
+# Guarding the prop was not enough either. A reviewer combined the rule check into the ARGUMENT -
+# actionState(capabilities.approve && !ruleGate, ...) - and every assertion above stayed green: the
+# prop is still literal, and actionState's body is still clean, because the decision now happens
+# before the call. So the two call sites are pinned verbatim, and no actionState call may carry a
+# logical operator. Note proposal?.status is optional chaining, not a ternary, hence \?[^.].
+Q ($page -match 'actionState\(capabilities\.approve, "PROPUESTA", proposal\?\.status, busy\)') 'UI-T05 approve reads its permission with nothing combined into it'
+Q ($page -match 'actionState\(capabilities\.publish, "APROBADA", proposal\?\.status, busy\)') 'UI-T05 publish reads its permission with nothing combined into it'
+Q ($page -notmatch 'actionState\([^)]*(&&|\|\||\?[^.])') 'UI-T05 nothing is combined into an actionState argument'
+# The previous list named three of the five outcomes. It omitted WARNING and COMPLIANT, and said
+# nothing about SchedulingRuleSeverity, whose BLOCKING value is a decision route of its own - which
+# is precisely the value the surviving mutant used.
+Q ($page -notmatch 'COMPLIANT|BLOCKED|EXCEPTION_REQUIRED|NOT_APPLICABLE|WARNING|BLOCKING') 'UI-T05 the page never names a rule outcome or a blocking severity'
 Q ($page -match 'setGateProblem\(toProblem\(caught\)\)') 'UI-T05 a refusal is taken from the server, not predicted'
 Q (([regex]::Matches($page, 'setGateProblem\(toProblem\(caught\)\)')).Count -eq 2) 'UI-T05 both approve and publish surrender the decision to the server'
 
@@ -158,8 +169,8 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 
-if ($passed -ne 60) {
-    Write-Output "I9 MVP UI FAIL: expected 60 assertions, ran $passed"
+if ($passed -ne 63) {
+    Write-Output "I9 MVP UI FAIL: expected 63 assertions, ran $passed"
     exit 1
 }
 

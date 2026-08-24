@@ -65,15 +65,19 @@ pantalla: la respuesta `RULE_BLOCKED` se renderizó con su título y su código.
 
 ## 4. Puntos abiertos — el cierre no procede mientras sigan aquí
 
-Ocho puntos. Todos verificados contra el código de `75969a5` el 2026-08-23. La numeración anterior
-llegaba a nueve porque el modo demostrativo aparecía dos veces; ahora es un solo punto, el 4.
+Diez puntos. Los ocho anteriores se verificaron contra el código de `75969a5`; el 9 y el 10 los
+encontró la revisión independiente de `f46855d` y quedaron sin resolver. Antes fueron nueve porque el
+modo demostrativo se contaba dos veces; hoy es un solo punto, el 4.
 
-1. **Dos commits sin revisión independiente registrada**: `f46855d` y `96abfb6`. Los tres que antes
-   figuraban aquí —`8363a4b`, `f9dea34`, `3699dac`— y los de Task 27 **sí** fueron revisados: sus
-   hallazgos se cerraron en `f46855d`, que además añadió a esta lista los puntos 6 y 7 de entonces.
-   Lo que queda sin revisión registrada es el propio `f46855d` y el lanzador `96abfb6`. Las
-   revisiones ejecutadas en esta rama encontraron un fallo abierto real cada una, en código que se
-   leía correctamente.
+1. **La revisión se hizo; queda sin revisar el commit que la cierra.** `f46855d` y `96abfb6` ya
+   fueron revisados de forma independiente, con prueba de mutación. Encontraron cinco cosas: la
+   puerta UI-T05 seguía siendo derrotable combinando la decisión dentro del argumento de
+   `actionState`; el defecto de exportación que ese commit corrigió no tenía ninguna aserción que
+   lo defendiera; el guardián de puntos abiertos era un piso de siete y no un conteo; el lanzador
+   no validaba el nombre del esquema y podía ejecutar SQL arbitrario; y daba por bueno un esquema
+   a medio construir, con lo que la aplicación caía sobre las tablas reales. Las cinco están
+   cerradas y probadas por mutación. Lo que queda sin revisión independiente es el commit que las
+   cierra, y los puntos 9 y 10, que la misma revisión encontró y que no se resolvieron.
 2. **Los veredictos se calculan sobre hechos que aporta el cliente.** `SchedulingRuleEvaluator`
    recibe `JsonElement facts`; los valida y los sanea, pero no los reconcilia contra las filas
    persistidas de asignación, turno o empleado. Es previo a este MVP; la exigencia de edición lo
@@ -104,6 +108,15 @@ llegaba a nueve porque el modo demostrativo aparecía dos veces; ahora es un sol
    `Verify-SgSuperAppI9MvpWorkflow.ps1` lo invoca sin ese parámetro, así que ni el fixture de
    notificaciones ni su aserción de deduplicación —el conteo `4|4|4`— llegan a ejecutarse. El arnés
    lo declara en un comentario junto a la llamada.
+9. **FE-T06 comprueba el texto del filtro, no el perfil que gobierna.** Un mutante que conserva el
+   literal `filter((item) => item.status === "ACTIVE")` y `active.length === 1`, pero pasa a la
+   pantalla el primer elemento de la lista **sin** filtrar, deja `I9 MVP FRONTEND API PASS` en
+   verde. Es decir: un perfil `DRAFT` puede gobernar la pantalla con la puerta abierta. El código
+   entregado es correcto; lo que falta es la aserción que lo mantenga así.
+10. **MI-T02 cubre tres de las siete reglas.** La aserción de que ninguna regla degradó a su
+    evaluador no disponible se apoya en el sufijo `EVALUATOR_UNAVAILABLE`, que solo existe en
+    `I9_OVERLAP_TRAVEL_`, `I9_TEMPLATE_DEVIATION_` e `I9_NOVELTY_REQUIREMENT_`. Si otra regla
+    degradara con otro código, la suite no lo vería.
 
 ## 5. Gate final del plan
 
@@ -117,7 +130,7 @@ llegaba a nueve porque el modo demostrativo aparecía dos veces; ahora es un sol
 | Perfil simulado se rechaza en producción | Sí — `PRODUCTION` responde 409 y no persiste |
 | El usuario autoriza explícitamente el cierre | **Pendiente** |
 
-**Propuesta:** cerrar la revisión del punto 4.1 antes de proponer el cierre. Los puntos 4.2 a 4.8
+**Propuesta:** cerrar la revisión del punto 4.1 antes de proponer el cierre. Los puntos 4.2 a 4.10
 quedan como limitaciones declaradas del alcance MVP, no como defectos ocultos, y corresponde al
 usuario decidir si alguno debe resolverse antes de dar por cerrado el MVP. De cara al ciclo de
 pruebas funcionales, los que se notan en pantalla son el 4 y el 5.

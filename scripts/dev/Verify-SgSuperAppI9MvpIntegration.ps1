@@ -108,6 +108,24 @@ INSERT INTO required_shifts(schedule_version_id,position_id,shift_date,starts_at
 INSERT INTO schedule_assignments(schedule_version_id,required_shift_id,employee_id,status)
  SELECT r.schedule_version_id,r.id,e.id,'ASIGNADA' FROM required_shifts r
  CROSS JOIN employees e WHERE e.identification_number='I9-INT-1';
+-- Una tercera version que la base permite y que el fixture nunca habia producido: perfil versionado
+-- SIN marca de simulado. Es la forma exacta sobre la que el encabezado de exportacion mentia, y su
+-- ausencia dejaba el arreglo sin nada que lo defendiera.
+INSERT INTO schedules(project_id,period_start,period_end,created_by)
+ SELECT id,date '2026-08-23',date '2026-08-23','operaciones.sg' FROM service_projects WHERE code='PROJECT-A';
+INSERT INTO schedule_versions(schedule_id,version_number,status,created_by,simulated,rule_profile_id,rule_profile_version)
+ SELECT s.id,1,'PROPUESTA','operaciones.sg',FALSE,p.id,p.version FROM schedules s
+ CROSS JOIN scheduling_rule_profiles p
+ WHERE s.period_start=date '2026-08-23' AND p.profile_code='I9-MVP-SIMULATED' AND p.status='ACTIVE';
+INSERT INTO required_shifts(schedule_version_id,position_id,shift_date,starts_at,ends_at)
+ SELECT sv.id,sp.id,s.period_start,time '08:00',time '20:00'
+ FROM schedule_versions sv JOIN schedules s ON s.id=sv.schedule_id
+ CROSS JOIN service_positions sp WHERE s.period_start=date '2026-08-23' AND sp.code='I9-INT-POSITION';
+INSERT INTO schedule_assignments(schedule_version_id,required_shift_id,employee_id,status)
+ SELECT r.schedule_version_id,r.id,e.id,'ASIGNADA' FROM required_shifts r
+ JOIN schedule_versions sv ON sv.id=r.schedule_version_id
+ JOIN schedules s ON s.id=sv.schedule_id
+ CROSS JOIN employees e WHERE s.period_start=date '2026-08-23' AND e.identification_number='I9-INT-1';
 '@
     Set-Content -LiteralPath $fixtureFile -Value $fixture -Encoding UTF8
     & $psql -X -w -v ON_ERROR_STOP=1 -f $fixtureFile | Out-Null
@@ -116,6 +134,7 @@ INSERT INTO schedule_assignments(schedule_version_id,required_shift_id,employee_
     $evaluatedVersion = Scalar "select sv.id from schedule_versions sv join schedules s on s.id=sv.schedule_id where s.period_start=date '2026-08-21'"
     $exportVersion = Scalar "select sv.id from schedule_versions sv join schedules s on s.id=sv.schedule_id where s.period_start=date '2026-08-22'"
     $evaluatedAssignment = Scalar "select id from schedule_assignments where schedule_version_id=$evaluatedVersion"
+    $plainVersion = Scalar "select sv.id from schedule_versions sv join schedules s on s.id=sv.schedule_id where s.period_start=date '2026-08-23'"
     $profileId = Scalar "select id from scheduling_rule_profiles where profile_code='I9-MVP-SIMULATED' and status='ACTIVE'"
 
     $env:ConnectionStrings__Postgres = "Host=$($parts.Host);Port=$($parts.Port);Database=$($parts.Database);Username=$($parts.Username);Password=$($parts.Password);Search Path=$schema,public"
@@ -258,7 +277,26 @@ INSERT INTO schedule_assignments(schedule_version_id,required_shift_id,employee_
     Q ($sheetXml -match 'DATOS SIMULADOS') 'MI-T09 the spreadsheet states the simulated origin too'
     if (Test-Path -LiteralPath $pdfFile) { Remove-Item -LiteralPath $pdfFile -Force }
 
-    Q ($passed -eq 38) 'numbered integration assertion count'
+    # MI-T10. Every version exported above carries the simulated mark AND a profile, which is the one
+    # shape the broken header and the fixed header printed identically. Restoring the pre-fix code
+    # verbatim left this suite at PASS, so the fix it was written to protect was undefended. This
+    # exports the shape the schema permits and the fixture never produced: a versioned profile with
+    # no simulated mark. The clause that used to lie is the one asserted.
+    & $psql -X -w -v ON_ERROR_STOP=1 -c "insert into scheduling_rule_evaluations(schedule_version_id,assignment_id,rule_profile_id,rule_code,outcome,severity,message_code,explanation,parameters_snapshot,facts_snapshot,scope_hash,exception_allowed,exception_status,correlation_id,evaluated_at,audit_actor) select $plainVersion,a.id,$profileId,'I9-R01','COMPLIANT','INFO','I9_R01_COMPLIANT','Jornada conforme.',jsonb_build_object('maxDailyHours',12),jsonb_build_object('dailyHours',8),repeat('e',64),FALSE,'NOT_REQUIRED','i9-mvpint-plain',now(),'operaciones.sg' from schedule_assignments a where a.schedule_version_id=$plainVersion" 2>&1 | Out-Null
+    $approvePlain = Call 'Post' "$base/portal/scheduling/proposals/$plainVersion/approve" $headers @{ expectedVersion=1 }
+    Q ($approvePlain.Status -eq 200) 'MI-T10 a decided version with a profile and no simulated mark is approved'
+    $publishPlain = Call 'Post' "$base/portal/scheduling/proposals/$plainVersion/publish" $headers @{ expectedVersion=1 }
+    Q ($publishPlain.Status -eq 200) 'MI-T10 that version is published'
+    $plainPdf = Join-Path ([System.IO.Path]::GetTempPath()) ($schema + '-plain.pdf')
+    Invoke-WebRequest -UseBasicParsing -Uri "$base/portal/scheduling/versions/$plainVersion/export.pdf" -Headers $headers -OutFile $plainPdf | Out-Null
+    # ASCII y no Latin1: Encoding::Latin1 llega con .NET 5 y aqui es $null en Windows PowerShell 5.1.
+    $plainText = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($plainPdf))
+    Q ($plainText -notmatch 'DATOS SIMULADOS') 'MI-T10 a version without the simulated mark is not called simulated'
+    Q ($plainText -match 'sin perfil de reglas versionado' -eq $false) 'MI-T10 a version carrying a profile is never said to lack one'
+    Q ($plainText -match 'perfil \d+ version \d+') 'MI-T10 the document names the profile it does carry'
+    if (Test-Path -LiteralPath $plainPdf) { Remove-Item -LiteralPath $plainPdf -Force }
+
+    Q ($passed -eq 43) 'numbered integration assertion count'
     Write-Output "I9 MVP INTEGRATION PASS $passed"
     exit 0
 }

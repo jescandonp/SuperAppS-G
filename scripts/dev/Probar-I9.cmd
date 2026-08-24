@@ -8,3 +8,7 @@ REM
 REM Todo ocurre sobre el esquema PostgreSQL sg_i9_pruebas. No toca datos productivos.
 
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Start-SgSuperAppI9Pruebas.ps1" %*
+
+REM Varias rutas de fallo del guion terminan sin pedir Enter, y un parametro mal escrito ni siquiera
+REM llega a ejecutarlo. Sin esta pausa, la ventana se cierra sola y el mensaje no se alcanza a leer.
+if errorlevel 1 pause

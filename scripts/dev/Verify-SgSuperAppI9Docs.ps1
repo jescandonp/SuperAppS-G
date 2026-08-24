@@ -1180,13 +1180,17 @@ if (-not (Test-Path -LiteralPath $closurePath)) {
         $failures.Add('MVP closure report does not leave the user authorisation Pendiente; only the user can grant it')
     }
 
-    # Keeping the heading while emptying the section passed too, so the items are counted. Seven is
-    # what the report carried when this was written; fewer means points were removed rather than
-    # resolved, and resolving one is a change to the report AND to this number, deliberately.
+    # Keeping the heading while emptying the section passed too, so the items are counted. The
+    # comparison used to be -lt 7, which is a floor and not a count: an independent review deleted
+    # the two points that the reviews had just proved were missing, renumbered, and this stayed
+    # green because eight minus two is still above seven. Points can be dropped without being
+    # resolved under a floor. The number is now pinned, so resolving one is a change to the report
+    # AND to this line, deliberately, and both show up in the same diff.
+    $expectedOpenItems = 10
     $openSection = [regex]::Match($closure, '(?s)## 4\. Puntos abiertos.*?(?=\n## )')
     $openItems = if ($openSection.Success) { ([regex]::Matches($openSection.Value, '(?m)^\d+\.\s')).Count } else { 0 }
-    if ($openItems -lt 7) {
-        $failures.Add("MVP closure report lists $openItems open points; it must still carry the seven it opened with")
+    if ($openItems -ne $expectedOpenItems) {
+        $failures.Add("MVP closure report lists $openItems open points; this gate is pinned to $expectedOpenItems. Resolving or adding one means changing both.")
     }
 
     # A document may not declare the closure it exists to withhold.

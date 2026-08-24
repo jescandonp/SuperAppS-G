@@ -44,7 +44,10 @@ function Sql([string[]]$Argumentos) {
 function SqlValor([string]$consulta) {
     $previo = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    try { $valor = & $psql -X -w -Atqc $consulta 2>$null; return ([string]$valor).Trim() }
+    # "$valor" y no ([string]$valor): cuando un comando nativo no emite nada, la variable recibe
+    # [AutomationNull]::Value, y el reparto de ESE valor a [string] da $null en vez de cadena vacia,
+    # de modo que .Trim() lanzaba y la guarda de "PostgreSQL caido" de mas abajo era inalcanzable.
+    try { $valor = & $psql -X -w -Atqc $consulta 2>$null; return "$valor".Trim() }
     finally { $ErrorActionPreference = $previo }
 }
 
@@ -94,6 +97,20 @@ $env:PGHOST = $partes.Host; $env:PGPORT = $partes.Port; $env:PGDATABASE = $parte
 $env:PGUSER = $partes.Username; $env:PGPASSWORD = $partes.Password
 $env:PGOPTIONS = $null
 
+# El nombre del esquema se interpola en DROP SCHEMA y psql -c acepta varias sentencias, asi que un
+# nombre libre es SQL arbitrario. Se exige el prefijo del entorno de pruebas: eso rechaza a la vez
+# 'public' (y 'PUBLIC', que los identificadores de SQL pliegan al mismo esquema real) y cualquier
+# nombre con punto y coma, comillas o espacios.
+# -cnotmatch y no -notmatch: los operadores de comparacion de PowerShell ignoran mayusculas por
+# defecto, de modo que 'SG_I9_PRUEBAS' pasaba la validacion y en SQL plegaba sobre el esquema real.
+if ($Esquema -cnotmatch '^sg_i9_[a-z0-9_]+$') {
+    Mal "El esquema '$Esquema' no es un esquema de pruebas valido."
+    Mal '   Debe empezar por sg_i9_ y llevar solo minusculas, digitos o guion bajo.'
+    Write-Host ''
+    Read-Host '  Pulse Enter para cerrar'
+    exit 2
+}
+
 $existe = SqlValor "select to_regnamespace('$Esquema') is not null"
 if ([string]::IsNullOrWhiteSpace($existe)) {
     Mal 'No fue posible conectar con PostgreSQL. Revise que el servicio este arriba.'
@@ -106,6 +123,28 @@ if ($Reset -and $existe -eq 't') {
     Paso "Eliminando el esquema $Esquema por -Reset"
     if ((Sql @('-v', 'ON_ERROR_STOP=1', '-c', "DROP SCHEMA $Esquema CASCADE")) -ne 0) { Mal 'No fue posible eliminar el esquema'; exit 1 }
     $existe = 'f'
+}
+
+# Existir no es estar completo. Si una migracion falla a mitad, el esquema queda creado y a medias;
+# la version anterior lo daba por bueno al reintentar y la API arrancaba con search_path=esquema,
+# public, de modo que las tablas ausentes se resolvian contra los datos reales. Se marca el esquema
+# al terminar el sembrado y, sin esa marca, se rehace en vez de conservarlo.
+$sello = 'entorno de pruebas I9 sembrado por completo'
+$completo = $false
+if ($existe -eq 't') {
+    $completo = (SqlValor "select coalesce(obj_description(to_regnamespace('$Esquema'),'pg_namespace'),'')") -eq $sello
+    if (-not $completo) {
+        # Rehacerlo aqui por iniciativa propia destruiria lo que el usuario tuviera dentro, que es
+        # justo el dano que este bloque existe para evitar. Se rehusa arrancar y se le deja la
+        # decision, que ya tiene su propia orden explicita.
+        Mal "El esquema $Esquema existe pero no esta completo."
+        Mal '   Un intento anterior quedo a medias, y arrancar asi haria que la aplicacion leyera'
+        Mal '   y escribiera sobre las tablas reales para todo lo que le falte.'
+        Mal '   Ejecute Probar-I9.cmd -Reset para rehacerlo desde cero.'
+        Write-Host ''
+        Read-Host '  Pulse Enter para cerrar'
+        exit 1
+    }
 }
 
 $sembrar = $existe -ne 't'
@@ -168,6 +207,8 @@ INSERT INTO scheduling_rule_evaluations(schedule_version_id,assignment_id,rule_p
     $fallo = (Sql @('-q', '-v', 'ON_ERROR_STOP=1', '-f', $escenario)) -ne 0
     Remove-Item -LiteralPath $escenario -Force -ErrorAction SilentlyContinue
     if ($fallo) { Mal 'Fallo el escenario de pruebas'; exit 1 }
+    # Ultima linea del sembrado: a partir de aqui el esquema puede reutilizarse sin rehacerlo.
+    if ((Sql @('-v', 'ON_ERROR_STOP=1', '-c', "COMMENT ON SCHEMA $Esquema IS '$sello'")) -ne 0) { Mal 'No fue posible marcar el esquema como completo'; exit 1 }
     Bien "Esquema $Esquema listo con datos simulados"
 } else {
     Bien "Esquema $Esquema ya existia; se conserva lo que haya. Use -Reset para empezar de cero."
