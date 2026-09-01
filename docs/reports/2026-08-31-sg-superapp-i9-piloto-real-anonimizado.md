@@ -6,6 +6,18 @@ septiembre 2026 + `PUESTOS PRUEBA 2026.xlsx` con el roster de guardas).
 Alcance: `SIMULATED` / `MVP_TEST`, esquema `sg_i9_pruebas`. No afirma politica institucional ni opera
 sobre datos productivos.
 
+> **Actualizacion 2026-09-01 — M1 resuelto.** El hallazgo 4.1 (abajo) tenia dos partes: la version vacia
+> que "Generar propuesta" crea (sigue asi, es un problema aparte, mas grande — ver M2-M5 en el plan de
+> el plan de correccion M1-M5 acordado el 2026-09-01) y que **la interfaz no podia mostrar ninguna version
+> existente, ni siquiera recien generada**, porque `ScheduleWorkflowResponse` nunca incluyo
+> `assignments`/`exceptions`. Esa segunda parte ya esta corregida: `PostgresPortalRepository.QueryScheduleAsync`
+> ahora las trae, `SchedulingPage.tsx` carga la version existente del proyecto/periodo sin pasar por
+> "Generar propuesta", y se agrego una confirmacion antes de crear una version nueva sobre una que ya
+> tiene asignaciones. Verificado en vivo contra este mismo proyecto piloto (matriz completa de
+> septiembre, 30 dias, D/N/VACANTE correctos) y con el nuevo verificador
+> `scripts/dev/Verify-SgSuperAppI9ScheduleVisibility.ps1` (`I9 SCHEDULE VISIBILITY PASS 16`). Detalle
+> completo en la seccion 4.1.
+>
 > Este documento registra el primer piloto funcional con datos operativos reales (anonimizados) que
 > el checklist de demo y el criterio de aceptacion #10 de la SPEC dejaban pendiente. No cierra el MVP:
 > ver seccion 4 para los hallazgos que quedan abiertos, incluido uno nuevo (4.1) mas severo que los ya
@@ -57,7 +69,10 @@ misma aprobacion Legal/Operaciones que ya rige 2X2/4X2/6X1 segun la SPEC seccion
 
 ## 4. Hallazgos
 
-### 4.1 — Nuevo, mas severo que los 11 ya documentados en el reporte de cierre: "Generar propuesta" no genera nada, y una segunda pulsacion oculta datos reales
+### 4.1 — "Generar propuesta" no genera nada, y una segunda pulsacion oculta datos reales
+
+**Estado: la parte de visibilidad (M1) esta corregida desde 2026-09-01; la generacion en si sigue sin
+implementar (M2-M5), ver actualizacion al inicio del documento.**
 
 El boton **Generar propuesta** (`POST /api/portal/scheduling/projects/{id}/proposals`) unicamente crea
 una fila vacia en `schedule_versions` (estado `PROPUESTA`, `source_snapshot='{}'`). No lee
@@ -135,31 +150,35 @@ consistente con como ya funciona el escenario de dos empleados; se documenta par
 
 ## 5. Que valida este piloto (y que no)
 
-**Valida:** que el catalogo de plantillas, `service_positions`, `employees` y
+**Valida:** que el catalogo de plantillas (incluida 4X4, ya oficial), `service_positions`, `employees` y
 `schedule_assignments`/`required_shifts` sostienen datos multi-sitio y multi-plantilla reales (no solo
 el par de empleados de juguete); que el flujo de autenticacion, el shell del portal y el selector de
-proyecto/periodo funcionan con un proyecto real de principio a fin; y que el concepto de vacante visible
-(SPEC seccion 2) se puede observar con un caso real (GRATAMIRA).
+proyecto/periodo funcionan con un proyecto real de principio a fin; que el concepto de vacante visible
+(SPEC seccion 2) se puede observar con un caso real (GRATAMIRA); y, desde la correccion M1, **que la
+matriz D/N/X/VACANTE real se puede ver en la interfaz real** (30 dias de septiembre, 4 sitios,
+verificado en vivo) sin pasar por `?demo=scheduling`.
 
-**No valida:** el motor de generacion deterministica en si (no esta cableado, ver 4.1), ni la matriz
-D/N/X/VACANTE de la interfaz contra este proyecto, ni el recorrido completo de aprobar/publicar/exportar
-del checklist de demo sobre datos reales. **No queda pendiente "repetirlo apuntando a versionId=5"**:
-se confirmo que ese camino no existe hoy en la interfaz ni en la forma en que la API responde (ver
-4.1) — hace falta desarrollo antes de poder intentarlo, no solo repetir el piloto.
+**No valida:** el motor de generacion deterministica en si — "Generar propuesta" sigue creando una
+version vacia; ver M2-M5 en el punto 3 de la seccion 6 — ni el recorrido completo de
+aprobar/publicar/exportar del checklist de demo sobre datos reales (deshabilitado por el mismo motivo:
+no hay overrides ni evaluaciones de regla persistidas contra este proyecto, solo la matriz sembrada).
 
 ## 6. Proximos pasos sugeridos
 
-1. Decidir con Operaciones/Juridica si el patron `4X4-PILOTO` aqui usado (4 dias, 4 noches, 4 descansos)
-   es el que realmente se opera en GRATAMIRA, antes de proponerlo para el catalogo oficial.
-2. Resolver 4.1 antes de cualquier prueba funcional adicional con datos reales. Esto requiere trabajo de
-   desarrollo, no solo configuracion: (a) que `GetScheduleVersionAsync`/`QueryScheduleAsync` incluyan
-   `assignments` en su respuesta, (b) una forma de cargar una version existente en la interfaz sin pasar
-   por `generate()` (ruta con `versionId`, o que el selector de proyecto/periodo detecte y ofrezca la
-   version mas reciente en vez de solo crear una nueva), y (c) cablear la generacion real
-   (`/recommendations/generate`) o, como minimo, advertir antes de crear una version vacia sobre un
-   proyecto que ya tiene asignaciones.
-3. Una vez resuelto el punto 2, repetir el recorrido del checklist de demo sobre el proyecto piloto
+1. ~~Decidir con Operaciones/Juridica si el patron 4x4 (4 dias, 4 noches, 4 descansos) es el que
+   realmente se opera en GRATAMIRA~~ — **hecho**: aprobado por el usuario el 2026-09-01 y promovido a
+   `db/seeds/010_i9_shift_templates.sql` como `4X4`, catalogo oficial.
+2. ~~Resolver la visibilidad de una version existente en la interfaz~~ — **hecho (M1)**: ver la
+   actualizacion al inicio de este documento.
+3. Ejecutar M2-M5 (roadmap acordado el 2026-09-01, no versionado en el repo): M2 expande
+   `required_shifts` desde `position_coverage_rules` dentro de la generacion; M3 ensambla los `facts`
+   reales que cada regla R01-R07 necesita para poder llamar `POST /rules/evaluate` por candidato antes
+   de rankear (cada regla tiene su propio archivo de 150-400 lineas, es una sub-tarea por regla); M4
+   calcula scoring real (continuidad, equidad, horas acumuladas, distancia) que hoy nadie produce; M5
+   es la verificacion end-to-end y repetir este piloto dejando que el motor genere de verdad. Solo
+   entonces cablear la generacion real al boton "Generar propuesta".
+4. Una vez resuelto el punto 3, repetir el recorrido del checklist de demo sobre el proyecto piloto
    (matriz, comparacion, excepciones, aprobacion, publicacion, exportacion) con datos reales en vez del
    escenario de dos empleados.
-4. Trasladar los hallazgos 4.2 y 4.3 a Operaciones para que confirmen si el roster o el PDF estan
+5. Trasladar los hallazgos 4.2 y 4.3 a Operaciones para que confirmen si el roster o el PDF estan
    desactualizados.

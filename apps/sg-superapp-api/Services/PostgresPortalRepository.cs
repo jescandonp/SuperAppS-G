@@ -3422,8 +3422,83 @@ where x.schedule_version_id=@version and e.assignment_id=@assignment and a.updat
     { await using var cmd=new NpgsqlCommand("update schedule_versions sv set vacancy_count=(select count(*) from schedule_assignments where schedule_version_id=sv.id and status='VACANTE'),exception_count=(select count(*) from schedule_exceptions x where x.schedule_version_id=sv.id and not "+SupersededDecisionPredicate+"),coverage_percent=coalesce((select round(100.0*count(*) filter(where status='ASIGNADA')/nullif(count(*),0),2) from schedule_assignments where schedule_version_id=sv.id),0) where sv.id=@id",cn,tx);cmd.Parameters.AddWithValue("id",id);await cmd.ExecuteNonQueryAsync(ct); }
 
     private async Task<ScheduleWorkflowResponse?> QueryScheduleAsync(string filter,long id,DateOnly? period,CancellationToken ct)
-    { await using var cn=new NpgsqlConnection(_connectionString);await cn.OpenAsync(ct);await using var cmd=new NpgsqlCommand($"select sv.id,sv.schedule_id,s.project_id,sv.version_number,sv.status,s.period_start,s.period_end,sv.coverage_percent,sv.vacancy_count,sv.exception_count,coalesce((sv.source_snapshot->>'acceptedVacancy')::boolean,false),sv.created_by,sv.approved_by,sv.published_by from schedule_versions sv join schedules s on s.id=sv.schedule_id where {filter}",cn);cmd.Parameters.AddWithValue("id",id);if(period.HasValue)cmd.Parameters.AddWithValue("period",period.Value);await using var rd=await cmd.ExecuteReaderAsync(ct);return await rd.ReadAsync(ct)?ReadScheduleWorkflow(rd):null; }
-    private static ScheduleWorkflowResponse ReadScheduleWorkflow(NpgsqlDataReader r){var created=r.GetString(11);var approved=r.IsDBNull(12)?null:r.GetString(12);var published=r.IsDBNull(13)?null:r.GetString(13);return new(r.GetInt64(0),r.GetInt64(1),r.GetInt64(2),r.GetInt32(3),r.GetString(4),r.GetFieldValue<DateOnly>(5).ToString("yyyy-MM-dd"),r.GetFieldValue<DateOnly>(6).ToString("yyyy-MM-dd"),r.GetDecimal(7),r.GetInt32(8),r.GetInt32(9),r.GetBoolean(10),created,approved,published,published is not null&&created==approved&&approved==published);}
+    {
+        await using var cn=new NpgsqlConnection(_connectionString);await cn.OpenAsync(ct);
+        await using var cmd=new NpgsqlCommand($"select sv.id,sv.schedule_id,s.project_id,sv.version_number,sv.status,s.period_start,s.period_end,sv.coverage_percent,sv.vacancy_count,sv.exception_count,coalesce((sv.source_snapshot->>'acceptedVacancy')::boolean,false),sv.created_by,sv.approved_by,sv.published_by from schedule_versions sv join schedules s on s.id=sv.schedule_id where {filter}",cn);
+        cmd.Parameters.AddWithValue("id",id);if(period.HasValue)cmd.Parameters.AddWithValue("period",period.Value);
+        ScheduleWorkflowResponse? workflow;
+        await using (var rd=await cmd.ExecuteReaderAsync(ct)) { workflow = await rd.ReadAsync(ct) ? ReadScheduleWorkflow(rd) : null; }
+        if (workflow is null) return null;
+        var assignments = await LoadScheduleAssignmentsAsync(cn, workflow.VersionId, ct);
+        var exceptions = await LoadScheduleExceptionsAsync(cn, workflow.VersionId, ct);
+        return workflow with { Assignments = assignments, Exceptions = exceptions };
+    }
+    private static ScheduleWorkflowResponse ReadScheduleWorkflow(NpgsqlDataReader r){var created=r.GetString(11);var approved=r.IsDBNull(12)?null:r.GetString(12);var published=r.IsDBNull(13)?null:r.GetString(13);return new(r.GetInt64(0),r.GetInt64(1),r.GetInt64(2),r.GetInt32(3),r.GetString(4),r.GetFieldValue<DateOnly>(5).ToString("yyyy-MM-dd"),r.GetFieldValue<DateOnly>(6).ToString("yyyy-MM-dd"),r.GetDecimal(7),r.GetInt32(8),r.GetInt32(9),r.GetBoolean(10),created,approved,published,published is not null&&created==approved&&approved==published,Array.Empty<ScheduleAssignmentResponse>(),Array.Empty<ScheduleExceptionResponse>());}
+
+    // A required shift's D/N label is a display convenience, not a legal threshold: it just tells the
+    // reader which side of midnight the shift starts on, the same convention the pilot's own fixtures
+    // use (08:00-20:00 for D, 20:00-08:00 for N). No rule or export path in this codebase derives it
+    // today, so this is the first place that needs to, and it must never be confused with a rule verdict.
+    private static string DeriveShiftCode(TimeOnly startsAt, TimeOnly endsAt) => startsAt < endsAt ? "D" : "N";
+
+    private static async Task<IReadOnlyList<ScheduleAssignmentResponse>> LoadScheduleAssignmentsAsync(NpgsqlConnection cn, long versionId, CancellationToken ct)
+    {
+        const string sql = @"select sa.id, rs.shift_date, rs.starts_at, rs.ends_at, rs.position_id, sa.employee_id, sa.status, sa.score, sa.reasons
+from schedule_assignments sa join required_shifts rs on rs.id = sa.required_shift_id
+where sa.schedule_version_id = @id order by rs.shift_date, rs.starts_at, sa.employee_id";
+        await using var cmd = new NpgsqlCommand(sql, cn); cmd.Parameters.AddWithValue("id", versionId);
+        var results = new List<ScheduleAssignmentResponse>();
+        await using var rd = await cmd.ExecuteReaderAsync(ct);
+        while (await rd.ReadAsync(ct))
+        {
+            var startsAt = rd.GetFieldValue<TimeOnly>(2); var endsAt = rd.GetFieldValue<TimeOnly>(3);
+            results.Add(new ScheduleAssignmentResponse(
+                rd.GetInt64(0), rd.GetFieldValue<DateOnly>(1).ToString("yyyy-MM-dd"),
+                startsAt.ToString("HH:mm"), endsAt.ToString("HH:mm"), rd.GetInt64(4),
+                rd.IsDBNull(5) ? null : rd.GetInt64(5), DeriveShiftCode(startsAt, endsAt), rd.GetString(6),
+                rd.IsDBNull(7) ? null : rd.GetDecimal(7), ParseReasons(rd.GetString(8))));
+        }
+        return results;
+    }
+
+    // schedule_assignments.reasons has only ever been written as a JSON array of plain explanation
+    // strings (SchedulingRecommendationEngine.Generate() and every seed script agree on that shape).
+    // The frontend contract wants {code,severity,message}. Rather than rewrite the write path, this
+    // wraps a bare string as an informational reason; an already-structured object passes through.
+    private static IReadOnlyList<ScheduleReasonResponse> ParseReasons(string reasonsJson)
+    {
+        using var document = JsonDocument.Parse(reasonsJson);
+        var results = new List<ScheduleReasonResponse>();
+        foreach (var item in document.RootElement.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.String)
+                results.Add(new ScheduleReasonResponse("", "INFORMATIVA", item.GetString() ?? ""));
+            else if (item.ValueKind == JsonValueKind.Object)
+                results.Add(new ScheduleReasonResponse(
+                    item.TryGetProperty("code", out var code) ? code.GetString() ?? "" : "",
+                    item.TryGetProperty("severity", out var severity) ? severity.GetString() ?? "INFORMATIVA" : "INFORMATIVA",
+                    item.TryGetProperty("message", out var message) ? message.GetString() ?? "" : ""));
+        }
+        return results;
+    }
+
+    private static async Task<IReadOnlyList<ScheduleExceptionResponse>> LoadScheduleExceptionsAsync(NpgsqlConnection cn, long versionId, CancellationToken ct)
+    {
+        const string sql = @"select id, assignment_id, exception_type, reason, responsible, decision_detail->>'resolutionDate', status, rule_code, scope_hash, motive_code, decision
+from schedule_exceptions where schedule_version_id = @id order by id";
+        await using var cmd = new NpgsqlCommand(sql, cn); cmd.Parameters.AddWithValue("id", versionId);
+        var results = new List<ScheduleExceptionResponse>();
+        await using var rd = await cmd.ExecuteReaderAsync(ct);
+        while (await rd.ReadAsync(ct))
+        {
+            results.Add(new ScheduleExceptionResponse(
+                rd.GetInt64(0), rd.IsDBNull(1) ? null : rd.GetInt64(1), rd.GetString(2), rd.GetString(3),
+                rd.GetString(4), rd.IsDBNull(5) ? null : rd.GetString(5), rd.GetString(6),
+                rd.IsDBNull(7) ? null : rd.GetString(7), rd.IsDBNull(8) ? null : rd.GetString(8),
+                rd.IsDBNull(9) ? null : rd.GetString(9), rd.IsDBNull(10) ? null : rd.GetString(10)));
+        }
+        return results;
+    }
 
     private async Task<bool> UpdateSchedulingConfigurationAsync(string sql, string eventType, string entityType, long id, Action<NpgsqlCommand> addParameters, long actorUserId, string actorUsername, CancellationToken cancellationToken)
     {
