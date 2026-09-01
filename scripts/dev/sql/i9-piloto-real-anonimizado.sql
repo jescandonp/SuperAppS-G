@@ -15,15 +15,6 @@ END $$;
 INSERT INTO clients(code,name,status) VALUES('I9-PILOTO-REAL','Piloto Nuevo Planeador (datos reales anonimizados)','ACTIVO') ON CONFLICT (code) DO NOTHING;
 INSERT INTO service_projects(client_id,code,name,effective_from,status,created_at,updated_at) SELECT id,'PILOTO-NUEVO-PLANEADOR','Piloto Nuevo Planeador - Septiembre 2026',date '2026-09-01','ACTIVO',now(),now() FROM clients WHERE code='I9-PILOTO-REAL' ON CONFLICT (code) DO NOTHING;
 
-INSERT INTO shift_templates (code, name, version, effective_from, mandatory_by_default, status)
-VALUES ('4X4-PILOTO', 'Ciclo 4x4 dia, noche y descanso (hipotesis de piloto, pendiente validacion Ops/Juridica)', 1, CURRENT_DATE, FALSE, 'ACTIVO')
-ON CONFLICT (code, version) DO NOTHING;
-WITH steps(step_order, shift_code) AS (VALUES (1,'D'),(2,'D'),(3,'D'),(4,'D'),(5,'N'),(6,'N'),(7,'N'),(8,'N'),(9,'X'),(10,'X'),(11,'X'),(12,'X'))
-INSERT INTO shift_template_steps (template_id, step_order, shift_code)
-SELECT st.id, s.step_order, s.shift_code FROM steps s, shift_templates st
-WHERE st.code='4X4-PILOTO' AND st.version=1
-ON CONFLICT (template_id, step_order) DO UPDATE SET shift_code = EXCLUDED.shift_code;
-
 -- Sitio: C.R ICONIK 68 (turno 2X2, puestos concurrentes 6)
 INSERT INTO service_positions(code,name,client_text,location_text,status) SELECT 'ICONIK-68','C.R ICONIK 68','Piloto Nuevo Planeador','C.R ICONIK 68','ACTIVO' WHERE NOT EXISTS (SELECT 1 FROM service_positions WHERE code='ICONIK-68');
 UPDATE service_positions SET project_id=(SELECT id FROM service_projects WHERE code='PILOTO-NUEVO-PLANEADOR') WHERE code='ICONIK-68';
@@ -82,8 +73,8 @@ INSERT INTO employees(identification_type,identification_number,full_name,employ
 -- Sitio: GRATAMIRA II (turno 4X4, puestos concurrentes 2)
 INSERT INTO service_positions(code,name,client_text,location_text,status) SELECT 'GRATAMIRA-II','GRATAMIRA II','Piloto Nuevo Planeador','GRATAMIRA II','ACTIVO' WHERE NOT EXISTS (SELECT 1 FROM service_positions WHERE code='GRATAMIRA-II');
 UPDATE service_positions SET project_id=(SELECT id FROM service_projects WHERE code='PILOTO-NUEVO-PLANEADOR') WHERE code='GRATAMIRA-II';
-INSERT INTO position_coverage_rules(position_id,template_id,weekday_scope,starts_at,ends_at,required_quantity,effective_from,status) SELECT sp.id, st.id, 'TODOS', '08:00', '20:00', 2, date '2026-09-01', 'ACTIVO' FROM service_positions sp, shift_templates st WHERE sp.code='GRATAMIRA-II' AND st.code='4X4-PILOTO' AND st.version=1 ON CONFLICT (position_id, template_id, effective_from) DO NOTHING;
-INSERT INTO position_coverage_rules(position_id,template_id,weekday_scope,starts_at,ends_at,required_quantity,effective_from,status) SELECT sp.id, st.id, 'TODOS', '20:00', '08:00', 2, date '2026-09-01', 'ACTIVO' FROM service_positions sp, shift_templates st WHERE sp.code='GRATAMIRA-II' AND st.code='4X4-PILOTO' AND st.version=1 ON CONFLICT (position_id, template_id, effective_from) DO NOTHING;
+INSERT INTO position_coverage_rules(position_id,template_id,weekday_scope,starts_at,ends_at,required_quantity,effective_from,status) SELECT sp.id, st.id, 'TODOS', '08:00', '20:00', 2, date '2026-09-01', 'ACTIVO' FROM service_positions sp, shift_templates st WHERE sp.code='GRATAMIRA-II' AND st.code='4X4' AND st.version=1 ON CONFLICT (position_id, template_id, effective_from) DO NOTHING;
+INSERT INTO position_coverage_rules(position_id,template_id,weekday_scope,starts_at,ends_at,required_quantity,effective_from,status) SELECT sp.id, st.id, 'TODOS', '20:00', '08:00', 2, date '2026-09-01', 'ACTIVO' FROM service_positions sp, shift_templates st WHERE sp.code='GRATAMIRA-II' AND st.code='4X4' AND st.version=1 ON CONFLICT (position_id, template_id, effective_from) DO NOTHING;
 INSERT INTO employees(identification_type,identification_number,full_name,employment_status,job_title,hire_date) SELECT 'CC','PILOTO-GRATAMIRA-II-01','Guarda GRATAMIRA-II 01','ACTIVO','GUARDA',date '2026-01-01' WHERE NOT EXISTS (SELECT 1 FROM employees WHERE identification_number='PILOTO-GRATAMIRA-II-01');
 INSERT INTO employees(identification_type,identification_number,full_name,employment_status,job_title,hire_date) SELECT 'CC','PILOTO-GRATAMIRA-II-02','Guarda GRATAMIRA-II 02','ACTIVO','GUARDA',date '2026-01-01' WHERE NOT EXISTS (SELECT 1 FROM employees WHERE identification_number='PILOTO-GRATAMIRA-II-02');
 INSERT INTO employees(identification_type,identification_number,full_name,employment_status,job_title,hire_date) SELECT 'CC','PILOTO-GRATAMIRA-II-03','Guarda GRATAMIRA-II 03','ACTIVO','GUARDA',date '2026-01-01' WHERE NOT EXISTS (SELECT 1 FROM employees WHERE identification_number='PILOTO-GRATAMIRA-II-03');

@@ -15,7 +15,7 @@
 ## Recorrido Funcional
 
 - [ ] Seleccionar proyecto y periodo; verificar estado vacio antes de generar.
-- [ ] Confirmar plantillas 2x2, 4x2 y 6x1 como obligatorias por defecto.
+- [ ] Confirmar plantillas 2x2, 4x2, 4x4 y 6x1 como obligatorias por defecto.
 - [ ] Generar propuesta y registrar tiempo de respuesta.
 - [ ] Revisar matriz D/N/X/VACANTE y explicación de al menos tres asignaciones.
 - [ ] Comparar `MINIMUM_IMPACT` y `GLOBAL` sin declarar ganador automatico.
