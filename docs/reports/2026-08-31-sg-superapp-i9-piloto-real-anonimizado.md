@@ -7,16 +7,28 @@ Alcance: `SIMULATED` / `MVP_TEST`, esquema `sg_i9_pruebas`. No afirma politica i
 sobre datos productivos.
 
 > **Actualizacion 2026-09-01 — M1 resuelto.** El hallazgo 4.1 (abajo) tenia dos partes: la version vacia
-> que "Generar propuesta" crea (sigue asi, es un problema aparte, mas grande — ver M2-M5 en el plan de
-> el plan de correccion M1-M5 acordado el 2026-09-01) y que **la interfaz no podia mostrar ninguna version
-> existente, ni siquiera recien generada**, porque `ScheduleWorkflowResponse` nunca incluyo
-> `assignments`/`exceptions`. Esa segunda parte ya esta corregida: `PostgresPortalRepository.QueryScheduleAsync`
-> ahora las trae, `SchedulingPage.tsx` carga la version existente del proyecto/periodo sin pasar por
-> "Generar propuesta", y se agrego una confirmacion antes de crear una version nueva sobre una que ya
-> tiene asignaciones. Verificado en vivo contra este mismo proyecto piloto (matriz completa de
-> septiembre, 30 dias, D/N/VACANTE correctos) y con el nuevo verificador
-> `scripts/dev/Verify-SgSuperAppI9ScheduleVisibility.ps1` (`I9 SCHEDULE VISIBILITY PASS 16`). Detalle
-> completo en la seccion 4.1.
+> que "Generar propuesta" crea (era un problema aparte, mas grande — ver M2 abajo, ya en curso) y que
+> **la interfaz no podia mostrar ninguna version existente, ni siquiera recien generada**, porque
+> `ScheduleWorkflowResponse` nunca incluyo `assignments`/`exceptions`. Esa segunda parte ya esta
+> corregida: `PostgresPortalRepository.QueryScheduleAsync` ahora las trae, `SchedulingPage.tsx` carga la
+> version existente del proyecto/periodo sin pasar por "Generar propuesta", y se agrego una confirmacion
+> antes de crear una version nueva sobre una que ya tiene asignaciones. Verificado en vivo contra este
+> mismo proyecto piloto (matriz completa de septiembre, 30 dias, D/N/VACANTE correctos) y con el nuevo
+> verificador `scripts/dev/Verify-SgSuperAppI9ScheduleVisibility.ps1` (`I9 SCHEDULE VISIBILITY PASS 16`).
+> Commit `cf50cc1`. Detalle completo en la seccion 4.1.
+>
+> **Actualizacion 2026-09-01 — M2 resuelto.** "Generar propuesta" ahora expande `required_shifts` de
+> verdad desde `position_coverage_rules` (server-side, determinista, dentro de la misma transaccion que
+> crea la version) y deja un cupo `VACANTE` con razon `CANDIDATES_NOT_EVALUATED` por cada turno
+> requerido — todavia no asigna a nadie (eso es M3/M4: evaluar candidatos contra las siete reglas y
+> rankearlos), pero ya no crea una version literalmente vacia cuando hay cobertura configurada. Solo se
+> expande la cobertura `ACTIVO`, vigente para cada fecha, de puestos `ACTIVO`, con `weekday_scope`
+> exactamente `'TODOS'` (un ambito semanal parcial no tiene convencion definida en ningun lugar de este
+> codebase — se omite en vez de adivinarse, ver seccion 4.6). Se ensancho ademas la restriccion unica de
+> `position_coverage_rules` (`db/migrations/009_i9_scheduling.sql`) para admitir una fila de franja
+> diurna y otra nocturna por puesto/plantilla/vigencia — antes la segunda quedaba descartada en
+> silencio por `ON CONFLICT DO NOTHING`, que era la causa real del hallazgo 4.4 (abajo, ahora obsoleto).
+> Verificado con `scripts/dev/Verify-SgSuperAppI9RequiredShiftsExpansion.ps1` (`PASS 14`).
 >
 > Este documento registra el primer piloto funcional con datos operativos reales (anonimizados) que
 > el checklist de demo y el criterio de aceptacion #10 de la SPEC dejaban pendiente. No cierra el MVP:
@@ -130,14 +142,27 @@ discrepancia real entre la nomina vigente y el encabezado impreso en la programa
 vale la pena que Operaciones revise (rotacion de personal no reflejada en el PDF, o el PDF cuenta solo
 "activos" bajo otro criterio).
 
-### 4.4 — `position_coverage_rules` es una fila por puesto+plantilla+vigencia, no una por franja
+### 4.4 — `position_coverage_rules` solo admitia una franja horaria por puesto+plantilla+vigencia (OBSOLETO, corregido en M2)
 
-El primer intento de siembra insertaba una fila de cobertura para el turno diurno y otra para el
-nocturno; la segunda caia siempre en `ON CONFLICT DO NOTHING` por la restriccion unica
-`uq_position_coverage_rules_period (position_id, template_id, effective_from)`. No es un bug: el modelo
-ya asume que la plantilla (via `shift_template_steps`) codifica dia/noche/descanso, y que la cobertura
-solo necesita declarar cantidad requerida y vigencia una vez por puesto. El script final quedo con una
-sola fila por sitio (franja 08:00–20:00 como referencia).
+**Estado: corregido 2026-09-01.** El primer intento de siembra insertaba una fila de cobertura para el
+turno diurno y otra para el nocturno; la segunda caia siempre en `ON CONFLICT DO NOTHING` por la
+restriccion unica `uq_position_coverage_rules_period (position_id, template_id, effective_from)`. En su
+momento se penso que no era un bug (que el modelo asumia que la cobertura solo necesitaba una franja de
+referencia). Al implementar M2 quedo claro que si era un bug real: un puesto con rotacion 24h
+necesita ambas franjas para que la expansion de turnos requeridos cubra el dia completo, y la
+restriccion se lo impedia sin avisar. Se ensancho a
+`UNIQUE (position_id, template_id, effective_from, starts_at)` en
+`db/migrations/009_i9_scheduling.sql`; el piloto ahora siembra ambas franjas por sitio.
+
+### 4.6 — `weekday_scope` no tiene ninguna convencion definida en el codebase
+
+Al implementar M2 (expandir `required_shifts` desde `position_coverage_rules`) se confirmo por busqueda
+exhaustiva que **ningun lugar del codigo, las migraciones o la documentacion define el formato de
+`weekday_scope`** — solo existe una restriccion de "no vacio". El piloto usa `'TODOS'` porque los 4
+sitios operan 24/7, y la expansion de M2 solo procesa cobertura con `weekday_scope='TODOS'` exactamente
+(cualquier otro valor se omite en vez de adivinarse). Si Operaciones necesita cobertura de solo algunos
+dias de la semana (turnos de oficina, por ejemplo), hace falta definir y documentar esa convencion antes
+de que M2 pueda expandirla — no es una limitacion tecnica, es una decision de producto pendiente.
 
 ### 4.5 — Metricas de version quedan en 0 cuando se siembra por SQL
 
@@ -158,9 +183,13 @@ proyecto/periodo funcionan con un proyecto real de principio a fin; que el conce
 matriz D/N/X/VACANTE real se puede ver en la interfaz real** (30 dias de septiembre, 4 sitios,
 verificado en vivo) sin pasar por `?demo=scheduling`.
 
-**No valida:** el motor de generacion deterministica en si — "Generar propuesta" sigue creando una
-version vacia; ver M2-M5 en el punto 3 de la seccion 6 — ni el recorrido completo de
-aprobar/publicar/exportar del checklist de demo sobre datos reales (deshabilitado por el mismo motivo:
+Desde M2, tambien valida que **"Generar propuesta" expande cobertura real** (`required_shifts` desde
+`position_coverage_rules`, con sus VACANTE explicitas) en vez de crear una version literalmente vacia.
+
+**No valida:** la evaluacion de candidatos ni el scoring — "Generar propuesta" deja todo cupo generado
+en `VACANTE` con razon `CANDIDATES_NOT_EVALUATED`, nunca asigna a nadie; ver M3-M4 en el punto 4 de la
+seccion 6 — ni el recorrido completo de aprobar/publicar/exportar del checklist de demo sobre datos
+reales (deshabilitado por el mismo motivo:
 no hay overrides ni evaluaciones de regla persistidas contra este proyecto, solo la matriz sembrada).
 
 ## 6. Proximos pasos sugeridos
@@ -170,15 +199,22 @@ no hay overrides ni evaluaciones de regla persistidas contra este proyecto, solo
    `db/seeds/010_i9_shift_templates.sql` como `4X4`, catalogo oficial.
 2. ~~Resolver la visibilidad de una version existente en la interfaz~~ — **hecho (M1)**: ver la
    actualizacion al inicio de este documento.
-3. Ejecutar M2-M5 (roadmap acordado el 2026-09-01, no versionado en el repo): M2 expande
-   `required_shifts` desde `position_coverage_rules` dentro de la generacion; M3 ensambla los `facts`
-   reales que cada regla R01-R07 necesita para poder llamar `POST /rules/evaluate` por candidato antes
-   de rankear (cada regla tiene su propio archivo de 150-400 lineas, es una sub-tarea por regla); M4
-   calcula scoring real (continuidad, equidad, horas acumuladas, distancia) que hoy nadie produce; M5
-   es la verificacion end-to-end y repetir este piloto dejando que el motor genere de verdad. Solo
-   entonces cablear la generacion real al boton "Generar propuesta".
-4. Una vez resuelto el punto 3, repetir el recorrido del checklist de demo sobre el proyecto piloto
-   (matriz, comparacion, excepciones, aprobacion, publicacion, exportacion) con datos reales en vez del
-   escenario de dos empleados.
-5. Trasladar los hallazgos 4.2 y 4.3 a Operaciones para que confirmen si el roster o el PDF estan
-   desactualizados.
+3. ~~M2: expandir `required_shifts` desde `position_coverage_rules` dentro de la generacion~~ —
+   **hecho**: ver actualizacion al inicio del documento. Requirio ademas ensanchar la restriccion
+   unica de `position_coverage_rules` (hallazgo 4.4, ahora obsoleto) y dejar sin definir el soporte de
+   `weekday_scope` parcial (hallazgo 4.6, decision de producto pendiente).
+4. M3: ensamblar los `facts` reales que cada regla R01-R07 necesita para poder llamar
+   `POST /rules/evaluate` por candidato antes de rankear (cada regla tiene su propio archivo de 150-400
+   lineas — `SchedulingWorkRestRules.cs`, `SchedulingOverlapTravelRules.cs`,
+   `SchedulingNoveltyRequirementRules.cs`, `SchedulingTemplateDeviationRule.cs` — es una sub-tarea por
+   regla, no una sola). M4: calcular scoring real (continuidad, equidad, horas acumuladas, distancia)
+   que hoy nadie produce — `SchedulingRecommendationEngine.Score()` lo espera ya calculado. M5:
+   verificacion end-to-end y repetir este piloto dejando que el motor genere de verdad, comparando
+   contra los 4 PDF. Solo entonces cablear `POST /recommendations/generate` al boton "Generar
+   propuesta".
+5. Una vez resuelto M3-M4, repetir el recorrido del checklist de demo sobre el proyecto piloto (matriz,
+   comparacion, excepciones, aprobacion, publicacion, exportacion) con datos reales en vez del escenario
+   de dos empleados.
+6. Trasladar los hallazgos 4.2, 4.3 y 4.6 a Operaciones: 4.2/4.3 para que confirmen si el roster o el
+   PDF estan desactualizados; 4.6 para que definan si hace falta cobertura de dias parciales y, si es
+   asi, en que formato.

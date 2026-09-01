@@ -3184,8 +3184,57 @@ where t.status='ACTIVO' order by t.code,s.step_order", connection);
         long versionId;
         await using (var cmd = new NpgsqlCommand("insert into schedule_versions(schedule_id,version_number,status,source_snapshot,created_by) select @s,coalesce(max(version_number),0)+1,'PROPUESTA',jsonb_build_object('acceptedVacancy',@v),@a from schedule_versions where schedule_id=@s returning id", cn, tx))
         { cmd.Parameters.AddWithValue("s",scheduleId); cmd.Parameters.AddWithValue("v",acceptedVacancy); cmd.Parameters.AddWithValue("a",actor); versionId=(long)(await cmd.ExecuteScalarAsync(ct) ?? throw new InvalidOperationException("No fue posible crear la propuesta.")); }
-        await InsertAuditLogAsync(cn,tx,actorId,actor,"SCHEDULE_PROPOSAL_CREATED","SCHEDULE_VERSION",versionId.ToString(),"jsonb_build_object('acceptedVacancy',@vacancy)",c=>c.Parameters.AddWithValue("vacancy",acceptedVacancy),ct);
+        var expanded = await ExpandRequiredShiftsAsync(cn, tx, versionId, projectId, from, to, ct);
+        await RefreshScheduleMetricsAsync(cn, tx, versionId, ct);
+        await InsertAuditLogAsync(cn,tx,actorId,actor,"SCHEDULE_PROPOSAL_CREATED","SCHEDULE_VERSION",versionId.ToString(),"jsonb_build_object('acceptedVacancy',@vacancy,'requiredShiftsGenerated',@shifts)",c=>{c.Parameters.AddWithValue("vacancy",acceptedVacancy);c.Parameters.AddWithValue("shifts",expanded);},ct);
         await tx.CommitAsync(ct); return (await GetScheduleVersionAsync(versionId,ct))!;
+    }
+
+    // M2: expande los turnos requeridos desde la cobertura configurada (position_coverage_rules),
+    // determinista sobre el periodo pedido. No asigna empleados todavia (eso es M3-M4: evaluar
+    // candidatos contra las siete reglas y rankearlos) - cada cupo generado queda VACANTE con una
+    // razon explicita de que nadie fue evaluado aun, nunca asignado por presuncion. Solo se expande
+    // la cobertura cuyo weekday_scope sea exactamente 'TODOS' (insensible a mayusculas/espacios); un
+    // ambito semanal parcial (solo entre semana, etc.) no tiene una convencion definida en ningun
+    // lugar de este codebase (ver PostgresPortalRepository.cs, UpsertCoverageRuleRequest solo exige
+    // que el texto no este vacio) y esta deliberadamente fuera de este alcance en vez de adivinado.
+    private static async Task<int> ExpandRequiredShiftsAsync(
+        NpgsqlConnection cn, NpgsqlTransaction tx, long versionId, long projectId, DateOnly from, DateOnly to, CancellationToken ct)
+    {
+        const string sql = @"
+with inserted_shifts as (
+    insert into required_shifts(schedule_version_id, position_id, shift_date, starts_at, ends_at, required_quantity, source_snapshot)
+    select @versionId, pcr.position_id, d::date, pcr.starts_at, pcr.ends_at, pcr.required_quantity,
+           jsonb_build_object('fuente', 'position_coverage_rules', 'coverageRuleId', pcr.id, 'templateCode', st.code)
+    from position_coverage_rules pcr
+    join service_positions sp on sp.id = pcr.position_id
+    join shift_templates st on st.id = pcr.template_id
+    cross join generate_series(@from::date, @to::date, interval '1 day') as d
+    where sp.project_id = @projectId
+      and sp.status = 'ACTIVO'
+      and pcr.status = 'ACTIVO'
+      and pcr.effective_from <= d::date
+      and (pcr.effective_to is null or pcr.effective_to >= d::date)
+      and upper(btrim(pcr.weekday_scope)) = 'TODOS'
+    on conflict (schedule_version_id, position_id, shift_date, starts_at, ends_at) do nothing
+    returning id, required_quantity
+),
+inserted_vacancies as (
+    insert into schedule_assignments(schedule_version_id, required_shift_id, employee_id, status, reasons)
+    select @versionId, s.id, null, 'VACANTE',
+           '[{""code"":""CANDIDATES_NOT_EVALUATED"",""severity"":""BLOCKING"",""message"":""Ningun candidato fue evaluado todavia contra las reglas versionadas; no se presume cumplimiento.""}]'::jsonb
+    from inserted_shifts s, generate_series(1, s.required_quantity)
+    returning 1
+)
+select (select count(*) from inserted_shifts) as shifts, (select count(*) from inserted_vacancies) as vacancies";
+        await using var cmd = new NpgsqlCommand(sql, cn, tx);
+        cmd.Parameters.AddWithValue("versionId", versionId);
+        cmd.Parameters.AddWithValue("projectId", projectId);
+        cmd.Parameters.AddWithValue("from", from);
+        cmd.Parameters.AddWithValue("to", to);
+        await using var rd = await cmd.ExecuteReaderAsync(ct);
+        await rd.ReadAsync(ct);
+        return (int)(long)rd.GetInt64(0);
     }
 
     public Task<ScheduleWorkflowResponse?> GetScheduleVersionAsync(long id, CancellationToken ct=default) => QueryScheduleAsync("sv.id=@id",id,null,ct);

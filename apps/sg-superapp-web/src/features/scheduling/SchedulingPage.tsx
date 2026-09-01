@@ -86,8 +86,8 @@ export function SchedulingPage({ user }: Props) {
     if (!demoMode && proposal && (proposal.assignments?.length ?? 0) > 0) {
       const confirmed = window.confirm(
         `La versión actual (v${proposal.versionNumber}) tiene ${proposal.assignments!.length} asignaciones. ` +
-        "Generar una propuesta nueva crea una versión vacía y no borra la actual, pero la versión nueva " +
-        "será la única visible desde esta pantalla. ¿Continuar de todas formas?"
+        "Generar una propuesta nueva crea una versión distinta, todavía sin candidatos evaluados, y no " +
+        "borra la actual — pero la versión nueva será la única visible desde esta pantalla. ¿Continuar de todas formas?"
       );
       if (!confirmed) return;
     }
