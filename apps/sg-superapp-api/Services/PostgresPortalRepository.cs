@@ -3,6 +3,7 @@ using NpgsqlTypes;
 using System.Text;
 using System.Text.Json;
 using System.Data;
+using System.Globalization;
 using Sg.SuperApp.Api.Configuration;
 using Sg.SuperApp.Api.Contracts.Auth;
 using Sg.SuperApp.Api.Contracts.Portal;
@@ -67,11 +68,18 @@ public sealed class PostgresPortalRepository
         };
 
     private readonly string _connectionString;
+    private readonly SchedulingRuleEvaluator _ruleEvaluator;
+    private readonly SchedulingRuleProfileRepository _ruleProfileRepository;
+    private readonly SchedulingRuleHttpRepository _ruleHttpRepository;
 
-    public PostgresPortalRepository(IConfiguration configuration)
+    public PostgresPortalRepository(IConfiguration configuration, SchedulingRuleEvaluator ruleEvaluator,
+        SchedulingRuleProfileRepository ruleProfileRepository, SchedulingRuleHttpRepository ruleHttpRepository)
     {
         _connectionString = configuration.GetConnectionString("Postgres")
             ?? throw new InvalidOperationException("Connection string 'Postgres' not configured.");
+        _ruleEvaluator = ruleEvaluator;
+        _ruleProfileRepository = ruleProfileRepository;
+        _ruleHttpRepository = ruleHttpRepository;
     }
 
     public async Task<bool> CanConnectAsync(CancellationToken cancellationToken = default)
@@ -3187,7 +3195,13 @@ where t.status='ACTIVO' order by t.code,s.step_order", connection);
         var expanded = await ExpandRequiredShiftsAsync(cn, tx, versionId, projectId, from, to, ct);
         await RefreshScheduleMetricsAsync(cn, tx, versionId, ct);
         await InsertAuditLogAsync(cn,tx,actorId,actor,"SCHEDULE_PROPOSAL_CREATED","SCHEDULE_VERSION",versionId.ToString(),"jsonb_build_object('acceptedVacancy',@vacancy,'requiredShiftsGenerated',@shifts)",c=>{c.Parameters.AddWithValue("vacancy",acceptedVacancy);c.Parameters.AddWithValue("shifts",expanded);},ct);
-        await tx.CommitAsync(ct); return (await GetScheduleVersionAsync(versionId,ct))!;
+        await tx.CommitAsync(ct);
+        // M3: se evalua despues de comprometer la transaccion, nunca dentro de ella. PersistEvaluationsAsync
+        // abre su propia conexion y exige encontrar la version ya en estado PROPUESTA; llamarlo con la
+        // transaccion de creacion todavia abierta la dejaria invisible (aislamiento de Postgres entre
+        // conexiones) y cada intento fallaria con "La propuesta no acepta esta evaluacion o perfil de reglas."
+        await EvaluateCandidatesForRequiredShiftsAsync(versionId, projectId, from, actor, ct);
+        return (await GetScheduleVersionAsync(versionId,ct))!;
     }
 
     // M2: expande los turnos requeridos desde la cobertura configurada (position_coverage_rules),
@@ -3205,7 +3219,7 @@ where t.status='ACTIVO' order by t.code,s.step_order", connection);
 with inserted_shifts as (
     insert into required_shifts(schedule_version_id, position_id, shift_date, starts_at, ends_at, required_quantity, source_snapshot)
     select @versionId, pcr.position_id, d::date, pcr.starts_at, pcr.ends_at, pcr.required_quantity,
-           jsonb_build_object('fuente', 'position_coverage_rules', 'coverageRuleId', pcr.id, 'templateCode', st.code)
+           jsonb_build_object('fuente', 'position_coverage_rules', 'coverageRuleId', pcr.id, 'templateCode', st.code, 'templateVersion', st.version)
     from position_coverage_rules pcr
     join service_positions sp on sp.id = pcr.position_id
     join shift_templates st on st.id = pcr.template_id
@@ -3235,6 +3249,198 @@ select (select count(*) from inserted_shifts) as shifts, (select count(*) from i
         await using var rd = await cmd.ExecuteReaderAsync(ct);
         await rd.ReadAsync(ct);
         return (int)(long)rd.GetInt64(0);
+    }
+
+    // M3: por cada turno requerido que M2 acaba de expandir, evalua a cada candidato vigente del puesto
+    // (employee_position_assignments) contra las siete reglas con hechos reales - nunca fabricados - y
+    // persiste el veredicto sin atarlo a ninguna asignacion (assignmentId=null): es exactamente lo que
+    // PersistScheduleRecommendationAsync necesitara en M4 para rankear sin que el llamador invente su
+    // propia evaluacion. Si no hay perfil de reglas ACTIVE para el proyecto, no evalua nada - un estado
+    // ya conocido en la interfaz (RuleProfileState "UNCONFIGURED"), no un error que deba tumbar la
+    // generacion completa. Costo aceptado: una conexion por evaluacion (mismo patron que
+    // PersistEvaluationsAsync ya usa); no es apto para produccion a gran escala, solo MVP_TEST.
+    private async Task EvaluateCandidatesForRequiredShiftsAsync(
+        long versionId, long projectId, DateOnly from, string actor, CancellationToken ct)
+    {
+        await using var cn = new NpgsqlConnection(_connectionString);
+        await cn.OpenAsync(ct);
+
+        string projectCode;
+        await using (var cmd = new NpgsqlCommand("select code from service_projects where id=@id", cn))
+        { cmd.Parameters.AddWithValue("id", projectId); projectCode = (string)(await cmd.ExecuteScalarAsync(ct))!; }
+
+        SchedulingRuleProfile profile;
+        try { profile = await _ruleProfileRepository.LoadActiveAsync(projectCode, from, SchedulingEnvironmentScope.MVP_TEST, ct); }
+        catch (InvalidOperationException) { return; }
+
+        var shifts = new List<(long PositionId, DateOnly Date, TimeOnly StartsAt, TimeOnly EndsAt, string? TemplateCode, int? TemplateVersion, DateOnly? AnchorDate)>();
+        await using (var cmd = new NpgsqlCommand(@"
+select rs.position_id, rs.shift_date, rs.starts_at, rs.ends_at,
+       rs.source_snapshot->>'templateCode', (rs.source_snapshot->>'templateVersion')::int, pcr.effective_from
+from required_shifts rs
+left join position_coverage_rules pcr on pcr.id = (rs.source_snapshot->>'coverageRuleId')::bigint
+where rs.schedule_version_id=@id", cn))
+        {
+            cmd.Parameters.AddWithValue("id", versionId);
+            await using var rd = await cmd.ExecuteReaderAsync(ct);
+            while (await rd.ReadAsync(ct))
+                shifts.Add((rd.GetInt64(0), rd.GetFieldValue<DateOnly>(1), rd.GetFieldValue<TimeOnly>(2), rd.GetFieldValue<TimeOnly>(3),
+                    rd.IsDBNull(4) ? null : rd.GetString(4), rd.IsDBNull(5) ? null : rd.GetInt32(5),
+                    rd.IsDBNull(6) ? null : rd.GetFieldValue<DateOnly>(6)));
+        }
+
+        var templateSequences = new Dictionary<string, IReadOnlyList<string>>();
+        async Task<IReadOnlyList<string>> LoadSequenceAsync(string templateCode, int templateVersion)
+        {
+            var key = $"{templateCode}|{templateVersion}";
+            if (templateSequences.TryGetValue(key, out var cached)) return cached;
+            var steps = new List<string>();
+            await using var cmd = new NpgsqlCommand(@"select sts.shift_code from shift_template_steps sts
+join shift_templates st on st.id=sts.template_id where st.code=@code and st.version=@version order by sts.step_order", cn);
+            cmd.Parameters.AddWithValue("code", templateCode); cmd.Parameters.AddWithValue("version", templateVersion);
+            await using var rd = await cmd.ExecuteReaderAsync(ct);
+            while (await rd.ReadAsync(ct)) steps.Add(rd.GetString(0));
+            templateSequences[key] = steps;
+            return steps;
+        }
+
+        var projector = new ShiftCycleProjector();
+        foreach (var shift in shifts)
+        {
+            var candidates = new List<long>();
+            await using (var cmd = new NpgsqlCommand(@"select employee_id from employee_position_assignments
+where position_id=@position and status='VIGENTE' and start_date<=@date and (end_date is null or end_date>=@date)", cn))
+            {
+                cmd.Parameters.AddWithValue("position", shift.PositionId); cmd.Parameters.AddWithValue("date", shift.Date);
+                await using var rd = await cmd.ExecuteReaderAsync(ct);
+                while (await rd.ReadAsync(ct)) candidates.Add(rd.GetInt64(0));
+            }
+            if (candidates.Count == 0) continue;
+
+            var positionCode = await ResolvePositionCodeAsync(cn, shift.PositionId, ct);
+            var proposedStart = shift.Date.ToDateTime(shift.StartsAt);
+            var proposedEnd = shift.Date.ToDateTime(shift.EndsAt);
+            if (shift.EndsAt <= shift.StartsAt) proposedEnd = proposedEnd.AddDays(1);
+
+            string? expectedShiftCode = null;
+            if (shift.TemplateCode is not null && shift.TemplateVersion is not null && shift.AnchorDate is not null)
+            {
+                var sequence = await LoadSequenceAsync(shift.TemplateCode, shift.TemplateVersion.Value);
+                if (sequence.Count > 0)
+                {
+                    var projected = projector.Project(new ShiftCycleRequest(sequence, shift.AnchorDate.Value, shift.Date, shift.Date, 0));
+                    expectedShiftCode = projected.Count > 0 ? projected[0].ShiftCode : null;
+                }
+            }
+            var proposedShiftCode = DeriveShiftCode(shift.StartsAt, shift.EndsAt);
+
+            foreach (var employeeId in candidates)
+            {
+                var facts = await BuildCandidateFactsAsync(cn, employeeId, positionCode, shift.Date, proposedStart, proposedEnd,
+                    shift.TemplateCode, shift.TemplateVersion, shift.AnchorDate, expectedShiftCode, proposedShiftCode, ct);
+                var batch = _ruleEvaluator.Evaluate(profile, projectCode, from, facts);
+                await _ruleHttpRepository.PersistEvaluationsAsync(versionId, null, projectCode, batch, actor, ct);
+            }
+        }
+    }
+
+    private static async Task<string> ResolvePositionCodeAsync(NpgsqlConnection cn, long positionId, CancellationToken ct)
+    {
+        await using var cmd = new NpgsqlCommand("select code from service_positions where id=@id", cn);
+        cmd.Parameters.AddWithValue("id", positionId);
+        var code = (string?)await cmd.ExecuteScalarAsync(ct);
+        return string.IsNullOrWhiteSpace(code) ? $"POS-{positionId}" : code;
+    }
+
+    // Hechos de un candidato para un turno requerido. R01/R02/R03/R05/R07 se calculan de datos reales ya
+    // persistidos en I9; R04/R06 llegan con arreglos vacios a proposito - no existe hoy una integracion
+    // real con las novedades de I2/I6 ni los requisitos de puesto de I5 que produzca el catalogo que esas
+    // reglas exigen, y un arreglo vacio produce el veredicto honesto (_UNVERIFIED/_MISSING), nunca uno
+    // fabricado. "writtenAgreement" tampoco tiene hoy una fuente real: se envia false por el mismo motivo.
+    private static async Task<JsonElement> BuildCandidateFactsAsync(
+        NpgsqlConnection cn, long employeeId, string destinationPositionCode, DateOnly shiftDate,
+        DateTime proposedStart, DateTime proposedEnd, string? templateCode, int? templateVersion,
+        DateOnly? anchorDate, string? expectedShiftCode, string proposedShiftCode, CancellationToken ct)
+    {
+        var rows = new List<(string PositionCode, DateOnly Date, TimeOnly Starts, TimeOnly Ends, string VersionStatus)>();
+        await using (var cmd = new NpgsqlCommand(@"
+select coalesce(sp.code, 'POS-' || sp.id), rs.shift_date, rs.starts_at, rs.ends_at, sv.status
+from schedule_assignments sa
+join required_shifts rs on rs.id = sa.required_shift_id
+join schedule_versions sv on sv.id = sa.schedule_version_id
+join service_positions sp on sp.id = rs.position_id
+where sa.employee_id = @employeeId and sa.status = 'ASIGNADA' and sv.status not in ('CANCELADA','REEMPLAZADA')", cn))
+        {
+            cmd.Parameters.AddWithValue("employeeId", employeeId);
+            await using var rd = await cmd.ExecuteReaderAsync(ct);
+            while (await rd.ReadAsync(ct))
+                rows.Add((rd.GetString(0), rd.GetFieldValue<DateOnly>(1), rd.GetFieldValue<TimeOnly>(2), rd.GetFieldValue<TimeOnly>(3), rd.GetString(4)));
+        }
+
+        DateTime IntervalStart((string PositionCode, DateOnly Date, TimeOnly Starts, TimeOnly Ends, string VersionStatus) r) => r.Date.ToDateTime(r.Starts);
+        DateTime IntervalEnd((string PositionCode, DateOnly Date, TimeOnly Starts, TimeOnly Ends, string VersionStatus) r)
+        { var end = r.Date.ToDateTime(r.Ends); return r.Ends <= r.Starts ? end.AddDays(1) : end; }
+
+        var intervals = rows.Select(r => new { Row = r, Start = IntervalStart(r), End = IntervalEnd(r) }).ToList();
+        var previous = intervals.Where(i => i.End <= proposedStart).OrderByDescending(i => i.End).FirstOrDefault();
+
+        var weekOffset = ((int)shiftDate.DayOfWeek + 6) % 7;
+        var weekStart = shiftDate.AddDays(-weekOffset);
+        var weekEnd = weekStart.AddDays(7);
+        var proposedHours = (decimal)(proposedEnd - proposedStart).TotalHours;
+        var dailyHours = proposedHours + (decimal)intervals.Where(i => i.Row.Date == shiftDate).Sum(i => (i.End - i.Start).TotalHours);
+        var weeklyHours = proposedHours + (decimal)intervals.Where(i => i.Row.Date >= weekStart && i.Row.Date < weekEnd).Sum(i => (i.End - i.Start).TotalHours);
+
+        var employeeCode = employeeId.ToString(CultureInfo.InvariantCulture);
+        var noAgreementAnchor = proposedStart.AddDays(-30);
+        var expectedCells = expectedShiftCode is null ? Array.Empty<object>() : new object[]
+        { new { cell = "DEFAULT", expected = expectedShiftCode } };
+        var proposedCells = expectedShiftCode is null ? Array.Empty<object>() : new object[]
+        { new { cell = "DEFAULT", proposed = proposedShiftCode } };
+
+        // Los evaluadores de reglas exigen timestamps ISO-8601 con offset explicito (regex
+        // ^...(?:Z|[+-]\d{2}:\d{2})$ en cada archivo de regla). Los timestamps calculados aqui son
+        // ingenuos (fecha+hora sin zona); se fija -05:00 (Colombia) como convencion, igual que ya usan
+        // los fixtures de prueba existentes (scripts/dev/Verify-SgSuperAppI9MvpIntegration.ps1).
+        static string FormatTimestamp(DateTime value) =>
+            new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Unspecified), TimeSpan.FromHours(-5))
+                .ToString("yyyy-MM-ddTHH:mm:sszzz", CultureInfo.InvariantCulture);
+
+        var facts = new
+        {
+            assignmentId = $"CAND-{employeeCode}",
+            scheduleVersionId = "GENERATION",
+            employeeId = employeeCode,
+            shiftId = $"REQ-{shiftDate:yyyyMMdd}-{destinationPositionCode}",
+            dailyHours,
+            weeklyHours,
+            writtenAgreement = false,
+            previousShiftEnd = FormatTimestamp(previous?.End ?? noAgreementAnchor),
+            proposedShiftStart = FormatTimestamp(proposedStart),
+            proposedShiftEnd = FormatTimestamp(proposedEnd),
+            positionCode = destinationPositionCode,
+            shiftStart = FormatTimestamp(proposedStart),
+            shiftEnd = FormatTimestamp(proposedEnd),
+            existingIntervals = intervals.Select(i => new
+            {
+                employeeId = employeeCode,
+                status = i.Row.VersionStatus is "APROBADA" or "PUBLICADA" ? "APPROVED" : "DRAFT",
+                start = FormatTimestamp(i.Start),
+                end = FormatTimestamp(i.End)
+            }).ToArray(),
+            previousAssignmentId = previous is null ? $"NONE-{employeeCode}" : $"PREV-{employeeCode}",
+            originPositionCode = previous?.Row.PositionCode ?? destinationPositionCode,
+            destinationPositionCode,
+            previousShiftStart = FormatTimestamp(previous is null ? noAgreementAnchor.AddHours(-8) : previous.Start),
+            noveltyEvaluations = Array.Empty<object>(),
+            requirementEvaluations = Array.Empty<object>(),
+            templateCode = templateCode ?? "SIN-PLANTILLA",
+            templateVersion = (templateVersion ?? 0).ToString(CultureInfo.InvariantCulture),
+            anchorDate = (anchorDate ?? shiftDate).ToString("yyyy-MM-dd"),
+            expectedCells,
+            proposedCells
+        };
+        return JsonDocument.Parse(JsonSerializer.Serialize(facts)).RootElement;
     }
 
     public Task<ScheduleWorkflowResponse?> GetScheduleVersionAsync(long id, CancellationToken ct=default) => QueryScheduleAsync("sv.id=@id",id,null,ct);
