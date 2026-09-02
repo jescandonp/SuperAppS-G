@@ -15,6 +15,38 @@ END $$;
 INSERT INTO clients(code,name,status) VALUES('I9-PILOTO-REAL','Piloto Nuevo Planeador (datos reales anonimizados)','ACTIVO') ON CONFLICT (code) DO NOTHING;
 INSERT INTO service_projects(client_id,code,name,effective_from,status,created_at,updated_at) SELECT id,'PILOTO-NUEVO-PLANEADOR','Piloto Nuevo Planeador - Septiembre 2026',date '2026-09-01','ACTIVO',now(),now() FROM clients WHERE code='I9-PILOTO-REAL' ON CONFLICT (code) DO NOTHING;
 
+-- Perfil de reglas MVP_TEST del piloto (mismos parametros demo que I9-MVP-SIMULATED,
+-- alcance propio: PILOTO-NUEVO-PLANEADOR).
+INSERT INTO scheduling_rule_profiles (profile_code,version,origin,environment_scope,scope_code,effective_from,status,checksum,created_by,approval_evidence)
+VALUES ('I9-PILOTO-SIMULATED',1,'SIMULATED','MVP_TEST','PILOTO-NUEVO-PLANEADOR',DATE '2026-09-01','DRAFT',repeat('0',64),'seed.i9.piloto',
+  '{"classification":"SIMULATED_DEMO_NOT_INSTITUTIONAL","approval":"AUTHORIZED_FOR_MVP_TEST_ONLY","basedOn":"I9-MVP-SIMULATED v2"}'::jsonb)
+ON CONFLICT (profile_code,version) DO NOTHING;
+WITH desired(rule_code,parameters,catalog_snapshot) AS (VALUES
+ ('I9-R01','{"ordinaryDailyHours":8,"ordinaryWeeklyHours":42,"approvalFromDailyHours":10,"absoluteDailyHours":12,"absoluteWeeklyHours":60,"writtenAgreementRequiredAboveOrdinary":true}'::jsonb,
+  '{"classification":"SIMULATED_DEMO_NOT_INSTITUTIONAL","source":"MVP_SPEC_V2"}'::jsonb),
+ ('I9-R02','{"minimumRestHours":12,"otherReasonRequiresDescription":true}'::jsonb,
+  '{"classification":"SIMULATED_DEMO_NOT_INSTITUTIONAL","approvedMotiveCodes":["OPERATIONAL_CONTINUITY_DEMO","EMERGENCY_DEMO","OTHER"]}'::jsonb),
+ ('I9-R03','{"intervalSemantics":"HALF_OPEN","adjacentIntervalsOverlap":false,"precedenceOver":["I9-R05"]}'::jsonb,
+  '{"classification":"SIMULATED_DEMO_NOT_INSTITUTIONAL","sources":["CURRENT_DRAFTS","APPROVED_SCHEDULES"]}'::jsonb),
+ ('I9-R04','{"unknownOutcome":"UNVERIFIED","unknownApprovalBlocked":true}'::jsonb,
+  '{"classification":"SIMULATED_DEMO_NOT_INSTITUTIONAL","approvedMotiveCodes":["HR_VALIDATED_DEMO","OPERATIONAL_CONTINUITY_DEMO"],"mappingDemo":[]}'::jsonb),
+ ('I9-R05','{"missingRelationOutcome":"EXCEPTION_REQUIRED","neverAssumeZero":true,"directional":true}'::jsonb,
+  '{"classification":"SIMULATED_DEMO_NOT_INSTITUTIONAL","matrixDemo":[]}'::jsonb),
+ ('I9-R06','{"validForEntireShift":true,"unverifiedOutcome":"EXCEPTION_REQUIRED","informativeRequiresOwnerAndDueDate":true}'::jsonb,
+  '{"classification":"SIMULATED_DEMO_NOT_INSTITUTIONAL","approvedMotiveCodes":["HR_VALIDATED_DEMO"],"requirementsDemo":[]}'::jsonb),
+ ('I9-R07','{"compareBy":["templateVersion","anchor","cell"],"changeInvalidatesApproval":true}'::jsonb,
+  '{"classification":"SIMULATED_DEMO_NOT_INSTITUTIONAL","templateCodes":["2X2","4X2","4X4","6X1"],"templateVersions":["1"],"approvedMotiveCodes":["OPERATIONAL_NEED_DEMO","COVERAGE_DEMO","OTHER"]}'::jsonb)
+)
+INSERT INTO scheduling_rule_profile_entries(rule_profile_id,rule_code,parameters,catalog_snapshot,enabled)
+SELECT p.id,d.rule_code,d.parameters,d.catalog_snapshot,TRUE FROM scheduling_rule_profiles p CROSS JOIN desired d
+WHERE p.profile_code='I9-PILOTO-SIMULATED' AND p.version=1 AND p.status='DRAFT'
+ON CONFLICT (rule_profile_id,rule_code) DO UPDATE SET parameters=EXCLUDED.parameters,catalog_snapshot=EXCLUDED.catalog_snapshot,enabled=TRUE;
+UPDATE scheduling_rule_profiles p SET checksum=content.checksum,status='ACTIVE',activated_by='seed.i9.piloto',activated_at=NOW()
+FROM (SELECT e.rule_profile_id,
+ encode(public.digest(convert_to(string_agg(e.rule_code||':'||i9_mvp_canonical_jsonb(e.parameters)||':'||i9_mvp_canonical_jsonb(e.catalog_snapshot),'|' ORDER BY e.rule_code),'UTF8'),'sha256'),'hex') AS checksum
+ FROM scheduling_rule_profile_entries e GROUP BY e.rule_profile_id) content
+WHERE p.id=content.rule_profile_id AND p.profile_code='I9-PILOTO-SIMULATED' AND p.version=1 AND p.status='DRAFT';
+
 -- Sitio: C.R ICONIK 68 (turno 2X2, puestos concurrentes 6)
 INSERT INTO service_positions(code,name,client_text,location_text,status) SELECT 'ICONIK-68','C.R ICONIK 68','Piloto Nuevo Planeador','C.R ICONIK 68','ACTIVO' WHERE NOT EXISTS (SELECT 1 FROM service_positions WHERE code='ICONIK-68');
 UPDATE service_positions SET project_id=(SELECT id FROM service_projects WHERE code='PILOTO-NUEVO-PLANEADOR') WHERE code='ICONIK-68';

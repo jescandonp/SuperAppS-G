@@ -43,16 +43,34 @@ sobre datos productivos.
 > `COMPLIANT`) y con el nuevo verificador `scripts/dev/Verify-SgSuperAppI9CandidateEvaluation.ps1`
 > (`PASS 10`), mas regresion confirmada de M1 y M2 (`PASS 16` y `PASS 14` respectivamente, sin cambios).
 >
-> **Hallazgo real, no un bug:** al generar una propuesta real para el proyecto piloto
-> (`PILOTO-NUEVO-PLANEADOR`), `scheduling_rule_evaluations` quedo en cero filas. La causa: el unico
-> perfil de reglas `MVP_TEST` activo esta sembrado con `scope_code='PROJECT-A'` (el escenario de
-> juguete, `db/seeds/011_i9_mvp_simulated_rule_profile.sql`) — el proyecto piloto no tiene un perfil
-> propio, y M3 se rehusa correctamente a evaluar sin uno (falla `LoadActiveAsync`, se captura y se
-> omite, exactamente el mismo criterio que R04/R06: sin configuracion real, no se presume nada). Esto
-> es correcto, no un defecto: inventar parametros R01-R07 para los 4 sitios reales de S&G sin aprobacion
-> de Legal/Operaciones seria exactamente el tipo de umbral institucional que esta SPEC se niega a
-> inventar. Falta que Operaciones/Legal definan un perfil de reglas (real o demo-con-valores-reales)
-> para `PILOTO-NUEVO-PLANEADOR` antes de que M3 produzca veredictos sobre este proyecto especifico.
+> **Hallazgo real, ya resuelto (2026-09-02):** al generar por primera vez una propuesta real para el
+> proyecto piloto, `scheduling_rule_evaluations` quedaba en cero filas — el unico perfil `MVP_TEST`
+> activo estaba sembrado con `scope_code='PROJECT-A'` (el escenario de juguete), y el piloto no tenia
+> perfil propio; M3 se rehusaba correctamente a evaluar sin uno, en vez de presumir nada. Se agrego
+> `I9-PILOTO-SIMULATED`, un perfil `MVP_TEST` propio para `PILOTO-NUEVO-PLANEADOR` (sembrado en
+> `scripts/dev/sql/i9-piloto-real-anonimizado.sql`), reusando **exactamente los mismos parametros R01-R07
+> ya marcados `SIMULATED_DEMO_NOT_INSTITUTIONAL` y aprobados para MVP_TEST** en el perfil de `PROJECT-A`
+> — no se invento ningun umbral nuevo, solo se amplio su alcance. Los catalogos de novedades (R04),
+> matriz de traslados (R05) y requisitos de puesto (R06) se dejaron vacios a proposito (no hay catalogo
+> real para los 4 sitios todavia; ver el parrafo de abajo).
+>
+> Verificado en vivo, extremo a extremo: con el perfil activo (7 reglas), generar una propuesta real de
+> 2 dias sobre los 4 sitios del piloto produjo **1092 evaluaciones reales sobre 39 candidatos reales**,
+> con veredictos variados y explicables — no un resultado uniforme fabricado:
+>
+> | Regla | Resultado | Lectura |
+> |---|---|---|
+> | R01 (jornada) | 156 `BLOCKED` | Todos los turnos configurados duran 12h (mas que las 8h ordinarias); el perfil exige acuerdo escrito para superar la jornada ordinaria, y como `writtenAgreement` no tiene fuente real hoy (se envia `false`, honesto), todos bloquean por falta de ese acuerdo — un hallazgo real de negocio, no un error de calculo. |
+> | R02 (descanso) | 122 `COMPLIANT`, 34 `EXCEPTION_REQUIRED` | Distincion real segun el historial de turnos de cada candidato. |
+> | R03 (traslapes) | 111 `COMPLIANT`, 45 `BLOCKED` | Deteccion real de cruces con otras versiones vivas. |
+> | R04 (novedades) | 156 `WARNING` | Catalogo vacio a proposito → no verificado, nunca cumplimiento fabricado. |
+> | R05 (traslados) | 156 `COMPLIANT` | Sin turno previo en el periodo evaluado → atajo `_SAME_POSITION`, correcto. |
+> | R06 (requisitos) | 156 `WARNING` | Catalogo vacio a proposito → no verificado. |
+> | R07 (plantilla) | 156 `BLOCKED` | Los guardas reales rotan escalonados; comparados contra una unica secuencia sin escalonar (limitacion conocida, ver seccion 4.3 del plan de M3), la desviacion es real y esperada. |
+>
+> Falta todavia: que Operaciones/Legal revisen si estos parametros MVP_TEST (pensados como demo) deben
+> convertirse en la politica real para estos 4 sitios, y construir la integracion real de novedades
+> (R04) y requisitos (R06) con I2/I5/I6 antes de que esas dos reglas dejen de salir `WARNING` siempre.
 >
 > Este documento registra el primer piloto funcional con datos operativos reales (anonimizados) que
 > el checklist de demo y el criterio de aceptacion #10 de la SPEC dejaban pendiente. No cierra el MVP:
@@ -211,16 +229,17 @@ Desde M2, tambien valida que **"Generar propuesta" expande cobertura real** (`re
 `position_coverage_rules`, con sus VACANTE explicitas) en vez de crear una version literalmente vacia.
 
 Desde M3, tambien valida que el mecanismo de evaluacion de candidatos contra las siete reglas funciona
-con datos reales (turno previo real, horas reales, traslapes reales) — pero **no** produce veredictos
-sobre los sitios reales del piloto todavia, porque `PILOTO-NUEVO-PLANEADOR` no tiene perfil de reglas
-propio (ver el hallazgo en la actualizacion de M3 al inicio del documento); si se genera una propuesta
-real para este proyecto hoy, `scheduling_rule_evaluations` queda en cero filas, correctamente.
+con datos reales (turno previo real, horas reales, traslapes reales) **sobre los 4 sitios reales del
+piloto**, no solo sobre un escenario anonimo: con el perfil `I9-PILOTO-SIMULATED` activo (ver
+actualizacion al inicio del documento), 1092 evaluaciones reales sobre 39 candidatos reales, con
+veredictos variados y explicables por regla.
 
 **No valida:** el scoring ni la asignacion real de un candidato a un turno — "Generar propuesta" deja
-todo cupo generado en `VACANTE`, evaluado o no, nunca asigna a nadie; ver M4 en el punto 6 de la
-seccion 6 — ni el recorrido completo de aprobar/publicar/exportar del checklist de demo sobre datos
-reales (bloqueado por lo mismo: sin perfil de reglas propio para el piloto, ninguna version de ese
-proyecto puede pasar el gate de "toda regla decidida" que exige aprobar/publicar).
+todo cupo generado en `VACANTE`, evaluado o no, nunca asigna a nadie (ver M4 en el punto 6 de la
+seccion 6); ni el recorrido completo de aprobar/publicar/exportar del checklist de demo sobre datos
+reales (bloqueado por lo mismo, mas porque R01 bloquea todo por falta de acuerdo escrito y R04/R06
+salen sin verificar — ningun candidato pasa hoy el gate de "toda regla decidida" que exige
+aprobar/publicar, correctamente, dado el estado real de los datos).
 
 ## 6. Proximos pasos sugeridos
 
@@ -235,13 +254,12 @@ proyecto puede pasar el gate de "toda regla decidida" que exige aprobar/publicar
    `weekday_scope` parcial (hallazgo 4.6, decision de producto pendiente).
 4. ~~M3: ensamblar los `facts` reales que cada regla R01-R07 necesita para poder llamar
    `POST /rules/evaluate` por candidato antes de rankear~~ — **hecho**: ver actualizacion al inicio del
-   documento. Reveló que el proyecto piloto no tiene perfil de reglas propio (ver el hallazgo justo
-   debajo de esa actualizacion) — sin resolver eso, M3 no produce veredictos sobre datos reales del
-   piloto, solo sobre el escenario `PROJECT-A`.
-5. Definir con Operaciones/Legal un perfil de reglas `MVP_TEST` para `PILOTO-NUEVO-PLANEADOR` (parametros
-   R01-R07 reales o demo-con-valores-reales para los 4 sitios), siguiendo el patron de
-   `db/seeds/011_i9_mvp_simulated_rule_profile.sql` — sin esto, repetir el piloto con M3 solo confirma el
-   mecanismo, no produce veredictos utiles sobre GRATAMIRA/ICONIK/VIENA/LIFE72.
+   documento.
+5. ~~Definir un perfil de reglas `MVP_TEST` propio para `PILOTO-NUEVO-PLANEADOR`~~ — **hecho**: perfil
+   `I9-PILOTO-SIMULATED`, mismos parametros demo ya aprobados que `PROJECT-A`, sin catalogos de
+   novedades/requisitos/traslados (vacios a proposito). Pendiente que Operaciones/Legal confirmen si
+   estos parametros demo deben volverse politica real para estos 4 sitios, y construir la integracion
+   real de novedades (R04) y requisitos (R06) con I2/I5/I6.
 6. M4: calcular scoring real (continuidad, equidad, horas acumuladas, distancia) que hoy nadie produce —
    `SchedulingRecommendationEngine.Score()` lo espera ya calculado. M5: verificacion end-to-end y repetir
    este piloto dejando que el motor genere de verdad, comparando contra los 4 PDF. Solo entonces cablear
