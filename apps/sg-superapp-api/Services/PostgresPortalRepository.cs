@@ -3487,10 +3487,15 @@ where sa.employee_id = @employeeId and sa.status = 'ASIGNADA' and sv.status not 
 
         var employeeCode = employeeId.ToString(CultureInfo.InvariantCulture);
         var noAgreementAnchor = proposedStart.AddDays(-30);
+        // SchedulingTemplateDeviationRule.TryReadCells exige {employeeId,date,cell,shiftCode} por celda
+        // - no {cell,expected}/{cell,proposed} como se enviaba antes. Ese desajuste de forma hacia que
+        // I9-R07 saliera BLOCKED por INVALID_INPUT siempre que si habia plantilla real, nunca llegaba a
+        // comparar de verdad la secuencia esperada contra la propuesta.
+        var shiftDateCode = shiftDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var expectedCells = expectedShiftCode is null ? Array.Empty<object>() : new object[]
-        { new { cell = "DEFAULT", expected = expectedShiftCode } };
+        { new { employeeId = employeeCode, date = shiftDateCode, cell = "DEFAULT", shiftCode = expectedShiftCode } };
         var proposedCells = expectedShiftCode is null ? Array.Empty<object>() : new object[]
-        { new { cell = "DEFAULT", proposed = proposedShiftCode } };
+        { new { employeeId = employeeCode, date = shiftDateCode, cell = "DEFAULT", shiftCode = proposedShiftCode } };
 
         // Los evaluadores de reglas exigen timestamps ISO-8601 con offset explicito (regex
         // ^...(?:Z|[+-]\d{2}:\d{2})$ en cada archivo de regla). Los timestamps calculados aqui son
