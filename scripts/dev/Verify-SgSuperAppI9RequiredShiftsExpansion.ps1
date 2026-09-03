@@ -3,11 +3,13 @@ param([string]$RepositoryRoot,[int]$Port = 5423)
 
 # M2 (roadmap acordado 2026-09-01 tras el piloto real anonimizado): "Generar propuesta"
 # (CreateScheduleProposalAsync) ahora expande required_shifts desde position_coverage_rules para el
-# periodo pedido, y deja un cupo VACANTE por cada turno requerido (nadie ha sido evaluado todavia
-# contra las reglas - eso es M3/M4). Este verificador cubre exactamente esa expansion, incluidas sus
-# guardas: solo puestos ACTIVO, solo cobertura ACTIVO y vigente para cada fecha, y solo
-# weekday_scope='TODOS' (un ambito semanal parcial no tiene convencion definida en este codebase, asi
-# que se omite en vez de adivinarse). La base temporal se elimina y la API se detiene siempre.
+# periodo pedido. Este verificador cubre exactamente esa expansion, incluidas sus guardas: solo
+# puestos ACTIVO, solo cobertura ACTIVO y vigente para cada fecha, y solo weekday_scope='TODOS' (un
+# ambito semanal parcial no tiene convencion definida en este codebase, asi que se omite en vez de
+# adivinarse). El proyecto de esta fixture (PROJECT-EXP) no tiene ningun perfil de reglas ACTIVE
+# configurado, asi que tras M4 cada turno expandido sigue llegando VACANTE, ahora por el motivo real
+# (RULE_PROFILE_UNCONFIGURED, no el placeholder generico CANDIDATES_NOT_EVALUATED que M2 escribia antes
+# de M4). La base temporal se elimina y la API se detiene siempre.
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) {
@@ -149,7 +151,11 @@ INSERT INTO position_coverage_rules(position_id,template_id,weekday_scope,starts
     Q (@($proposal.assignments).Count -eq 12) 'RS-T02 only the ACTIVO position with TODOS coverage in vigency expands (2 slots x 2 shifts x 3 days)'
     Q (@($proposal.assignments | Where-Object { $_.status -ne 'VACANTE' }).Count -eq 0) 'RS-T03 every generated slot is VACANTE, never presumed ASIGNADA'
     Q (@($proposal.assignments | Where-Object { $_.positionId -ne $proposal.assignments[0].positionId }).Count -eq 0) 'RS-T04 no shift was generated for the inactive, partial-scope, or expired-coverage positions'
-    Q ($proposal.assignments[0].reasons[0].code -eq 'CANDIDATES_NOT_EVALUATED') 'RS-T05 the vacancy reason names why: nobody has been evaluated yet'
+    # M4: PROJECT-EXP no tiene ningun perfil de reglas ACTIVE configurado (el unico sembrado,
+    # I9-MVP-SIMULATED, esta scoped a PROJECT-A) - EvaluateCandidatesForRequiredShiftsAsync no evalua ni
+    # rankea nada, pero sigue dejando una vacante real y visible por cada turno requerido (la garantia
+    # que M2 ya ofrecia), con un motivo honesto en vez del antiguo placeholder generico.
+    Q ($proposal.assignments[0].reasons[0].message -eq 'RULE_PROFILE_UNCONFIGURED') 'RS-T05 the vacancy reason names why: no active rule profile exists for this project yet'
     Q ($proposal.vacancyCount -eq 12) 'RS-T06 schedule_versions.vacancy_count reflects the generated vacancies (metrics were refreshed)'
     Q ($proposal.coveragePercent -eq 0) 'RS-T06 coveragePercent stays 0 until M3/M4 actually assign someone'
 

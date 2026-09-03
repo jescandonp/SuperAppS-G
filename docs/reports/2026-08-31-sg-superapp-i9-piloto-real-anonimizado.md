@@ -72,6 +72,54 @@ sobre datos productivos.
 > convertirse en la politica real para estos 4 sitios, y construir la integracion real de novedades
 > (R04) y requisitos (R06) con I2/I5/I6 antes de que esas dos reglas dejen de salir `WARNING` siempre.
 >
+> **Actualizacion 2026-09-03 — M4 resuelto (con un hallazgo real importante).** "Generar propuesta" ahora
+> rankea a los candidatos reales que M3 evalua y persiste la asignacion real (o la vacante real, con su
+> motivo) via `SchedulingRecommendationEngine.Generate` + `PersistScheduleRecommendationAsync` — piezas
+> que ya existian y ya estaban probadas de forma aislada (`Verify-SgSuperAppI9MvpGeneration.ps1`, 13
+> escenarios); M4 solo les da entrada real: por cada candidato evaluado, `Continuity` (`1` si trabajo real
+> el dia calendario inmediatamente anterior, si no `0`) y `Equity` (`1/(1+n)`, `n` = turnos `ASIGNADA`
+> reales que ya tiene en el periodo) se calculan de datos ya persistidos; `AdditionalHours`,
+> `DistancePenalty` y `PublishedScheduleChange` se dejan en `0` porque no existe hoy una fuente real de
+> horas acumuladas fuera del periodo, distancia ni republicacion previa — hueco de datos documentado, no
+> un valor inventado. `ExpandRequiredShiftsAsync` (M2) ya no siembra el cupo `VACANTE` placeholder: la
+> vacante real (con motivo real) la escribe el motor.
+>
+> **Hallazgo real (no un defecto de M4, un hueco de datos con consecuencia visible):** con los parametros
+> `SIMULATED_DEMO_NOT_INSTITUTIONAL` ya aprobados, **I9-R04 sale `WARNING` para el 100% de las
+> evaluaciones reales** porque `BuildCandidateFactsAsync` envia `noveltyEvaluations=[]` a proposito (no
+> hay integracion real con I2 todavia — nunca se inventa disponibilidad), y
+> `SchedulingEligibilityService` proyecta `WARNING` como bloqueante ("un turno sin verificar no acredita
+> nada"). Consecuencia real: **hoy nadie puede terminar `ASIGNADA` via "Generar propuesta"**, sin importar
+> cuanto mejore el ranking — todo turno requerido queda `VACANTE`. Verificado en vivo sobre el piloto real
+> (`schedule_versions.id=4`, periodo 2026-09-02/03, 4 sitios): 48 turnos requeridos, **48 `VACANTE`, 0
+> `ASIGNADA`**, con motivos reales y diferenciados (48/48 citan `I9_R04_UNVERIFIED`; 46/48 citan ademas
+> `I9_R02_EXCEPTION_REQUIRED` por descanso real insuficiente; 44/48 citan `I9_R01_WRITTEN_AGREEMENT_REQUIRED`),
+> y 1092 evaluaciones reales persistidas (mismo numero que M3 ya habia reportado, ahora alimentando el
+> ranking real). Esto hace mas urgente la integracion real de R04 con I2 que cualquier otro pendiente:
+> aunque R01/R07 tambien bloquean casi todo, R04 es el unico que bloquea **sin excepcion posible** hoy
+> (`WARNING` siempre se proyecta como bloqueante, nunca como `SUBSANABLE`).
+>
+> **Dos correcciones reales encontradas al construir el verificador de M4** (ninguna estaba en el plan
+> aprobado, ambas se corrigieron antes de dar M4 por terminado):
+> 1. Un proyecto sin perfil de reglas `ACTIVE` configurado quedaba **sin ninguna fila de
+>    `schedule_assignments`** (ni `VACANTE`) — la garantia de M2 de que todo turno requerido queda visible
+>    se habia roto al quitar el placeholder. Se corrigio: sin perfil, cada turno sigue recibiendo una
+>    `VACANTE` real con motivo `RULE_PROFILE_UNCONFIGURED`, nunca un veredicto de reglas inventado.
+> 2. Un turno con `required_quantity>1` (varios cupos concurrentes del mismo puesto/horario) solo
+>    generaba **una** fila de asignacion, no `N` — el motor de ranking (ya existente, ya probado) no
+>    modela "cupos" como concepto propio. Se corrigio generando `N` entradas independientes hacia el
+>    motor por turno; se documenta como limitacion heredada que un mismo candidato podria ganar dos cupos
+>    hermanos del mismo turno (el freno es el mismo descuento por acumulacion que ya usa el motor entre
+>    turnos distintos, no una exclusion dura) — redisenar el motor para exclusividad dura queda fuera de
+>    alcance de M4.
+>
+> Verificado con el nuevo `scripts/dev/Verify-SgSuperAppI9CandidateRanking.ps1` (`PASS 14`, dos candidatos
+> con historial real distinto mas un puesto sin candidatos reales, confirmando que un turno con cero
+> candidatos sigue llegando al motor con `Candidates=[]` en vez de desaparecer), mas regresion confirmada
+> de M1, M2 y M3 (`Verify-SgSuperAppI9ScheduleVisibility.ps1`, `Verify-SgSuperAppI9RequiredShiftsExpansion.ps1`
+> actualizado para el nuevo motivo real, y `Verify-SgSuperAppI9CandidateEvaluation.ps1`, sin cambios de
+> fondo).
+>
 > Este documento registra el primer piloto funcional con datos operativos reales (anonimizados) que
 > el checklist de demo y el criterio de aceptacion #10 de la SPEC dejaban pendiente. No cierra el MVP:
 > ver seccion 4 para los hallazgos que quedan abiertos, incluido uno nuevo (4.1) mas severo que los ya
@@ -234,12 +282,18 @@ piloto**, no solo sobre un escenario anonimo: con el perfil `I9-PILOTO-SIMULATED
 actualizacion al inicio del documento), 1092 evaluaciones reales sobre 39 candidatos reales, con
 veredictos variados y explicables por regla.
 
-**No valida:** el scoring ni la asignacion real de un candidato a un turno — "Generar propuesta" deja
-todo cupo generado en `VACANTE`, evaluado o no, nunca asigna a nadie (ver M4 en el punto 6 de la
-seccion 6); ni el recorrido completo de aprobar/publicar/exportar del checklist de demo sobre datos
-reales (bloqueado por lo mismo, mas porque R01 bloquea todo por falta de acuerdo escrito y R04/R06
-salen sin verificar — ningun candidato pasa hoy el gate de "toda regla decidida" que exige
-aprobar/publicar, correctamente, dado el estado real de los datos).
+Desde M4, tambien valida que el ranking real (`SchedulingRecommendationEngine` + hechos reales de
+continuidad/equidad) esta cableado de punta a punta sobre los 4 sitios reales del piloto — pero el
+resultado real y honesto hoy es **0 `ASIGNADA` de 48 turnos requeridos**: R04 (novedades) bloquea el
+100% de las evaluaciones porque no existe integracion real con I2 todavia (ver actualizacion al inicio
+del documento). El piloto hace visible, con datos reales, exactamente por que: no es un defecto del
+ranking, es la consecuencia honesta de un hueco de datos ya conocido.
+
+**No valida:** que un candidato real pueda terminar `ASIGNADA` hoy — bloqueado por R04 (siempre
+`WARNING`, sin integracion real con I2) y, en menor medida, por R01 (falta de acuerdo escrito real) y
+R07 (rotacion escalonada sin modelar); ni el recorrido completo de aprobar/publicar/exportar del
+checklist de demo sobre datos reales (mismo bloqueo: ningun candidato pasa hoy el gate de "toda regla
+decidida" que exige aprobar/publicar, correctamente, dado el estado real de los datos).
 
 ## 6. Proximos pasos sugeridos
 
@@ -260,13 +314,21 @@ aprobar/publicar, correctamente, dado el estado real de los datos).
    novedades/requisitos/traslados (vacios a proposito). Pendiente que Operaciones/Legal confirmen si
    estos parametros demo deben volverse politica real para estos 4 sitios, y construir la integracion
    real de novedades (R04) y requisitos (R06) con I2/I5/I6.
-6. M4: calcular scoring real (continuidad, equidad, horas acumuladas, distancia) que hoy nadie produce —
-   `SchedulingRecommendationEngine.Score()` lo espera ya calculado. M5: verificacion end-to-end y repetir
-   este piloto dejando que el motor genere de verdad, comparando contra los 4 PDF. Solo entonces cablear
-   `POST /recommendations/generate` al boton "Generar propuesta".
-7. Una vez resuelto M4-M5, repetir el recorrido del checklist de demo sobre el proyecto piloto (matriz,
+6. ~~M4: calcular scoring real (continuidad, equidad, horas acumuladas, distancia) y rankear/asignar
+   candidatos de verdad~~ — **hecho**: ver actualizacion al inicio del documento. Verificado en vivo
+   sobre el piloto real que hoy el resultado honesto es 0 `ASIGNADA` de 48 turnos, porque R04 bloquea el
+   100% sin integracion real con I2 — el hallazgo mas importante que dejo M4, y el que mas urge resolver
+   antes de M5.
+7. **Integracion real de R04 (novedades) con I2** — hoy es el unico bloqueo sin excepcion posible
+   (`WARNING` nunca se proyecta como `SUBSANABLE`); sin esto, "Generar propuesta" seguira devolviendo
+   0 `ASIGNADA` sin importar cuanto mejore el ranking. Prioridad mas alta que R01/R07 para desbloquear
+   asignaciones reales.
+8. M5: verificacion end-to-end y repetir este piloto dejando que el motor asigne de verdad (una vez R04
+   tenga datos reales), comparando contra los 4 PDF. Solo entonces cablear el resultado real al boton
+   "Generar propuesta" como flujo por defecto sin advertencias adicionales.
+9. Una vez resuelto M5, repetir el recorrido del checklist de demo sobre el proyecto piloto (matriz,
    comparacion, excepciones, aprobacion, publicacion, exportacion) con datos reales en vez del escenario
    de dos empleados.
-8. Trasladar los hallazgos 4.2, 4.3 y 4.6 a Operaciones: 4.2/4.3 para que confirmen si el roster o el
-   PDF estan desactualizados; 4.6 para que definan si hace falta cobertura de dias parciales y, si es
-   asi, en que formato.
+10. Trasladar los hallazgos 4.2, 4.3 y 4.6 a Operaciones: 4.2/4.3 para que confirmen si el roster o el
+    PDF estan desactualizados; 4.6 para que definan si hace falta cobertura de dias parciales y, si es
+    asi, en que formato.
