@@ -162,6 +162,38 @@ sobre datos productivos.
 > actualizado para el nuevo motivo real, y `Verify-SgSuperAppI9CandidateEvaluation.ps1`, sin cambios de
 > fondo).
 >
+> **Actualizacion 2026-09-03 — R04/R06 deshabilitados para MVP_TEST (decision del usuario), y una
+> segunda salvaguarda encontrada al aplicarla.** El usuario aprobo explicitamente deshabilitar R04 y R06
+> para el perfil `I9-PILOTO-SIMULATED` (sin fuente real de ninguna de las dos, ver arriba), en vez de
+> dejarlas bloqueando indefinidamente. Implementarlo requirio dos cambios reales, no uno:
+> 1. `SchedulingRuleEvaluator`: una regla `enabled=false` ahora produce `NOT_APPLICABLE` (nunca acredita
+>    cumplimiento, pero tampoco bloquea por si sola), en vez de `WARNING` (que
+>    `SchedulingEligibilityService` siempre proyectaba como bloqueante — asi que "deshabilitar" antes
+>    nunca desbloqueaba nada, solo cambiaba el texto del motivo). Documentado en el codigo como la misma
+>    salvaguarda anti-"aprobar por omision" aplicada de otra forma: la decision de excluir la regla queda
+>    en el perfil versionado y auditable, nunca en un valor vacio.
+> 2. **Segunda salvaguarda independiente, encontrada solo al verificar en vivo (no por lectura de
+>    codigo):** `SchedulingRuleProfileValidator.Validate` exigia que **las siete reglas estuvieran
+>    `enabled=true`** para que un perfil fuera siquiera cargable — con R04/R06 deshabilitados,
+>    `LoadActiveAsync` lanzaba una excepcion y la generacion caia al mismo `RULE_PROFILE_UNCONFIGURED`
+>    de un proyecto sin perfil. Se corrigio para exigir presencia (exactamente una entrada por cada una
+>    de las siete reglas, sin duplicados, ninguna faltante), no habilitacion.
+>
+> Se sembro `I9-PILOTO-SIMULATED` v3 (`scripts/dev/sql/i9-piloto-rule-profile-v2-r04-r06-disabled.sql` —
+> v2 quedo con un `effective_from` incorrecto en el primer intento, corregido a v3 sobre este esquema;
+> el script del repo ya nace correcto para instalaciones nuevas) con los mismos parametros R01-R07 ya
+> aprobados, salvo R04 y R06 en `enabled=FALSE`. **Verificado en vivo sobre el piloto real**
+> (`schedule_versions.id=8`, mismo periodo): R04 y R06 pasan de `WARNING` a `NOT_APPLICABLE` en las 156
+> evaluaciones de cada una, y R07 (ya corregido) sigue variado (78 `COMPLIANT` / 78
+> `EXCEPTION_REQUIRED`) — pero **el resultado final sigue en 0 `ASIGNADA` de 48 turnos**, porque
+> **I9-R01 (jornada) bloquea el 100% por si solo** (turnos reales de 12h sin fuente real de acuerdo
+> escrito) y el usuario no aprobo deshabilitar esa regla — es la unica de las cuatro que queda como
+> decision de negocio genuinamente pendiente, no una limitacion tecnica. Verificado sin regresion con
+> `Verify-SgSuperAppI9R07.ps1` (`PASS 20`), `Verify-SgSuperAppI9R04R06.ps1` (`PASS 55`, incluye el
+> recorrido completo `LoadActiveAsync`+`Validate` sobre PostgreSQL real), `Verify-SgSuperAppI9R03R05.ps1`
+> (`PASS 35`), `Verify-SgSuperAppI9MvpGeneration.ps1` (`PASS 13`), `Verify-SgSuperAppI9Eligibility.ps1` y
+> `Verify-SgSuperAppI9MvpWorkflow.ps1` (`PASS 65`).
+>
 > Este documento registra el primer piloto funcional con datos operativos reales (anonimizados) que
 > el checklist de demo y el criterio de aceptacion #10 de la SPEC dejaban pendiente. No cierra el MVP:
 > ver seccion 4 para los hallazgos que quedan abiertos, incluido uno nuevo (4.1) mas severo que los ya
@@ -325,11 +357,7 @@ actualizacion al inicio del documento), 1092 evaluaciones reales sobre 39 candid
 veredictos variados y explicables por regla.
 
 Desde M4, tambien valida que el ranking real (`SchedulingRecommendationEngine` + hechos reales de
-continuidad/equidad) esta cableado de punta a punta sobre los 4 sitios reales del piloto — pero el
-resultado real y honesto hoy es **0 `ASIGNADA` de 48 turnos requeridos**: R01, R04 y R06 bloquean el
-100% de las evaluaciones, cada uno por un motivo real distinto (ver actualizaciones al inicio del
-documento). El piloto hace visible, con datos reales, exactamente por que: no es un defecto del
-ranking, es la consecuencia honesta de tres brechas reales de datos/politica, todavia sin decidir.
+continuidad/equidad) esta cableado de punta a punta sobre los 4 sitios reales del piloto.
 
 Tambien valida, tras la correccion del 2026-09-03, que **R07 (desviacion de plantilla) ya compara la
 secuencia real contra lo propuesto** en vez de fallar siempre por un desajuste de forma en los hechos:
@@ -337,13 +365,18 @@ sobre el mismo piloto real, 78 de 156 evaluaciones salen `COMPLIANT` y 78 `EXCEP
 resultado variado y explicable (mitad de la cuadrilla coincide con la secuencia esperada, mitad se
 aparta en una fase, coherente con una rotacion real escalonada), no un bloqueo estructural.
 
-**No valida:** que un candidato real pueda terminar `ASIGNADA` hoy — bloqueado de forma independiente
-por R01 (turnos de 12h sin fuente real de acuerdo escrito), R04 (sin ninguna fuente real de novedades de
-personal — el modulo "Novedades" esta explicitamente fuera del MVP, no es una integracion pendiente) y
-R06 (sin catalogo real de requisitos por puesto para estos 4 sitios); ni el recorrido completo de
-aprobar/publicar/exportar del checklist de demo sobre datos reales (mismo bloqueo: ningun candidato pasa
-hoy el gate de "toda regla decidida" que exige aprobar/publicar, correctamente, dado el estado real de
-los datos).
+Tambien valida, tras la decision del usuario del 2026-09-03 de deshabilitar R04 y R06 para
+`I9-PILOTO-SIMULATED`, que un perfil puede excluir explicitamente una regla sin fuente real de datos
+(`NOT_APPLICABLE`, nunca cumplimiento fabricado) y que el sistema deja de bloquear por esas dos reglas
+en concreto — verificado en vivo: R04 y R06 pasan de `WARNING` (156/156) a `NOT_APPLICABLE` (156/156).
+
+**No valida:** que un candidato real pueda terminar `ASIGNADA` hoy — el resultado real y honesto sigue
+siendo **0 `ASIGNADA` de 48 turnos requeridos**, porque **I9-R01 bloquea el 100% por si solo** (turnos
+reales de 12h sin fuente real de acuerdo escrito) y esa es la unica de las cuatro reglas que el usuario
+no aprobo deshabilitar — sigue siendo una decision de negocio genuinamente pendiente (ver seccion 6), no
+una limitacion tecnica; ni el recorrido completo de aprobar/publicar/exportar del checklist de demo
+sobre datos reales (mismo bloqueo: ningun candidato pasa hoy el gate de "toda regla decidida" que exige
+aprobar/publicar, correctamente, dado el estado real de los datos).
 
 ## 6. Proximos pasos sugeridos
 
@@ -364,32 +397,31 @@ los datos).
    novedades/requisitos/traslados (vacios a proposito).
 6. ~~M4: calcular scoring real (continuidad, equidad, horas acumuladas, distancia) y rankear/asignar
    candidatos de verdad~~ — **hecho**: ver actualizacion al inicio del documento. Verificado en vivo
-   sobre el piloto real que hoy el resultado honesto es 0 `ASIGNADA` de 48 turnos, porque R01, R04 y R06
-   bloquean el 100% de forma independiente — el hallazgo mas importante que dejo M4.
+   sobre el piloto real que el resultado honesto era 0 `ASIGNADA` de 48 turnos, porque R01, R04 y R06
+   bloqueaban el 100% de forma independiente — el hallazgo mas importante que dejo M4.
 7. ~~Corregir R07 (desviacion de plantilla)~~ — **hecho (2026-09-03)**: no era rotacion escalonada sin
    modelar, era un desajuste de forma en los hechos (`BuildCandidateFactsAsync` enviaba
    `{cell,expected}`/`{cell,proposed}` en vez de `{employeeId,date,cell,shiftCode}`). Corregido y
    verificado: ahora compara de verdad (78/156 `COMPLIANT`, 78/156 `EXCEPTION_REQUIRED` sobre el piloto
-   real). No cambio el resultado final (R01/R04/R06 lo siguen bloqueando todo), pero deja de ser parte
-   del problema.
-8. **Decision de Operaciones/Legal sobre los tres bloqueos reales que quedan** (ninguno se resuelve con
-   mas codigo sin esta decision primero):
-   - **R01**: ¿existe o se puede generar un acuerdo escrito real para los turnos de 12h de estos sitios,
-     o el umbral de jornada ordinaria del perfil demo debe ajustarse para este tipo de operacion?
-   - **R04**: el modulo "Novedades" esta explicitamente fuera de alcance del MVP
-     (`docs/specs/2026-05-21-sg-superapp-spec-00-arquitectura-incrementos.md` seccion 4) — no hay tabla
-     ni fuente real, y construirla ahora seria ampliar el alcance ya decidido. ¿Se deshabilita la regla
-     `enabled=false` para perfiles MVP_TEST (documentando que el chequeo de novedades queda manual
-     durante el piloto), o se deja bloqueando hasta que "Novedades" exista como modulo real?
-   - **R06**: no hay catalogo real de requisitos por puesto para estos 4 sitios (solo el demo de
-     `POSITION-1` de juguete). ¿Se construye un catalogo real minimo para el piloto, o se deshabilita
-     igual que R04?
-9. M5: una vez tomadas esas decisiones, repetir este piloto dejando que el motor asigne de verdad,
-   comparando contra los 4 PDF. Solo entonces cablear el resultado real al boton "Generar propuesta"
-   como flujo por defecto sin advertencias adicionales.
-10. Una vez resuelto M5, repetir el recorrido del checklist de demo sobre el proyecto piloto (matriz,
+   real).
+8. ~~Deshabilitar R04 y R06 para `I9-PILOTO-SIMULATED`~~ — **hecho (2026-09-03, decision del usuario)**:
+   sin fuente real de novedades ("Novedades" fuera de alcance del MVP,
+   `docs/specs/2026-05-21-sg-superapp-spec-00-arquitectura-incrementos.md` seccion 4) ni de requisitos
+   por puesto para estos 4 sitios. Requirio dos cambios reales (`SchedulingRuleEvaluator`: disabled=
+   `NOT_APPLICABLE` en vez de `WARNING`; `SchedulingRuleProfileValidator`: exige presencia de las siete
+   reglas, no habilitacion) — ver actualizacion al inicio del documento. Verificado en vivo: R04/R06
+   pasan a `NOT_APPLICABLE` (156/156 cada una), sin regresion en R01-R03/R05/R07.
+9. **Decision de Operaciones/Legal sobre R01, el unico bloqueo real que queda:** ¿existe o se puede
+   generar un acuerdo escrito real para los turnos de 12h de estos sitios, o el umbral de jornada
+   ordinaria del perfil demo debe ajustarse para este tipo de operacion? Mientras no se decida, el
+   resultado honesto de "Generar propuesta" sobre el piloto real sigue siendo 0 `ASIGNADA` de 48 —
+   ya no por tres motivos independientes, solo por este uno.
+10. M5: una vez tomada esa decision, repetir este piloto dejando que el motor asigne de verdad,
+    comparando contra los 4 PDF. Solo entonces cablear el resultado real al boton "Generar propuesta"
+    como flujo por defecto sin advertencias adicionales.
+11. Una vez resuelto M5, repetir el recorrido del checklist de demo sobre el proyecto piloto (matriz,
     comparacion, excepciones, aprobacion, publicacion, exportacion) con datos reales en vez del escenario
     de dos empleados.
-11. Trasladar los hallazgos 4.2, 4.3 y 4.6 a Operaciones: 4.2/4.3 para que confirmen si el roster o el
+12. Trasladar los hallazgos 4.2, 4.3 y 4.6 a Operaciones: 4.2/4.3 para que confirmen si el roster o el
     PDF estan desactualizados; 4.6 para que definan si hace falta cobertura de dias parciales y, si es
     asi, en que formato.

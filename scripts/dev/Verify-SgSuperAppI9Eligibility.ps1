@@ -47,7 +47,10 @@ $cases = @(
     @{ Name="incapacity"; Facts=(New-Facts @(New-Evaluation 'I9-R04' 'BLOCKED' 'BLOCKING' 'I9_R04_INCAPACITY_ACTIVE')); Code="I9_R04_INCAPACITY_ACTIVE" },
     @{ Name="overlap"; Facts=(New-Facts @(New-Evaluation 'I9-R03' 'BLOCKED' 'BLOCKING' 'I9_R03_OVERLAP_APPROVED_BLOCKED')); Code="I9_R03_OVERLAP_APPROVED_BLOCKED" },
     @{ Name="travel"; Facts=(New-Facts @(New-Evaluation 'I9-R05' 'BLOCKED' 'BLOCKING' 'I9_R05_PROHIBITED')); Code="I9_R05_PROHIBITED" },
-    @{ Name="unverified"; Facts=(New-Facts @(New-Evaluation 'I9-R07' 'WARNING' 'ERROR' 'I9_R07_DISABLED_UNVERIFIED')); Code="I9_R07_DISABLED_UNVERIFIED" },
+    # 2026-09-03: a disabled rule no longer produces WARNING (it produces NOT_APPLICABLE, which does not
+    # block on its own - see SchedulingRuleEvaluator). This case still proves a genuine WARNING outcome
+    # (e.g. R04's real "no source of truth" verdict) is projected as blocking, unrelated to disabling.
+    @{ Name="unverified"; Facts=(New-Facts @(New-Evaluation 'I9-R04' 'WARNING' 'ERROR' 'I9_R04_UNVERIFIED')); Code="I9_R04_UNVERIFIED" },
     @{ Name="missing evaluation"; Facts=(New-Facts @()); Code="RULE_EVALUATION_MISSING" },
     @{ Name="orphan profile"; Facts=@{ active=$true; ruleProfileId=0; ruleProfileVersion=0; simulated=$true; ruleEvaluations=$compliant; requirementReasons=@() }; Code="RULE_PROFILE_MISSING" },
     @{ Name="requirement"; Facts=(New-Facts $compliant @(@{ code="REQUIREMENT_EXPIRED"; severity="BLOQUEANTE"; message="Requisito bloqueante vencido." })); Code="REQUIREMENT_EXPIRED" }

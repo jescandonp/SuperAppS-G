@@ -107,10 +107,12 @@ Q(false,inactive.Eligible,"GEN-T05 blocked");
 Q(1,inactive.Reasons.Count(x=>x.Code=="EMPLOYEE_INACTIVE"),"GEN-T05 stable code");Done("GEN-T05");
 
 // GEN-T06 an unverified rule never accredits compliance for an automatic assignment.
-var unverified=new[]{new RuleEvaluationReference("I9-R07",3,"WARNING","ERROR","I9_R07_DISABLED_UNVERIFIED","sin verificar",new string('b',64),false)};
+// 2026-09-03: a disabled rule is no longer WARNING (see SchedulingRuleEvaluator - it is NOT_APPLICABLE
+// now, and does not block on its own), so this uses R04's genuine "no source of truth" WARNING instead.
+var unverified=new[]{new RuleEvaluationReference("I9-R04",3,"WARNING","ERROR","I9_R04_UNVERIFIED","sin verificar",new string('b',64),false)};
 var unverifiedResult=eligibility.Evaluate(G(unverified));
 Q(false,unverifiedResult.Eligible,"GEN-T06 not eligible");
-Q(1,unverifiedResult.Reasons.Count(x=>x.Code=="I9_R07_DISABLED_UNVERIFIED"&&x.Severity=="BLOCKING"),"GEN-T06 stable code");Done("GEN-T06");
+Q(1,unverifiedResult.Reasons.Count(x=>x.Code=="I9_R04_UNVERIFIED"&&x.Severity=="BLOCKING"),"GEN-T06 stable code");Done("GEN-T06");
 
 // GEN-T07 EXCEPTION_REQUIRED keeps the candidate assignable but marks it as needing a decision.
 var pending=new[]{new RuleEvaluationReference("I9-R02",3,"EXCEPTION_REQUIRED","WARNING","I9_R02_MIN_REST","descanso","c".PadRight(64,'c'),true)};

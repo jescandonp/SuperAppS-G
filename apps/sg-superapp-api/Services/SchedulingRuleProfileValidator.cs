@@ -27,11 +27,18 @@ public sealed class SchedulingRuleProfileValidator
             profile.EffectiveTo.HasValue && profile.EffectiveTo.Value < profile.EffectiveFrom)
             throw new InvalidOperationException("The scheduling rule profile is incomplete.");
 
-        var enabledCodes = profile.Entries.Where(entry => entry.Enabled).Select(entry => entry.RuleCode).ToArray();
-        if (enabledCodes.Length != RequiredRules.Length ||
-            enabledCodes.Distinct(StringComparer.Ordinal).Count() != RequiredRules.Length ||
-            RequiredRules.Except(enabledCodes, StringComparer.Ordinal).Any())
-            throw new InvalidOperationException("The profile must contain one enabled entry for I9-R01 through I9-R07.");
+        // 2026-09-03: this used to require every entry to be enabled, which made a profile with any
+        // rule intentionally out of scope (enabled=false) unloadable at all - LoadActiveAsync would
+        // reject it outright, before SchedulingRuleEvaluator ever got a chance to record that rule as
+        // NOT_APPLICABLE. The requirement now is presence, not enablement: exactly one entry for each
+        // of the seven rules, no duplicates, none missing. A disabled entry still has to be one of
+        // those seven - it cannot be omitted from the profile - and the evaluator still records it
+        // (as NOT_APPLICABLE, never silently dropped and never presumed compliant).
+        var allCodes = profile.Entries.Select(entry => entry.RuleCode).ToArray();
+        if (allCodes.Length != RequiredRules.Length ||
+            allCodes.Distinct(StringComparer.Ordinal).Count() != RequiredRules.Length ||
+            RequiredRules.Except(allCodes, StringComparer.Ordinal).Any())
+            throw new InvalidOperationException("The profile must contain exactly one entry for I9-R01 through I9-R07.");
 
         if (profile.Checksum.Length != 64 || profile.Checksum.Any(character => !Uri.IsHexDigit(character)) ||
             profile.Entries.Any(entry => entry.Parameters.ValueKind != JsonValueKind.Object ||
