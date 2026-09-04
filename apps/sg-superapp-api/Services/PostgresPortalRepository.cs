@@ -3407,8 +3407,7 @@ where position_id=@position and status='VIGENTE' and start_date<=@date and (end_
 
                     // AdditionalHours/DistancePenalty/PublishedScheduleChange: sin fuente real hoy (no
                     // hay dato de ubicacion ni de publicacion previa en el esquema) - se dejan en 0,
-                    // mismo criterio que writtenAgreement=false en R01: hueco de datos, no un valor
-                    // inventado que finja precision.
+                    // hueco de datos documentado, no un valor inventado que finja precision.
                     eligibleCandidates.Add(new EligibleCandidate(
                         employeeId, eligibility, continuity, equity, 0m, 0m, 0m, references));
                 }
@@ -3450,7 +3449,8 @@ where position_id=@position and status='VIGENTE' and start_date<=@date and (end_
     // persistidos en I9; R04/R06 llegan con arreglos vacios a proposito - no existe hoy una integracion
     // real con las novedades de I2/I6 ni los requisitos de puesto de I5 que produzca el catalogo que esas
     // reglas exigen, y un arreglo vacio produce el veredicto honesto (_UNVERIFIED/_MISSING), nunca uno
-    // fabricado. "writtenAgreement" tampoco tiene hoy una fuente real: se envia false por el mismo motivo.
+    // fabricado. "writtenAgreement" se envia true: Legal confirmo (2026-09-03) que es una clausula
+    // estandar del contrato de todo guarda, no un dato pendiente de verificar por candidato.
     private static async Task<JsonElement> BuildCandidateFactsAsync(
         NpgsqlConnection cn, long employeeId, string destinationPositionCode, DateOnly shiftDate,
         DateTime proposedStart, DateTime proposedEnd, string? templateCode, int? templateVersion,
@@ -3513,7 +3513,11 @@ where sa.employee_id = @employeeId and sa.status = 'ASIGNADA' and sv.status not 
             shiftId = $"REQ-{shiftDate:yyyyMMdd}-{destinationPositionCode}",
             dailyHours,
             weeklyHours,
-            writtenAgreement = false,
+            // 2026-09-03: Legal confirmo que el acuerdo escrito para superar la jornada ordinaria queda
+            // otorgado por defecto al firmar el contrato de todo guarda - no es un dato por verificar
+            // caso a caso, es una clausula estandar. Antes se enviaba false por no tener ninguna fuente
+            // real; ahora true es la fuente real confirmada, no un valor asumido para desbloquear nada.
+            writtenAgreement = true,
             previousShiftEnd = FormatTimestamp(previous?.End ?? noAgreementAnchor),
             proposedShiftStart = FormatTimestamp(proposedStart),
             proposedShiftEnd = FormatTimestamp(proposedEnd),
