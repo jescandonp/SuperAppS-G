@@ -194,6 +194,34 @@ sobre datos productivos.
 > (`PASS 35`), `Verify-SgSuperAppI9MvpGeneration.ps1` (`PASS 13`), `Verify-SgSuperAppI9Eligibility.ps1` y
 > `Verify-SgSuperAppI9MvpWorkflow.ps1` (`PASS 65`).
 >
+> **Actualizacion 2026-09-04 — Primera asignacion real: 48 de 48 (100% de cobertura).** El usuario validó
+> con el equipo Legal de S&G el ultimo bloqueo que quedaba: **por defecto, todo guarda tiene el acuerdo
+> escrito para superar la jornada ordinaria ya otorgado al firmar su contrato** — no es un dato que haya
+> que verificar caso a caso, es una clausula contractual estandar. Con eso confirmado, `writtenAgreement`
+> pasa de `false` (hueco de datos) a `true` (fuente real confirmada por Legal) en
+> `BuildCandidateFactsAsync`. El resto de R01 no cambia: el limite absoluto de 12h sigue sin excepcion
+> posible, la jornada ordinaria de 8h sigue igual — solo deja de bloquear por falta de acuerdo escrito,
+> que ya no es un hueco de datos.
+>
+> **Verificado en vivo sobre el piloto real, periodo limpio (sin cruce con el mes ya sembrado):**
+> `schedule_versions.id=5`, 48 turnos requeridos, **48 `ASIGNADA`, 0 `VACANTE`, cobertura 100%** — la
+> primera vez que "Generar propuesta" asigna candidatos reales de principio a fin. Ningun veredicto se
+> presenta como perfecto sin serlo: R01 sale `EXCEPTION_REQUIRED` en las 156 evaluaciones (la jornada de
+> 12h sigue superando el umbral aprobable de 10h — cada asignacion queda marcada como pendiente de una
+> excepcion real antes de poder aprobarse o publicarse, no se oculta). R02/R03/R05 salen `COMPLIANT`
+> reales (sin conflictos en un periodo limpio); R04/R06 `NOT_APPLICABLE` (deshabilitadas); R07 mixta
+> (78 `COMPLIANT` / 78 `EXCEPTION_REQUIRED`, comparacion real de rotacion). Los puntajes (`SCORE`) son
+> negativos (-4 a -4.1), coherente con la formula real del motor (penaliza la excepcion pendiente).
+> Verificado sin regresion: `Verify-SgSuperAppI9CandidateEvaluation.ps1` (`PASS 10`),
+> `Verify-SgSuperAppI9CandidateRanking.ps1` (`PASS 15`), `Verify-SgSuperAppI9RequiredShiftsExpansion.ps1`
+> (`PASS 14`).
+>
+> Con esto, **las cuatro reglas que bloqueaban el 100% del piloto real quedan resueltas por decision de
+> negocio real** (R01 y R04/R06 explicitamente decididos por Legal/el usuario; R07 era un bug de codigo,
+> ya corregido). Lo que sigue pendiente para aprobar/publicar una version real es el flujo normal de
+> aprobacion de excepciones (`APPROVE_EXCEPTION`) sobre los R01 `EXCEPTION_REQUIRED` — eso ya existe y
+> esta probado desde incrementos anteriores, no es parte de lo que quedaba abierto en este piloto.
+>
 > Este documento registra el primer piloto funcional con datos operativos reales (anonimizados) que
 > el checklist de demo y el criterio de aceptacion #10 de la SPEC dejaban pendiente. No cierra el MVP:
 > ver seccion 4 para los hallazgos que quedan abiertos, incluido uno nuevo (4.1) mas severo que los ya
@@ -370,13 +398,19 @@ Tambien valida, tras la decision del usuario del 2026-09-03 de deshabilitar R04 
 (`NOT_APPLICABLE`, nunca cumplimiento fabricado) y que el sistema deja de bloquear por esas dos reglas
 en concreto — verificado en vivo: R04 y R06 pasan de `WARNING` (156/156) a `NOT_APPLICABLE` (156/156).
 
-**No valida:** que un candidato real pueda terminar `ASIGNADA` hoy — el resultado real y honesto sigue
-siendo **0 `ASIGNADA` de 48 turnos requeridos**, porque **I9-R01 bloquea el 100% por si solo** (turnos
-reales de 12h sin fuente real de acuerdo escrito) y esa es la unica de las cuatro reglas que el usuario
-no aprobo deshabilitar — sigue siendo una decision de negocio genuinamente pendiente (ver seccion 6), no
-una limitacion tecnica; ni el recorrido completo de aprobar/publicar/exportar del checklist de demo
-sobre datos reales (mismo bloqueo: ningun candidato pasa hoy el gate de "toda regla decidida" que exige
-aprobar/publicar, correctamente, dado el estado real de los datos).
+Desde el 2026-09-04, tambien valida — por primera vez — que **un candidato real puede terminar
+`ASIGNADA`**: con Legal confirmando que el acuerdo escrito de R01 es una clausula estandar del contrato
+(ver actualizacion al inicio del documento), un periodo real del piloto genero **48 de 48 turnos
+`ASIGNADA`, 0 `VACANTE`, 100% de cobertura** — sin fabricar ningun cumplimiento (R01 queda marcado
+`EXCEPTION_REQUIRED`, no `COMPLIANT`, porque la jornada de 12h sigue superando el umbral aprobable; cada
+asignacion sigue pendiente de una excepcion real antes de aprobar o publicar).
+
+**No valida todavia:** el recorrido completo de aprobar/publicar/exportar del checklist de demo con
+datos reales — las asignaciones ya existen, pero cada una trae una excepcion R01 real pendiente de
+aprobacion, y ese flujo (`APPROVE_EXCEPTION`) no se ejercito de punta a punta en este piloto todavia
+(existe y esta probado desde incrementos anteriores, solo falta recorrerlo con estos datos reales); ni
+que los parametros demo de R01/R04/R06 sean politica institucional definitiva mas alla de este piloto —
+siguen marcados `SIMULATED_DEMO_NOT_INSTITUTIONAL`.
 
 ## 6. Proximos pasos sugeridos
 
@@ -411,17 +445,22 @@ aprobar/publicar, correctamente, dado el estado real de los datos).
    `NOT_APPLICABLE` en vez de `WARNING`; `SchedulingRuleProfileValidator`: exige presencia de las siete
    reglas, no habilitacion) — ver actualizacion al inicio del documento. Verificado en vivo: R04/R06
    pasan a `NOT_APPLICABLE` (156/156 cada una), sin regresion en R01-R03/R05/R07.
-9. **Decision de Operaciones/Legal sobre R01, el unico bloqueo real que queda:** ¿existe o se puede
-   generar un acuerdo escrito real para los turnos de 12h de estos sitios, o el umbral de jornada
-   ordinaria del perfil demo debe ajustarse para este tipo de operacion? Mientras no se decida, el
-   resultado honesto de "Generar propuesta" sobre el piloto real sigue siendo 0 `ASIGNADA` de 48 —
-   ya no por tres motivos independientes, solo por este uno.
-10. M5: una vez tomada esa decision, repetir este piloto dejando que el motor asigne de verdad,
-    comparando contra los 4 PDF. Solo entonces cablear el resultado real al boton "Generar propuesta"
-    como flujo por defecto sin advertencias adicionales.
+9. ~~Decision de Operaciones/Legal sobre R01~~ — **hecho (2026-09-04)**: Legal confirmo que el acuerdo
+   escrito para superar la jornada ordinaria queda otorgado por defecto al firmar el contrato de todo
+   guarda — no es un dato por verificar caso a caso. `writtenAgreement` pasa de `false` a `true` en
+   `BuildCandidateFactsAsync`. Verificado en vivo sobre el piloto real, periodo limpio: **48 de 48
+   turnos `ASIGNADA`, 0 `VACANTE`, cobertura 100%** — la primera asignacion real de todo el piloto. R01
+   queda `EXCEPTION_REQUIRED` (no `COMPLIANT`, honesto: la jornada de 12h sigue superando el umbral
+   aprobable de 10h) en las 156 evaluaciones — cada asignacion sigue pendiente de una excepcion real.
+10. M5: recorrer el flujo de aprobacion de excepciones (`APPROVE_EXCEPTION`, ya existe y esta probado
+    desde incrementos anteriores) sobre esta version real hasta poder aprobarla y publicarla, y comparar
+    el resultado del motor contra los 4 PDF originales del piloto.
 11. Una vez resuelto M5, repetir el recorrido del checklist de demo sobre el proyecto piloto (matriz,
     comparacion, excepciones, aprobacion, publicacion, exportacion) con datos reales en vez del escenario
     de dos empleados.
 12. Trasladar los hallazgos 4.2, 4.3 y 4.6 a Operaciones: 4.2/4.3 para que confirmen si el roster o el
     PDF estan desactualizados; 4.6 para que definan si hace falta cobertura de dias parciales y, si es
     asi, en que formato.
+13. Confirmar con Operaciones/Legal si los parametros demo de R01 (jornada ordinaria 8h, umbral aprobable
+    10h, tope absoluto 12h) deben volverse politica institucional real para estos 4 sitios, o si necesitan
+    ajuste — hoy siguen marcados `SIMULATED_DEMO_NOT_INSTITUTIONAL`.
