@@ -3357,6 +3357,13 @@ where sa.employee_id=@employeeId and sa.status='ASIGNADA' and sv.status not in (
 
         var projector = new ShiftCycleProjector();
         var shiftInputs = new List<RequiredShiftRecommendationInput>();
+        // El motor rankea sobre veredictos sin atar a ninguna asignacion (M3: la asignacion real todavia
+        // no existe cuando se evalua). Una vez el motor elige un ganador, ese mismo veredicto ya
+        // computado (nunca uno recalculado) se vuelve a persistir mas abajo, esta vez atado al id real
+        // de schedule_assignments - sin esto, aprobar o publicar la version fallaba con
+        // RULE_ASSIGNMENT_UNEVALUATED porque el gate exige un veredicto ligado a la asignacion real, y
+        // ninguno lo estaba nunca.
+        var batchesByShiftEmployee = new Dictionary<(long RequiredShiftId, long EmployeeId), SchedulingRuleEvaluationBatch>();
         foreach (var shift in shifts)
         {
             var candidates = new List<long>();
@@ -3396,6 +3403,7 @@ where position_id=@position and status='VIGENTE' and start_date<=@date and (end_
                         shift.TemplateCode, shift.TemplateVersion, shift.AnchorDate, expectedShiftCode, proposedShiftCode, ct);
                     var batch = _ruleEvaluator.Evaluate(profile, projectCode, from, facts);
                     await _ruleHttpRepository.PersistEvaluationsAsync(versionId, null, projectCode, batch, actor, ct);
+                    batchesByShiftEmployee[(shift.RequiredShiftId, employeeId)] = batch;
 
                     var references = SchedulingEligibilityService.ToReferences(batch);
                     var eligibility = _eligibilityService.Evaluate(new GuardSchedulingFacts(
@@ -3435,6 +3443,22 @@ where position_id=@position and status='VIGENTE' and start_date<=@date and (end_
             shiftInputs);
         var result = _recommendationEngine.Generate(request);
         await PersistScheduleRecommendationAsync(request, result, ct);
+
+        // Atar el veredicto ya computado del ganador a la asignacion real que se acaba de crear. Solo
+        // ASIGNADA lo necesita: una VACANTE no tiene un candidato cuyo cumplimiento haya que certificar,
+        // sus motivos reales ya quedan en schedule_assignments.reasons (union de lo que bloqueo a cada
+        // candidato juzgado), no en un veredicto atado.
+        var asignadas = new List<(long AssignmentId, long RequiredShiftId, long EmployeeId)>();
+        await using (var cmd = new NpgsqlCommand(
+            "select id, required_shift_id, employee_id from schedule_assignments where schedule_version_id=@v and status='ASIGNADA'", cn))
+        {
+            cmd.Parameters.AddWithValue("v", versionId);
+            await using var rd = await cmd.ExecuteReaderAsync(ct);
+            while (await rd.ReadAsync(ct)) asignadas.Add((rd.GetInt64(0), rd.GetInt64(1), rd.GetInt64(2)));
+        }
+        foreach (var (assignmentId, requiredShiftId, employeeId) in asignadas)
+            if (batchesByShiftEmployee.TryGetValue((requiredShiftId, employeeId), out var winningBatch))
+                await _ruleHttpRepository.PersistEvaluationsAsync(versionId, assignmentId, projectCode, winningBatch, actor, ct);
     }
 
     private static async Task<string> ResolvePositionCodeAsync(NpgsqlConnection cn, long positionId, CancellationToken ct)
@@ -3669,15 +3693,36 @@ where exists(select 1 from schedule_versions sv join scheduling_rule_profiles rp
     // CreateScheduleExceptionAsync deliberately carves it out: its evidence is validated by Talento
     // Humano rather than by the requesting actor, so the flag is never set on that path. Without the
     // carve-out an approved R06 decision could never satisfy the gate.
+    //
+    // Fourth (2026-09-05, added once real batch generation started producing hundreds of these): an
+    // evaluation with no assignment_id is pre-decision scratch data from ranking a shift's candidate
+    // pool, not a verdict about anyone's real assignment - EvaluateCandidatesForRequiredShiftsAsync
+    // persists one for every candidate considered, win or lose, so the engine can judge eligibility
+    // before any assignment exists. `current` (which feeds `pending`/`decided`/`unevaluated`) drops
+    // these entirely: grouping them the way bound evaluations are grouped would collapse an entire
+    // version's worth of them - every rejected candidate, across every shift - into one arbitrary row
+    // per rule, and a pending EXCEPTION_REQUIRED among them would demand a decision for guards nobody
+    // assigned. Only a verdict re-persisted bound to the real schedule_assignments.id it belongs to
+    // (which the generation flow does immediately after picking a winner) satisfies `current` here.
+    // The standalone `blocked` count deliberately keeps reading every row regardless of binding: a
+    // version-level BLOCKED with no assignment_id is a real, already-tested case (a block that
+    // predates any assignment existing at all) and must still condemn the version - that is the
+    // existing fail-closed behavior the third point above describes, unrelated to the scratch rows
+    // this point is about. `total` (the RULE_EVALUATION_MISSING check) reads the same unrestricted
+    // way, for the identical reason: a version can be blocked before it has a single assignment, and
+    // that must not read as "nothing was ever evaluated". VACANTE rows never get a bound verdict
+    // either way - there is no selected candidate whose compliance needs certifying - so
+    // `unevaluated` only requires one of ASIGNADA rows; a vacancy's real reasons already live in
+    // schedule_assignments.reasons, not a bound verdict.
     private static async Task<SchedulingTransitionEvidence> RequireEveryRuleDecidedAsync(
         NpgsqlConnection cn,NpgsqlTransaction tx,long versionId,CancellationToken ct)
     {
         const string sql=@"with current as (
-  select distinct on (coalesce(e.assignment_id,0),e.rule_code)
+  select distinct on (e.assignment_id,e.rule_code)
          e.id,e.assignment_id,e.rule_code,e.scope_hash,e.outcome,e.exception_allowed,e.evaluated_at
   from scheduling_rule_evaluations e
-  where e.schedule_version_id=@version
-  order by coalesce(e.assignment_id,0),e.rule_code,e.evaluated_at desc,e.id desc),
+  where e.schedule_version_id=@version and e.assignment_id is not null
+  order by e.assignment_id,e.rule_code,e.evaluated_at desc,e.id desc),
 decided as (
   select c.id from current c
   where c.outcome='EXCEPTION_REQUIRED' and (c.exception_allowed or c.rule_code='I9-R06') and exists(
@@ -3685,7 +3730,7 @@ decided as (
     where x.evaluation_id=c.id and x.rule_code=c.rule_code and x.scope_hash=c.scope_hash
       and x.decision='APPROVED'))
 select sv.simulated,coalesce(sv.rule_profile_id,0),coalesce(sv.rule_profile_version,0),
-(select count(*) from current),
+(select count(*) from scheduling_rule_evaluations e3 where e3.schedule_version_id=sv.id),
 (select count(*) from current c join schedule_assignments a on a.id=c.assignment_id
    where a.updated_at>c.evaluated_at),
 (select count(*) from scheduling_rule_evaluations b
@@ -3695,7 +3740,7 @@ select sv.simulated,coalesce(sv.rule_profile_id,0),coalesce(sv.rule_profile_vers
 (select count(*) from current c where c.outcome='WARNING'),
 (select count(*) from current c where c.outcome='EXCEPTION_REQUIRED' and c.id not in(select id from decided)),
 (select count(*) from decided),
-(select count(*) from schedule_assignments a where a.schedule_version_id=sv.id
+(select count(*) from schedule_assignments a where a.schedule_version_id=sv.id and a.status='ASIGNADA'
    and not exists(select 1 from current c where c.assignment_id=a.id))
 from schedule_versions sv where sv.id=@version";
         bool simulated; long profileId,profileVersion,total,superseded,blocked,unverified,pending,decided,unevaluated;
