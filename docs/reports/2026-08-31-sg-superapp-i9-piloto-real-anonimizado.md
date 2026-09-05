@@ -218,9 +218,37 @@ sobre datos productivos.
 >
 > Con esto, **las cuatro reglas que bloqueaban el 100% del piloto real quedan resueltas por decision de
 > negocio real** (R01 y R04/R06 explicitamente decididos por Legal/el usuario; R07 era un bug de codigo,
-> ya corregido). Lo que sigue pendiente para aprobar/publicar una version real es el flujo normal de
-> aprobacion de excepciones (`APPROVE_EXCEPTION`) sobre los R01 `EXCEPTION_REQUIRED` — eso ya existe y
-> esta probado desde incrementos anteriores, no es parte de lo que quedaba abierto en este piloto.
+> ya corregido).
+>
+> **Actualizacion 2026-09-05 — M5: primera version del piloto real aprobada y publicada de punta a
+> punta.** Intentar aprobar la version real (48/48 `ASIGNADA`) revelo dos huecos reales mas, ninguno
+> descubierto por lectura de codigo, ambos solo al ejecutar el flujo real:
+> 1. **Los veredictos de M3 nunca quedaban atados a la asignacion real que M4 crea despues.**
+>    `EvaluateCandidatesForRequiredShiftsAsync` persiste cada veredicto con `assignment_id=null` (asi
+>    tiene que ser mientras rankea, la asignacion todavia no existe); pero nunca se volvia a persistir
+>    ese mismo veredicto atado al id real una vez el motor elegia un ganador. El gate de
+>    aprobar/publicar exige exactamente eso (`RequireEveryRuleDecidedAsync`), y sin el enlace, aprobar
+>    fallaba con `RULE_ASSIGNMENT_UNEVALUATED` a pesar de que las 336 evaluaciones reales por candidato
+>    si existian. Corregido: el mismo batch ya computado se vuelve a persistir, atado al id real, justo
+>    despues de crear la asignacion — nunca se recalcula nada. De paso se ajusto el gate para que las
+>    evaluaciones sin atar (el descarte de candidatos durante el ranking) dejen de contar para
+>    pending/decided/unevaluated (antes colapsaban en una fila arbitraria por regla), y para que una
+>    `VACANTE` ya no exija un veredicto atado (no hay candidato seleccionado que certificar). Sin
+>    regresion: `Verify-SgSuperAppI9MvpWorkflow.ps1` (`PASS 65`, el mismo verificador que ya prueba este
+>    gate desde antes de M3/M4).
+> 2. **El catalogo de I9-R01 no declaraba ningun motivo aprobado.** Con el acuerdo escrito confirmado
+>    (ver arriba), cada asignacion real queda `EXCEPTION_REQUIRED` porque la jornada de 12h supera el
+>    umbral aprobable de 10h — pero `CreateScheduleExceptionAsync` rechazaba toda excepcion de R01
+>    porque su `catalog_snapshot` no tenia `approvedMotiveCodes`. Se agrego (`I9-PILOTO-SIMULATED` v3)
+>    reusando los mismos codigos demo ya aprobados para R02.
+>
+> **Verificado en vivo, de punta a punta, sobre el piloto real:** generar una propuesta limpia (48/48
+> `ASIGNADA`, 100% cobertura) → crear las 48 excepciones reales de R01 (`OPERATIONAL_CONTINUITY_DEMO`)
+> + las 24 de R07 (`COVERAGE_DEMO`, la mitad de la cuadrilla que se aparta de su rotacion esperada) vía
+> `POST /exceptions` → **aprobar** (`status: APROBADA`) → **publicar** (`status: PUBLICADA`,
+> `coveragePercent: 100`, `vacancyCount: 0`, `exceptionCount: 72`). Es la primera vez que "Generar
+> propuesta" recorre el flujo completo — generar, asignar, decidir excepciones, aprobar y publicar —
+> con datos reales del piloto, de principio a fin.
 >
 > Este documento registra el primer piloto funcional con datos operativos reales (anonimizados) que
 > el checklist de demo y el criterio de aceptacion #10 de la SPEC dejaban pendiente. No cierra el MVP:
@@ -405,12 +433,18 @@ Desde el 2026-09-04, tambien valida — por primera vez — que **un candidato r
 `EXCEPTION_REQUIRED`, no `COMPLIANT`, porque la jornada de 12h sigue superando el umbral aprobable; cada
 asignacion sigue pendiente de una excepcion real antes de aprobar o publicar).
 
-**No valida todavia:** el recorrido completo de aprobar/publicar/exportar del checklist de demo con
-datos reales — las asignaciones ya existen, pero cada una trae una excepcion R01 real pendiente de
-aprobacion, y ese flujo (`APPROVE_EXCEPTION`) no se ejercito de punta a punta en este piloto todavia
-(existe y esta probado desde incrementos anteriores, solo falta recorrerlo con estos datos reales); ni
-que los parametros demo de R01/R04/R06 sean politica institucional definitiva mas alla de este piloto —
-siguen marcados `SIMULATED_DEMO_NOT_INSTITUTIONAL`.
+Desde el 2026-09-05, tambien valida — por primera vez — **el recorrido completo hasta una version
+publicada con datos reales**: generar (48/48 `ASIGNADA`), decidir las 72 excepciones reales (48 de R01,
+24 de R07) vía `POST /exceptions`, aprobar y publicar. Esto requirio corregir dos huecos reales mas,
+encontrados solo al ejecutar el flujo (ver actualizacion al inicio del documento): los veredictos de M3
+nunca quedaban atados a la asignacion real que M4 crea despues (el gate de aprobar lo exige), y el
+catalogo de R01 no declaraba ningun motivo aprobado para su excepcion.
+
+**No valida todavia:** que los parametros demo de R01/R04/R06 sean politica institucional definitiva
+mas alla de este piloto — siguen marcados `SIMULATED_DEMO_NOT_INSTITUTIONAL`; ni el recorrido de
+excepciones/exportacion sobre los 4 sitios reales completos (se probo sobre un periodo limpio de 2
+dias, no sobre los 30 dias de septiembre con la programacion ya existente); ni la comparacion del
+resultado del motor contra los 4 PDF originales del piloto (pendiente, ver seccion 6).
 
 ## 6. Proximos pasos sugeridos
 
@@ -452,15 +486,23 @@ siguen marcados `SIMULATED_DEMO_NOT_INSTITUTIONAL`.
    turnos `ASIGNADA`, 0 `VACANTE`, cobertura 100%** — la primera asignacion real de todo el piloto. R01
    queda `EXCEPTION_REQUIRED` (no `COMPLIANT`, honesto: la jornada de 12h sigue superando el umbral
    aprobable de 10h) en las 156 evaluaciones — cada asignacion sigue pendiente de una excepcion real.
-10. M5: recorrer el flujo de aprobacion de excepciones (`APPROVE_EXCEPTION`, ya existe y esta probado
-    desde incrementos anteriores) sobre esta version real hasta poder aprobarla y publicarla, y comparar
-    el resultado del motor contra los 4 PDF originales del piloto.
-11. Una vez resuelto M5, repetir el recorrido del checklist de demo sobre el proyecto piloto (matriz,
-    comparacion, excepciones, aprobacion, publicacion, exportacion) con datos reales en vez del escenario
-    de dos empleados.
-12. Trasladar los hallazgos 4.2, 4.3 y 4.6 a Operaciones: 4.2/4.3 para que confirmen si el roster o el
+10. ~~M5: recorrer el flujo de aprobacion de excepciones sobre una version real hasta poder aprobarla y
+    publicarla~~ — **hecho (2026-09-05)**: ver actualizacion al inicio del documento. Encontro y corrigio
+    dos huecos reales mas (veredictos de M3 nunca atados a la asignacion real de M4; catalogo de R01 sin
+    motivos aprobados). Verificado en vivo: propuesta generada (48/48 `ASIGNADA`) → 72 excepciones reales
+    decididas → `APROBADA` → `PUBLICADA`, `coveragePercent:100`, `vacancyCount:0`. Primera vez que el
+    flujo completo de "Generar propuesta" llega hasta una version publicada con datos reales.
+11. Repetir este mismo recorrido (generar, decidir excepciones, aprobar, publicar) sobre los 30 dias
+    completos de septiembre con los 4 sitios reales (esta vez solo se probo un periodo limpio de 2 dias
+    sin cruce con la programacion ya sembrada), y comparar el resultado del motor contra los 4 PDF
+    originales del piloto.
+12. Una vez hecho lo anterior, repetir el recorrido del checklist de demo sobre el proyecto piloto
+    (matriz, comparacion, excepciones, aprobacion, publicacion, exportacion) con datos reales en vez del
+    escenario de dos empleados.
+13. Trasladar los hallazgos 4.2, 4.3 y 4.6 a Operaciones: 4.2/4.3 para que confirmen si el roster o el
     PDF estan desactualizados; 4.6 para que definan si hace falta cobertura de dias parciales y, si es
     asi, en que formato.
-13. Confirmar con Operaciones/Legal si los parametros demo de R01 (jornada ordinaria 8h, umbral aprobable
-    10h, tope absoluto 12h) deben volverse politica institucional real para estos 4 sitios, o si necesitan
-    ajuste — hoy siguen marcados `SIMULATED_DEMO_NOT_INSTITUTIONAL`.
+14. Confirmar con Operaciones/Legal si los parametros demo de R01 (jornada ordinaria 8h, umbral aprobable
+    10h, tope absoluto 12h) y los motivos de excepcion reusados de R02 deben volverse politica
+    institucional real para estos 4 sitios, o si necesitan ajuste — hoy siguen marcados
+    `SIMULATED_DEMO_NOT_INSTITUTIONAL`.
