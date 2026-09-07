@@ -254,6 +254,85 @@ sobre datos productivos.
 > el checklist de demo y el criterio de aceptacion #10 de la SPEC dejaban pendiente. No cierra el MVP:
 > ver seccion 4 para los hallazgos que quedan abiertos, incluido uno nuevo (4.1) mas severo que los ya
 > documentados en el reporte de cierre del 2026-08-17.
+>
+> **Actualizacion 2026-09-07 — recorrido real repetido sobre los 30 dias completos de septiembre: dos
+> bugs reales encontrados y corregidos, y un hallazgo de diseno del gate de aprobacion documentado sin
+> tocar.** El punto 11 de la seccion 6 pedia repetir el mismo recorrido (generar → decidir excepciones
+> → aprobar → publicar) sobre el mes completo, no solo el periodo limpio de 2 dias que probo M5. Antes
+> de generar, se marco `schedule_versions.id=2` (el mes sembrado por SQL directo, 720 filas, usado como
+> insumo de M3 para poblar `employee_position_assignments`) como `REEMPLAZADA` — sigue intacto como
+> historial, pero deja de contar como version "viva" para R01/R03/R05 y no choca con la generacion real
+> nueva sobre el mismo periodo.
+>
+> **Bug real 1 (encontrado solo al ejecutar, no por lectura de codigo): las horas y la continuidad
+> nunca veian lo que la propia corrida ya habia decidido.** La primera generacion real de 30 dias
+> (`schedule_versions.id=8`) publico "limpio": 720/720 `ASIGNADA`, 100% cobertura, 0 vacantes. Al
+> desglosar por sitio, GRATAMIRA-II (4 guardas reales, `required_quantity=2` de dia + `2` de noche,
+> `scripts/dev/sql/i9-piloto-real-anonimizado.sql:143-144`) tenia sus 4 guardas trabajando **los 30 dias
+> de septiembre sin un solo descanso** — 2 fijos siempre de dia, 2 fijos siempre de noche. Causa raiz en
+> `PostgresPortalRepository.BuildCandidateFactsAsync` (`dailyHours`/`weeklyHours`) y en
+> `WorkedPreviousCalendarDayAsync`/`CountAssignedShiftsInPeriodAsync` (continuidad/equidad de M4): todas
+> consultan `schedule_assignments` ya persistidas, pero `EvaluateCandidatesForRequiredShiftsAsync`
+> evaluaba **todo el mes primero** y solo llamaba `PersistScheduleRecommendationAsync` **una vez, al
+> final** — asi que para un periodo nuevo (sin version previa) esos hechos volvian siempre en cero sin
+> importar cuantos dias consecutivos ya llevara trabajados la misma persona dentro de la misma corrida.
+> Verificado en el `facts_snapshot` real de I9-R01 para el mismo guardia: `weeklyHours:12` identico en
+> 2026-09-01, 02 y 03 (nunca acumulaba). Por eso I9-R01 nunca escalaba a `BLOCKED`
+> (`ABSOLUTE_MAX_EXCEEDED`, el tope de 60h/semana) sin importar cuantos dias seguidos ya se hubiera
+> asignado a la misma persona. **Corregido:** `EvaluateCandidatesForRequiredShiftsAsync` ahora agrupa
+> los turnos requeridos por fecha y llama `Generate()` + `PersistScheduleRecommendationAsync` **un dia a
+> la vez**, en orden cronologico, para que los hechos del dia N vean de verdad lo que la misma corrida ya
+> decidio en los dias 1..N-1.
+>
+> **Bug real 2, encontrado al reintentar con el bug 1 ya corregido: el motor podia intentar asignar al
+> mismo candidato dos veces al mismo turno concurrente y tumbar la generacion con un 500.** Con las horas
+> ya acumulando de verdad, un candidato que llega a su tope semanal real queda `BLOCKED` (inelegible) —
+> pero en un sitio sin margen real (GRATAMIRA-II: 4 guardas para 4 cupos concurrentes/dia, sin ningun
+> suplente), eso puede dejar menos candidatos elegibles que cupos por cubrir. `SchedulingRecommendationEngine.Generate()`
+> solo desalentaba con un descuento blando (`AdditionalHoursPenalty` sobre `assignedCounts`) que un mismo
+> candidato ganara dos cupos hermanos del mismo `required_shift_id` — nunca lo excluia de verdad, una
+> limitacion heredada ya documentada desde M4 ("el freno es el mismo descuento, no una exclusion dura").
+> Con el pool real reducido, esa falta de exclusion dura choco contra la restriccion real de la base
+> (`schedule_assignments_employee_unique`, `db/migrations/010_i9_schedule_versions.sql:89`) y la
+> generacion completa fallaba con `500 Internal Server Error` en vez de dejar el segundo cupo `VACANTE`
+> con un motivo honesto. **Corregido:** se agrego `usedForShift` (`Dictionary<long,HashSet<long>>`) en
+> `SchedulingRecommendationEngine.Generate()` — exclusion dura por `RequiredShiftId`, con un motivo nuevo
+> (`ALREADY_ASSIGNED_SAME_SHIFT`) cuando el unico candidato elegible restante ya gano el cupo hermano.
+>
+> **Verificacion sin regresion antes de repetir el recorrido en vivo:**
+> `Verify-SgSuperAppI9MvpWorkflow.ps1` (`PASS 65`), `Verify-SgSuperAppI9CandidateRanking.ps1` (`PASS 15`),
+> `Verify-SgSuperAppI9CandidateEvaluation.ps1` (`PASS 10`), `Verify-SgSuperAppI9RequiredShiftsExpansion.ps1`
+> (`PASS 14`) y `Verify-SgSuperAppI9MvpGeneration.ps1` (`PASS 13`) — los cinco verificadores que tocan
+> `BuildCandidateFactsAsync`, el gate de aprobar/publicar y `SchedulingRecommendationEngine`, sin cambios.
+>
+> **Resultado real, con ambos bugs corregidos** (`schedule_versions.id=10`, `schedule_versions.id=8` y
+> `.id=9` -una corrida parcial que se corto en el bug 2, dias 1-6 ya persistidos- marcadas `REEMPLAZADA`):
+> **692/720 `ASIGNADA`, 96.11% de cobertura, 28 `VACANTE` reales** — todas en GRATAMIRA-II (92/120, 77%).
+> ICONIK-68, LIFE-72 y VIENA llegan a 100% con rotacion real y descanso real (los guardas de ICONIK-68
+> trabajan 19 de 30 dias, no 30/30). GRATAMIRA-II sigue sin poder cerrar sin vacantes con solo 4 guardas
+> reales para 4 cupos concurrentes por dia — exactamente la ausencia de un quinto guarda que ya
+> documentaba el hallazgo 4.2, ahora con prueba real de por que: no hay forma de rotar 4 personas sobre 4
+> cupos diarios sin que alguna termine sin descanso, y en cuanto acumula suficientes dias seguidos el
+> tope semanal real (60h) la bloquea. Se crearon las 1209 excepciones reales necesarias
+> (692 de R01 + 57 de R02 + 460 de R07) vía `POST /exceptions`, todas `APPROVED`.
+>
+> **Hallazgo de diseno, documentado sin modificar (decision del usuario 2026-09-07): la version 10 no se
+> pudo aprobar ni publicar.** El gate de aprobar (`PostgresPortalRepository.RequireEveryRuleDecidedAsync`)
+> rechaza la version completa si existe **cualquier** veredicto `BLOCKED`, este o no ligado a una
+> asignacion real — comportamiento deliberado y ya probado (`WF-T07`), pensado originalmente para "un
+> bloqueo que antecede a cualquier asignacion". Con las horas ya acumulando de verdad, la version 10 trae
+> **352 veredictos `BLOCKED` de candidatos que nunca fueron realmente asignados** (el motor siempre eligio
+> a otra persona con capacidad real disponible) — repartidos entre **los 4 sitios**, no solo GRATAMIRA-II
+> (GRATAMIRA-II: 4 candidatos afectados/56 evaluaciones; ICONIK-68: 19/184; LIFE-72: 10/56; VIENA: 6/56;
+> practicamente los 39 guardas reales del piloto rozan su tope semanal en algun turno durante un mes
+> completo, aunque el motor nunca los seleccione ese dia). Con este diseno, **ninguna version generada
+> sobre un periodo de 30 dias reales puede llegar a `APROBADA`**, sin importar que el horario realmente
+> publicado sea 100% honesto y cumplido para quienes si quedaron asignados. Se presento la disyuntiva al
+> usuario -angostar el gate para que solo el `BLOCKED` ligado a una asignacion real (o el caso
+> version-level sin ninguna asignacion) cuente, vs. dejarlo intacto y documentar- y **el usuario eligio no
+> tocar codigo ya probado sin su aprobacion explicita**: la version 10 queda en `PROPUESTA` (692/720
+> `ASIGNADA`, 96.11%, 1209 excepciones `APPROVED`, sin aprobar ni publicar), y esta decision de diseno del
+> gate queda pendiente para Operaciones/Producto junto con el hallazgo 4.2 original.
 
 ## 1. Que se cargo
 
@@ -440,11 +519,20 @@ encontrados solo al ejecutar el flujo (ver actualizacion al inicio del documento
 nunca quedaban atados a la asignacion real que M4 crea despues (el gate de aprobar lo exige), y el
 catalogo de R01 no declaraba ningun motivo aprobado para su excepcion.
 
+Desde el 2026-09-07, tambien valida que la generacion real **acumula de verdad horas, continuidad y
+equidad dentro del mismo mes** (los dos bugs corregidos esa fecha — ver actualizacion al inicio del
+documento): sobre los 30 dias completos de septiembre y los 4 sitios reales, **692/720 `ASIGNADA`
+(96.11%)**, con rotacion y descanso reales en 3 de los 4 sitios (ICONIK-68/LIFE-72/VIENA llegan a 100%),
+y **28 `VACANTE` reales y honestas en GRATAMIRA-II** (no fabricadas) porque 4 guardas no alcanzan para 4
+cupos concurrentes por dia sin descanso — la misma ausencia estructural que ya documentaba el hallazgo
+4.2, ahora con prueba real de motor.
+
 **No valida todavia:** que los parametros demo de R01/R04/R06 sean politica institucional definitiva
-mas alla de este piloto — siguen marcados `SIMULATED_DEMO_NOT_INSTITUTIONAL`; ni el recorrido de
-excepciones/exportacion sobre los 4 sitios reales completos (se probo sobre un periodo limpio de 2
-dias, no sobre los 30 dias de septiembre con la programacion ya existente); ni la comparacion del
-resultado del motor contra los 4 PDF originales del piloto (pendiente, ver seccion 6).
+mas alla de este piloto — siguen marcados `SIMULATED_DEMO_NOT_INSTITUTIONAL`; que una version de 30 dias
+reales pueda llegar a `APROBADA`/`PUBLICADA` — el gate actual rechaza cualquier `BLOCKED` sin ligar a una
+asignacion real, y a escala de un mes eso ocurre casi siempre (ver punto 15 de la seccion 6, decision de
+diseno pendiente, no tocada); ni la comparacion del resultado del motor contra los 4 PDF originales del
+piloto (pendiente, ver seccion 6).
 
 ## 6. Proximos pasos sugeridos
 
@@ -492,17 +580,33 @@ resultado del motor contra los 4 PDF originales del piloto (pendiente, ver secci
     motivos aprobados). Verificado en vivo: propuesta generada (48/48 `ASIGNADA`) → 72 excepciones reales
     decididas → `APROBADA` → `PUBLICADA`, `coveragePercent:100`, `vacancyCount:0`. Primera vez que el
     flujo completo de "Generar propuesta" llega hasta una version publicada con datos reales.
-11. Repetir este mismo recorrido (generar, decidir excepciones, aprobar, publicar) sobre los 30 dias
-    completos de septiembre con los 4 sitios reales (esta vez solo se probo un periodo limpio de 2 dias
-    sin cruce con la programacion ya sembrada), y comparar el resultado del motor contra los 4 PDF
-    originales del piloto.
-12. Una vez hecho lo anterior, repetir el recorrido del checklist de demo sobre el proyecto piloto
+11. ~~Repetir este mismo recorrido (generar, decidir excepciones, aprobar, publicar) sobre los 30 dias
+    completos de septiembre con los 4 sitios reales~~ — **hecho a medias (2026-09-07)**: ver actualizacion
+    al inicio del documento. Encontro y corrigio dos bugs reales (horas/continuidad ciegas a la propia
+    corrida; el motor podia duplicar un candidato en un turno concurrente y tumbar la generacion). El
+    recorrido llega honesto hasta **generar + decidir excepciones** (`schedule_versions.id=10`, 692/720
+    `ASIGNADA`, 96.11%, 1209 excepciones `APPROVED`), pero **no hasta aprobar/publicar**: el gate de
+    aprobar rechaza cualquier `BLOCKED` sin ligar, y a escala de 30 dias eso ocurre casi siempre aunque el
+    horario publicado sea honesto. Decision de diseno documentada, no resuelta — ver el nuevo punto 15.
+12. Comparar el resultado del motor (version 10, 692/720 `ASIGNADA`) contra los 4 PDF originales del
+    piloto — pendiente, no hecho en esta sesion.
+13. Una vez hecho lo anterior, repetir el recorrido del checklist de demo sobre el proyecto piloto
     (matriz, comparacion, excepciones, aprobacion, publicacion, exportacion) con datos reales en vez del
     escenario de dos empleados.
-13. Trasladar los hallazgos 4.2, 4.3 y 4.6 a Operaciones: 4.2/4.3 para que confirmen si el roster o el
-    PDF estan desactualizados; 4.6 para que definan si hace falta cobertura de dias parciales y, si es
+14. Trasladar los hallazgos 4.2, 4.3 y 4.6 a Operaciones: 4.2/4.3 para que confirmen si el roster o el
+    PDF estan desactualizados (4.2 ahora tiene prueba real adicional: con solo 4 guardas para 4 cupos
+    concurrentes/dia, GRATAMIRA-II no puede rotar sin que alguien quede sin descanso, y el tope semanal
+    real termina bloqueandola); 4.6 para que definan si hace falta cobertura de dias parciales y, si es
     asi, en que formato.
-14. Confirmar con Operaciones/Legal si los parametros demo de R01 (jornada ordinaria 8h, umbral aprobable
+15. Decision de diseno pendiente (nueva, 2026-09-07): el gate de aprobar
+    (`RequireEveryRuleDecidedAsync`) rechaza toda la version si existe cualquier veredicto `BLOCKED`, este
+    o no ligado a una asignacion real. A escala de un mes real esto lo dispara casi cualquier candidato
+    que roce su tope semanal en algun turno, aunque el motor nunca lo seleccione ese dia — con el diseno
+    actual, **ninguna version de 30 dias reales puede llegar a `APROBADA`**. Se le presento la opcion de
+    angostar el gate (solo contar `BLOCKED` ligado a una asignacion real, o el caso version-level sin
+    ninguna asignacion) al usuario, quien prefirio no tocar codigo ya probado sin mas contexto de negocio
+    — pendiente de una decision de Operaciones/Producto, no una tarea de ingenieria abierta.
+16. Confirmar con Operaciones/Legal si los parametros demo de R01 (jornada ordinaria 8h, umbral aprobable
     10h, tope absoluto 12h) y los motivos de excepcion reusados de R02 deben volverse politica
     institucional real para estos 4 sitios, o si necesitan ajuste — hoy siguen marcados
     `SIMULATED_DEMO_NOT_INSTITUTIONAL`.

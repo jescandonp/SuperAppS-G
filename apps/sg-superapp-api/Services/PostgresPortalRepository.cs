@@ -3356,7 +3356,6 @@ where sa.employee_id=@employeeId and sa.status='ASIGNADA' and sv.status not in (
         }
 
         var projector = new ShiftCycleProjector();
-        var shiftInputs = new List<RequiredShiftRecommendationInput>();
         // El motor rankea sobre veredictos sin atar a ninguna asignacion (M3: la asignacion real todavia
         // no existe cuando se evalua). Una vez el motor elige un ganador, ese mismo veredicto ya
         // computado (nunca uno recalculado) se vuelve a persistir mas abajo, esta vez atado al id real
@@ -3364,8 +3363,25 @@ where sa.employee_id=@employeeId and sa.status='ASIGNADA' and sv.status not in (
         // RULE_ASSIGNMENT_UNEVALUATED porque el gate exige un veredicto ligado a la asignacion real, y
         // ninguno lo estaba nunca.
         var batchesByShiftEmployee = new Dictionary<(long RequiredShiftId, long EmployeeId), SchedulingRuleEvaluationBatch>();
-        foreach (var shift in shifts)
+        var weights = new SchedulingWeights(1m, 1m, 0.1m, 0.1m, 5m, 0.1m);
+        // Generar y persistir un dia a la vez -no todo el periodo en un solo lote al final- es lo que
+        // permite que BuildCandidateFactsAsync (dailyHours/weeklyHours/rest) y
+        // WorkedPreviousCalendarDayAsync/CountAssignedShiftsInPeriodAsync (continuidad/equidad) vean de
+        // verdad lo que esta misma generacion ya decidio en dias anteriores del mismo periodo: esas
+        // consultas siempre leyeron schedule_assignments ya persistidas, pero antes de este cambio nada
+        // de la corrida en curso se persistia hasta el final (un solo Generate()+Persist para los 30
+        // dias), asi que para cualquier periodo nuevo (sin version previa) esos hechos siempre volvian en
+        // cero sin importar cuantos dias consecutivos ya se hubieran asignado dentro de la misma corrida.
+        // Hallazgo real (2026-09-06): sobre el piloto real de 30 dias, un sitio con exactamente tantos
+        // guardas como cupos concurrentes por dia (GRATAMIRA-II, 4 guardas para 2+2 cupos) terminaba con
+        // los 4 trabajando el mes completo sin ningun descanso, y I9-R01 nunca escalaba a BLOCKED
+        // (ABSOLUTE_MAX_EXCEEDED) porque weeklyHours siempre valia 12 -las horas del propio turno, nunca
+        // acumuladas- sin importar cuantos dias seguidos ya llevara trabajados esa misma persona.
+        foreach (var shiftsForDate in shifts.GroupBy(s => s.Date).OrderBy(g => g.Key))
         {
+            var shiftInputs = new List<RequiredShiftRecommendationInput>();
+            foreach (var shift in shiftsForDate)
+            {
             var candidates = new List<long>();
             await using (var cmd = new NpgsqlCommand(@"select employee_id from employee_position_assignments
 where position_id=@position and status='VIGENTE' and start_date<=@date and (end_date is null or end_date>=@date)", cn))
@@ -3435,14 +3451,17 @@ where position_id=@position and status='VIGENTE' and start_date<=@date and (end_
                     shift.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                     shift.StartsAt.ToString("HH:mm:ss", CultureInfo.InvariantCulture),
                     eligibleCandidates));
-        }
+            }
 
-        var request = new ScheduleRecommendationRequest(
-            versionId, $"generation-{versionId}",
-            new SchedulingWeights(1m, 1m, 0.1m, 0.1m, 5m, 0.1m),
-            shiftInputs);
-        var result = _recommendationEngine.Generate(request);
-        await PersistScheduleRecommendationAsync(request, result, ct);
+            if (shiftInputs.Count == 0) continue;
+            // Idempotency key por dia (no por version): cada dia es su propia corrida de
+            // schedule_generation_runs, persistida antes de evaluar el dia siguiente.
+            var dayKey = shiftsForDate.Key.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
+            var request = new ScheduleRecommendationRequest(
+                versionId, $"generation-{versionId}-{dayKey}", weights, shiftInputs);
+            var result = _recommendationEngine.Generate(request);
+            await PersistScheduleRecommendationAsync(request, result, ct);
+        }
 
         // Atar el veredicto ya computado del ganador a la asignacion real que se acaba de crear. Solo
         // ASIGNADA lo necesita: una VACANTE no tiene un candidato cuyo cumplimiento haya que certificar,
