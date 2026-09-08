@@ -68,7 +68,7 @@ public sealed record ScheduleReasonResponse(string Code, string Severity, string
 
 public sealed record ScheduleAssignmentResponse(
     long Id, string Date, string StartsAt, string EndsAt, long PositionId, long? EmployeeId,
-    string ShiftCode, string Status, decimal? Score, IReadOnlyList<ScheduleReasonResponse> Reasons);
+    string? EmployeeName, string ShiftCode, string Status, decimal? Score, IReadOnlyList<ScheduleReasonResponse> Reasons);
 
 public sealed record ScheduleExceptionResponse(
     long Id, long? AssignmentId, string ExceptionType, string Reason, string Responsible,

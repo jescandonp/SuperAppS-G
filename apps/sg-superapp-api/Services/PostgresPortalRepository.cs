@@ -3865,8 +3865,9 @@ where x.schedule_version_id=@version and e.assignment_id=@assignment and a.updat
 
     private static async Task<IReadOnlyList<ScheduleAssignmentResponse>> LoadScheduleAssignmentsAsync(NpgsqlConnection cn, long versionId, CancellationToken ct)
     {
-        const string sql = @"select sa.id, rs.shift_date, rs.starts_at, rs.ends_at, rs.position_id, sa.employee_id, sa.status, sa.score, sa.reasons
+        const string sql = @"select sa.id, rs.shift_date, rs.starts_at, rs.ends_at, rs.position_id, sa.employee_id, sa.status, sa.score, sa.reasons, e.full_name
 from schedule_assignments sa join required_shifts rs on rs.id = sa.required_shift_id
+left join employees e on e.id = sa.employee_id
 where sa.schedule_version_id = @id order by rs.shift_date, rs.starts_at, sa.employee_id";
         await using var cmd = new NpgsqlCommand(sql, cn); cmd.Parameters.AddWithValue("id", versionId);
         var results = new List<ScheduleAssignmentResponse>();
@@ -3877,7 +3878,8 @@ where sa.schedule_version_id = @id order by rs.shift_date, rs.starts_at, sa.empl
             results.Add(new ScheduleAssignmentResponse(
                 rd.GetInt64(0), rd.GetFieldValue<DateOnly>(1).ToString("yyyy-MM-dd"),
                 startsAt.ToString("HH:mm"), endsAt.ToString("HH:mm"), rd.GetInt64(4),
-                rd.IsDBNull(5) ? null : rd.GetInt64(5), DeriveShiftCode(startsAt, endsAt), rd.GetString(6),
+                rd.IsDBNull(5) ? null : rd.GetInt64(5), rd.IsDBNull(9) ? null : rd.GetString(9),
+                DeriveShiftCode(startsAt, endsAt), rd.GetString(6),
                 rd.IsDBNull(7) ? null : rd.GetDecimal(7), ParseReasons(rd.GetString(8))));
         }
         return results;

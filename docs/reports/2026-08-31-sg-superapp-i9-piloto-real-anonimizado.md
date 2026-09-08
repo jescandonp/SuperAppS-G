@@ -333,6 +333,61 @@ sobre datos productivos.
 > tocar codigo ya probado sin su aprobacion explicita**: la version 10 queda en `PROPUESTA` (692/720
 > `ASIGNADA`, 96.11%, 1209 excepciones `APPROVED`, sin aprobar ni publicar), y esta decision de diseno del
 > gate queda pendiente para Operaciones/Producto junto con el hallazgo 4.2 original.
+>
+> **Actualizacion 2026-09-07/08 — nombres reales cargados (autorizado por Operaciones) y tres bugs reales
+> mas, encontrados solo al intentar comparar visualmente contra los PDF originales.** El anonimizado
+> "Guarda GRATAMIRA-II 01" no se puede cotejar a simple vista contra el PDF real de Operaciones; el
+> usuario confirmo autorizacion explicita de Operaciones para usar **nombres reales** de los 41 guardas
+> del piloto en el esquema de pruebas (`sg_i9_pruebas`) — alcance acordado: **solo nombre completo**,
+> cedula y celular se mantienen sinteticos (`PILOTO-<SITIO>-NN`), no hay necesidad real de esos datos
+> para validar asignacion/rotacion.
+>
+> Los 4 PDF de `Artefactos Consultoria/Datos Prueba - Nuevo Planeador/*.pdf` traian una linea de SQL de
+> depuracion pegada antes del header `%PDF-1.4` (un export corrupto, no un problema de este repo) —
+> se extrajeron los bytes reales a partir de esa marca para poder leerlos. Con los nombres reales de ahi
+> y de `PUESTOS PRUEBA 2026.xlsx` (columna `NOMBRES`, agrupada por `PUESTO`), se renombraron los 41
+> `employees` sinteticos del piloto por `UPDATE ... set full_name=...`, preservando el mismo orden
+> NOMINA/RELEVANTE del xlsx — **no existe un mapeo 1:1 original que recuperar** (el patron D/N/X de la
+> version 2 se calculo con aritmetica modular sobre la plantilla, nunca copio el comportamiento real de
+> nadie, verificado comparando el patron real de GRATAMIRA-II contra el sembrado: no coinciden). El
+> script de `UPDATE` con los 41 nombres reales vive **solo en el scratchpad de la sesion, nunca en el
+> repo** (mismo principio que ya regia el mapeo real→sintetico original).
+>
+> **Bug real 3: un loop infinito de refetch en el shell del portal.** `usePortalShell.ts` tenia un
+> `useEffect` que dependia del objeto `user` completo; `loadShellData` (llamada dentro de ese mismo
+> efecto) termina en `setUser(apiUser)` con un objeto nuevo en cada respuesta exitosa, asi que el cambio
+> de identidad de `user` volvia a disparar el efecto sin parar — cientos/miles de peticiones por minuto
+> contra `/api/auth/me`, `/api/portal/modules/{rol}` y `/api/portal/notifications/{usuario}`, visible en
+> vivo durante esta sesion (el navegador de prueba llego a acumular miles de peticiones y se volvio
+> inestable). Nunca se habia notado porque ninguna sesion anterior habia abierto el frontend real en un
+> navegador real por mas de un par de minutos. **Corregido:** el efecto ahora depende de `user?.username`
+> (identidad estable), no del objeto completo.
+>
+> **Bug real 4: la matriz y las exportaciones nunca mostraban el nombre del empleado, ni sintetico ni
+> real.** `ScheduleAssignmentResponse` (contrato de la API) nunca incluyo un campo de nombre —
+> `ScheduleMatrix.tsx` fabricaba la etiqueta como literal `Guarda ${employeeId}` en el cliente, y
+> `SchedulingExportService` hacia lo mismo en PDF/Excel. Renombrar los `employees` en la base no cambiaba
+> nada visible hasta corregir esto. **Corregido:** se agrego `EmployeeName` a `ScheduleAssignmentResponse`
+> y a `ScheduleExportRow` (`LEFT JOIN employees` en ambas consultas), y el frontend
+> (`ScheduleMatrix.tsx`, `types/portal.ts`) usa `employeeName` con `Guarda {id}` como respaldo solo si no
+> hay nombre. Verificado en vivo: version publicada real (`schedule_versions.id=7`) exportada a PDF y
+> Excel, ambos con los 41 nombres reales en la columna "Guarda". Limitacion menor, no corregida: el
+> generador de PDF (una implementacion minima, hecha a mano, solo ASCII) muestra "?" en los 2 nombres
+> del roster con "Ñ" (`JOSE SILVERIO PATIÑO SASTOQUE`, `WILLIAM NAZARENO QUIÑONES`) — el Excel no tiene
+> este problema. Sin regresion: `Verify-SgSuperAppI9Exports.ps1` (`PASS`, contra la version 7 real
+> publicada) y `Verify-SgSuperAppI9MvpWorkflow.ps1` (`PASS 65`).
+>
+> **Bug real 5 (entorno, no logica de negocio): el frontend cargaba en blanco.** `apps/sg-superapp-web`
+> corre desde un junction (`C:\tmp\sg-superapp-web-dev`) para evitar el `&` de `ProyectoS&G` en la ruta,
+> pero Vite resuelve el junction a la ruta real al servir su propio cliente (`env.mjs`), y ese `&` rompia
+> el parseo de un script generado por Vite (`SyntaxError: missing ) after argument list`) — la app
+> quedaba en pantalla negra sin ningun contenido. **Corregido:** `resolve.preserveSymlinks: true` en
+> `vite.config.ts`.
+>
+> Estado actual: los 41 guardas del piloto (`PILOTO-NUEVO-PLANEADOR`) tienen nombre real en
+> `sg_i9_pruebas.employees.full_name`; la matriz web, el PDF y el Excel ya lo muestran. Pendiente:
+> ejecutar la comparacion real linea a linea contra los 4 PDF de Operaciones (punto 12 de la seccion 6) —
+> esta sesion preparo el escenario para hacerla, no la ejecuto todavia.
 
 ## 1. Que se cargo
 
