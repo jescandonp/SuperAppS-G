@@ -81,18 +81,26 @@ public sealed class PostgresPortalRepository
     private static readonly IReadOnlyDictionary<string, (string Label, string Description, string Status)> ModuleCatalog =
         new Dictionary<string, (string Label, string Description, string Status)>(StringComparer.OrdinalIgnoreCase)
         {
-            ["DASHBOARD"] = ("Dashboard", "Vista inicial del piloto.", "Disponible"),
-            ["EMPLOYEES"] = ("Empleados / Guardas", "Consulta inicial del maestro de empleados I2.", "Disponible"),
-            ["POSITIONS"] = ("Puestos de Servicio", "Listado y detalle inicial I3.", "Disponible"),
-            ["COURSES"] = ("Cursos y Acreditaciones", "Pendiente implementacion en I5.", "Pendiente"),
+            ["DASHBOARD"] = ("Dashboard", "Indicadores del piloto por rol.", "Disponible"),
+            ["EMPLOYEES"] = ("Empleados / Guardas", "Maestro de empleados y guardas I2.", "Disponible"),
+            ["POSITIONS"] = ("Puestos de Servicio", "Listado, detalle y asignaciones I3.", "Disponible"),
+            ["SCHEDULING"] = ("Programacion de Turnos", "Generacion asistida y aprobacion de programacion I9.", "Disponible"),
             ["CERTIFICATES"] = ("Certificaciones", "Firmantes y certificados laborales I4.", "Disponible"),
-            ["ALERTS"] = ("Alertas", "Pendiente implementacion en I6.", "Pendiente"),
+            ["COURSES"] = ("Cursos y Acreditaciones", "Tipos de curso, cumplimiento y registros I5.", "Disponible"),
+            ["ALERTS"] = ("Alertas", "Generadores, exportacion y fallback de correo I6.", "Disponible"),
+            ["IMPORTS"] = ("Cargas de Datos", "Historial y prevalidacion de cargas I2.", "Disponible"),
             ["NOTIFICATIONS"] = ("Notificaciones", "Bandeja shell de I1.", "Disponible"),
-            ["IMPORTS"] = ("Cargas de Datos", "Historial y prevalidacion CSV inicial I2.", "Disponible"),
-            ["SETTINGS"] = ("Configuracion", "Administracion base del piloto.", "Disponible"),
-            ["NOVEDADES"] = ("Novedades", "Proximamente / En diseno para incrementos futuros.", "Pendiente"),
-            ["SCHEDULING"] = ("Programacion de Turnos", "Generacion asistida y aprobacion de programacion I9.", "Disponible")
+            ["SETTINGS"] = ("Configuracion", "Proximamente / En diseno para incrementos futuros.", "Pendiente"),
+            ["NOVEDADES"] = ("Novedades", "Proximamente / En diseno para incrementos futuros.", "Pendiente")
         };
+
+    // Orden de despliegue en el menu lateral, por flujo de trabajo (no alfabetico):
+    // vista general -> datos maestros -> operacion -> cumplimiento -> soporte/administracion.
+    private static readonly IReadOnlyList<string> ModuleDisplayOrder = new[]
+    {
+        "DASHBOARD", "EMPLOYEES", "POSITIONS", "SCHEDULING", "CERTIFICATES",
+        "COURSES", "ALERTS", "IMPORTS", "NOTIFICATIONS", "SETTINGS", "NOVEDADES"
+    };
 
     private readonly string _connectionString;
     private readonly SchedulingRuleEvaluator _ruleEvaluator;
@@ -289,20 +297,24 @@ public sealed class PostgresPortalRepository
             from role_permissions rp
             join roles r on r.id = rp.role_id
             where upper(r.code) = upper(@roleCode)
-              and rp.allowed = true
-            order by rp.module_code;";
+              and rp.allowed = true;";
 
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var command = new NpgsqlCommand(sql, connection);
         command.Parameters.AddWithValue("roleCode", roleCode);
 
-        var modules = new List<PortalModuleResponse>();
+        var allowedModuleCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            var moduleCode = reader.GetString(0).ToUpperInvariant();
-            if (ModuleCatalog.TryGetValue(moduleCode, out var metadata))
+            allowedModuleCodes.Add(reader.GetString(0).ToUpperInvariant());
+        }
+
+        var modules = new List<PortalModuleResponse>();
+        foreach (var moduleCode in ModuleDisplayOrder)
+        {
+            if (allowedModuleCodes.Contains(moduleCode) && ModuleCatalog.TryGetValue(moduleCode, out var metadata))
             {
                 modules.Add(new PortalModuleResponse(
                     moduleCode.ToLowerInvariant(),

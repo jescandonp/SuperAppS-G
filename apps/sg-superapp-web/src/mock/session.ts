@@ -10,17 +10,17 @@ export const mockCurrentUser: CurrentUser = {
 };
 
 const baseModules: AppModule[] = [
-  { code: "dashboard", label: "Dashboard", description: "Vista inicial del piloto.", enabled: true, status: "Disponible" },
-  { code: "employees", label: "Empleados / Guardas", description: "Pendiente implementacion en I2.", enabled: true, status: "Pendiente" },
-  { code: "positions", label: "Puestos de Servicio", description: "Pendiente implementacion en I3.", enabled: true, status: "Pendiente" },
-  { code: "scheduling", label: "Programacion de Turnos", description: "Programacion asistida, explicable y auditable.", enabled: true, status: "Disponible" },
-  { code: "courses", label: "Cursos y Acreditaciones", description: "Pendiente implementacion en I5.", enabled: true, status: "Pendiente" },
-  { code: "certifications", label: "Certificaciones", description: "Pendiente implementacion en I4.", enabled: true, status: "Pendiente" },
-  { code: "alerts", label: "Alertas", description: "Pendiente implementacion en I6.", enabled: true, status: "Pendiente" },
+  { code: "dashboard", label: "Dashboard", description: "Indicadores del piloto por rol.", enabled: true, status: "Disponible" },
+  { code: "employees", label: "Empleados / Guardas", description: "Maestro de empleados y guardas I2.", enabled: true, status: "Disponible" },
+  { code: "positions", label: "Puestos de Servicio", description: "Listado, detalle y asignaciones I3.", enabled: true, status: "Disponible" },
+  { code: "scheduling", label: "Programacion de Turnos", description: "Programacion asistida, explicable y auditable I9.", enabled: true, status: "Disponible" },
+  { code: "certifications", label: "Certificaciones", description: "Firmantes y certificados laborales I4.", enabled: true, status: "Disponible" },
+  { code: "courses", label: "Cursos y Acreditaciones", description: "Tipos de curso, cumplimiento y registros I5.", enabled: true, status: "Disponible" },
+  { code: "alerts", label: "Alertas", description: "Generadores, exportacion y fallback de correo I6.", enabled: true, status: "Disponible" },
+  { code: "imports", label: "Cargas de Datos", description: "Historial y prevalidacion de cargas I2.", enabled: true, status: "Disponible" },
   { code: "notifications", label: "Notificaciones", description: "Bandeja shell de I1.", enabled: true, status: "Disponible" },
   { code: "audit", label: "Auditoria", description: "Consulta transversal de eventos I7.", enabled: true, status: "Disponible" },
-  { code: "imports", label: "Cargas de Datos", description: "Pendiente implementacion en I2.", enabled: true, status: "Pendiente" },
-  { code: "settings", label: "Configuracion", description: "Administracion base del piloto.", enabled: true, status: "Disponible" },
+  { code: "settings", label: "Configuracion", description: "Proximamente / En diseno para incrementos futuros.", enabled: true, status: "Pendiente" },
   { code: "novedades", label: "Novedades", description: "Proximamente / En diseno para incrementos futuros.", enabled: true, status: "Pendiente" }
 ];
 
