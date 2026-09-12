@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import type { AppModule, CurrentUser, NotificationFilters, NotificationItem, NotificationSeverity, NotificationSourceModule, NotificationStatus } from "../../types/portal";
 
@@ -51,9 +52,37 @@ export function ShellLayout({
   onArchiveNotification,
   onLogout
 }: ShellLayoutProps) {
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const notificationAnchorRef = useRef<HTMLDivElement>(null);
+
   const updateFilters = (next: Partial<NotificationFilters>) => {
     onNotificationFiltersChange({ ...notificationFilters, ...next });
   };
+
+  useEffect(() => {
+    if (!isNotificationsOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (notificationAnchorRef.current && !notificationAnchorRef.current.contains(event.target as Node)) {
+        setIsNotificationsOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsNotificationsOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isNotificationsOpen]);
 
   return (
     <div className="shell sentinel-console">
@@ -90,17 +119,96 @@ export function ShellLayout({
             <input id="portal-search" type="search" placeholder="Buscar empleados, puestos o modulos..." />
           </div>
 
-          <div className="user-block">
-            <div className="notification-pill" aria-label="Notificaciones no leidas">{unreadNotificationCount}</div>
-            <div>
-              <strong>{user.fullName}</strong>
-              <p className="muted">
-                {user.username} · {user.role}
-              </p>
+          <div className="user-block-anchor" ref={notificationAnchorRef}>
+            <div className="user-block">
+              <button
+                type="button"
+                className="notification-pill"
+                aria-label="Notificaciones no leidas"
+                aria-expanded={isNotificationsOpen}
+                onClick={() => setIsNotificationsOpen((open) => !open)}
+              >
+                {unreadNotificationCount}
+              </button>
+              <div>
+                <strong>{user.fullName}</strong>
+                <p className="muted">
+                  {user.username} · {user.role}
+                </p>
+              </div>
+              <button type="button" className="ghost-button" onClick={onLogout}>
+                Salir
+              </button>
             </div>
-            <button type="button" className="ghost-button" onClick={onLogout}>
-              Salir
-            </button>
+
+            {isNotificationsOpen ? (
+              <aside className="notification-popover" aria-label="Bandeja de notificaciones">
+                <div className="notification-tray-header">
+                  <div>
+                    <p className="eyebrow">Personales y rol</p>
+                    <h2>Notificaciones</h2>
+                    <p className="muted">{notifications.length} items desde {source === "api" ? "API" : "mock local"}.</p>
+                  </div>
+                  <div className="notification-popover-actions">
+                    <button type="button" className="ghost-button" onClick={() => void onRefreshNotifications()}>
+                      Actualizar
+                    </button>
+                    <button type="button" className="ghost-button icon-button" aria-label="Cerrar notificaciones" onClick={() => setIsNotificationsOpen(false)}>
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <div className="notification-filters" aria-label="Filtros de notificaciones">
+                  <label>
+                    Estado
+                    <select value={notificationFilters.status ?? ""} onChange={(event) => updateFilters({ status: event.target.value ? event.target.value as NotificationStatus : undefined })}>
+                      <option value="">Todos</option>
+                      {statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    Severidad
+                    <select value={notificationFilters.severity ?? ""} onChange={(event) => updateFilters({ severity: event.target.value ? event.target.value as NotificationSeverity : undefined })}>
+                      <option value="">Todas</option>
+                      {severityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    Modulo
+                    <select value={notificationFilters.sourceModule ?? ""} onChange={(event) => updateFilters({ sourceModule: event.target.value ? event.target.value as NotificationSourceModule : undefined })}>
+                      <option value="">Todos</option>
+                      {moduleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="notification-list" role="list">
+                  {notifications.length === 0 ? (
+                    <div className="panel-empty compact-empty">No hay notificaciones con los filtros actuales.</div>
+                  ) : notifications.map((notification) => (
+                    <article key={notification.id} className={`notification-row severity-${notification.severity.toLowerCase()}`} role="listitem">
+                      <div className="notification-main">
+                        <div className="notification-row-heading">
+                          <strong>{notification.title}</strong>
+                          <span className="status-chip">{notification.severity}</span>
+                        </div>
+                        <p>{notification.body}</p>
+                        <small className="muted">{getNotificationScope(notification)} · {notification.sourceModule} · {notification.status}</small>
+                      </div>
+                      <div className="notification-actions">
+                        <button type="button" className="ghost-button" disabled={notification.status !== "UNREAD"} onClick={() => void onMarkNotificationRead(notification.id)}>
+                          Marcar leida
+                        </button>
+                        <button type="button" className="ghost-button" disabled={notification.status === "ARCHIVED"} onClick={() => void onArchiveNotification(notification.id)}>
+                          Archivar
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </aside>
+            ) : null}
           </div>
         </header>
 
@@ -108,68 +216,6 @@ export function ShellLayout({
           <section className="workspace-panel">
             <Outlet />
           </section>
-
-          <aside className="notification-tray" aria-label="Bandeja de notificaciones">
-            <div className="notification-tray-header">
-              <div>
-                <p className="eyebrow">Personales y rol</p>
-                <h2>Notificaciones</h2>
-                <p className="muted">{notifications.length} items desde {source === "api" ? "API" : "mock local"}.</p>
-              </div>
-              <button type="button" className="ghost-button" onClick={() => void onRefreshNotifications()}>
-                Actualizar
-              </button>
-            </div>
-
-            <div className="notification-filters" aria-label="Filtros de notificaciones">
-              <label>
-                Estado
-                <select value={notificationFilters.status ?? ""} onChange={(event) => updateFilters({ status: event.target.value ? event.target.value as NotificationStatus : undefined })}>
-                  <option value="">Todos</option>
-                  {statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-              </label>
-              <label>
-                Severidad
-                <select value={notificationFilters.severity ?? ""} onChange={(event) => updateFilters({ severity: event.target.value ? event.target.value as NotificationSeverity : undefined })}>
-                  <option value="">Todas</option>
-                  {severityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-              </label>
-              <label>
-                Modulo
-                <select value={notificationFilters.sourceModule ?? ""} onChange={(event) => updateFilters({ sourceModule: event.target.value ? event.target.value as NotificationSourceModule : undefined })}>
-                  <option value="">Todos</option>
-                  {moduleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-              </label>
-            </div>
-
-            <div className="notification-list" role="list">
-              {notifications.length === 0 ? (
-                <div className="panel-empty compact-empty">No hay notificaciones con los filtros actuales.</div>
-              ) : notifications.map((notification) => (
-                <article key={notification.id} className={`notification-row severity-${notification.severity.toLowerCase()}`} role="listitem">
-                  <div className="notification-main">
-                    <div className="notification-row-heading">
-                      <strong>{notification.title}</strong>
-                      <span className="status-chip">{notification.severity}</span>
-                    </div>
-                    <p>{notification.body}</p>
-                    <small className="muted">{getNotificationScope(notification)} · {notification.sourceModule} · {notification.status}</small>
-                  </div>
-                  <div className="notification-actions">
-                    <button type="button" className="ghost-button" disabled={notification.status !== "UNREAD"} onClick={() => void onMarkNotificationRead(notification.id)}>
-                      Marcar leida
-                    </button>
-                    <button type="button" className="ghost-button" disabled={notification.status === "ARCHIVED"} onClick={() => void onArchiveNotification(notification.id)}>
-                      Archivar
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </aside>
         </div>
       </main>
     </div>

@@ -88,7 +88,10 @@ async function sendJson<T>(path: string, method: "POST" | "PUT", body?: unknown)
     throw new PortalApiError(await readProblem(response));
   }
 
-  return response.json() as Promise<T>;
+  // A 200 with no body (e.g. PUT /portal/employees/{id}) is valid and must not
+  // be treated as a parse failure - response.json() throws on an empty string.
+  const text = await response.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 async function downloadSchedulingExport(path: string, fileName: string): Promise<void> {
