@@ -171,6 +171,18 @@ export async function fetchScheduleProposal(versionId: number): Promise<Schedule
   return getJson<ScheduleProposal>(`/portal/scheduling/proposals/${versionId}`);
 }
 
+// A missing schedule for a project/period is an expected outcome (nothing generated yet), not an
+// error to surface — the caller decides what to show instead, the same way it already does for the
+// initial "sin propuesta" state.
+export async function fetchScheduleByPeriod(projectId: number, period: string): Promise<ScheduleProposal | null> {
+  try {
+    return await getJson<ScheduleProposal>(`/portal/scheduling/projects/${projectId}/schedules/${period}`);
+  } catch (caught) {
+    if (caught instanceof PortalApiError && caught.status === 404) return null;
+    throw caught;
+  }
+}
+
 export async function updateScheduleAssignment(versionId: number, assignmentId: number, request: { employeeId?: number; status: "ASIGNADA" | "VACANTE"; reasons?: string[]; expectedVersion: number }): Promise<ScheduleProposal> {
   return sendJson<ScheduleProposal>(`/portal/scheduling/proposals/${versionId}/assignments/${assignmentId}`, "PUT", request);
 }

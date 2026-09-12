@@ -76,17 +76,19 @@ export function usePortalShell(): PortalShellState {
     }
   }, []);
 
+  // Depende de user?.username, no del objeto user completo: loadShellData termina llamando
+  // setUser(apiUser) con un objeto nuevo en cada respuesta, y si el efecto dependiera de la
+  // identidad de "user" se disparaba de nuevo con cada refresco -> loop infinito de fetch contra
+  // /api/auth/me, /api/portal/modules y /api/portal/notifications. Solo debe correr cuando cambia
+  // quien esta autenticado (login/logout), no cada vez que se refrescan sus propios datos.
   useEffect(() => {
     if (!user) {
       return;
     }
 
     void loadShellData(user);
-    // loadShellData succeeds by calling setUser(apiUser) with a freshly parsed object every
-    // time, so depending on `user` itself re-triggers this effect on its own success forever.
-    // Depending on the username instead only re-fires on an actual account change (login/logout).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.username, loadShellData]);
+  }, [user?.username]);
 
   const loginWithCredentials = useCallback(async (request: LoginRequest) => {
     setLoading(true);

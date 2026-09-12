@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { PortalApiError, approveSchedule, approveScheduleException, downloadSchedulePdf, downloadScheduleXlsx, fetchSchedulingCapabilities, fetchSchedulingProjects, fetchShiftTemplates, fetchSchedulingRuleEvaluations, fetchSchedulingRuleProfiles, generateScheduleProposal, publishSchedule, replanSchedule } from "../../services/portalApi";
+import { PortalApiError, approveSchedule, approveScheduleException, downloadSchedulePdf, downloadScheduleXlsx, fetchSchedulingCapabilities, fetchSchedulingProjects, fetchShiftTemplates, fetchScheduleByPeriod, fetchSchedulingRuleEvaluations, fetchSchedulingRuleProfiles, generateScheduleProposal, publishSchedule, replanSchedule } from "../../services/portalApi";
 import type { CurrentUser, ScheduleAssignment, ScheduleComparison, ScheduleProposal, SchedulingCapabilities, SchedulingProject, ShiftTemplate } from "../../types/portal";
 import type { SchedulingRuleEvaluationState, SchedulingRuleProblem, SchedulingRuleProfileState, SchedulingRuleRevalidationState } from "../../types/portal";
 import { RuleEvaluationPanel } from "./RuleEvaluationPanel";
@@ -70,7 +70,34 @@ export function SchedulingPage({ user }: Props) {
   // selector de la barra de control sincronizado con lo que el panel acaba de guardar.
   async function reloadProjects() { if (demoMode) return; try { setProjects(await fetchSchedulingProjects()); } catch { /* el panel de proyectos ya muestra su propio error */ } }
 
-  async function generate() { if (!projectId || !capabilities.generate) return; setBusy(true); setError(null); setMessage(null); try { const next = demoMode ? demoProposal(projectId, periodStart, periodEnd) : await generateScheduleProposal(projectId, { periodStart, periodEnd }); setProposal(next); setSelectedAssignment(next.assignments?.[0] ?? null); setTab("Matriz"); setMessage("Propuesta generada para revisión humana."); setGateProblem(null); if (!demoMode) { void loadRuleState(next.versionId); } } catch (caught) { setError(caught instanceof Error ? caught.message : "No fue posible generar la propuesta."); } finally { setBusy(false); } }
+  // A project/periodo ya puede tener una version con asignaciones reales (sembrada o generada antes).
+  // Cargarla aqui, sin pasar por generate(), es la unica forma de volver a verla: el backend nunca
+  // ofrece una ruta que la reconstruya, y regenerar crea una version vacia nueva que la tapa.
+  async function loadExisting(id: number, period: string) {
+    if (demoMode) return;
+    try {
+      const existing = await fetchScheduleByPeriod(id, period);
+      if (!existing) return;
+      setProposal(existing);
+      setSelectedAssignment(existing.assignments?.[0] ?? null);
+      if (existing.assignments?.length) setTab("Matriz");
+      void loadRuleState(existing.versionId);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "No fue posible cargar la programación existente.");
+    }
+  }
+  async function generate() {
+    if (!projectId || !capabilities.generate) return;
+    if (!demoMode && proposal && (proposal.assignments?.length ?? 0) > 0) {
+      const confirmed = window.confirm(
+        `La versión actual (v${proposal.versionNumber}) tiene ${proposal.assignments!.length} asignaciones. ` +
+        "Generar una propuesta nueva crea una versión distinta, todavía sin candidatos evaluados, y no " +
+        "borra la actual — pero la versión nueva será la única visible desde esta pantalla. ¿Continuar de todas formas?"
+      );
+      if (!confirmed) return;
+    }
+    setBusy(true); setError(null); setMessage(null);
+    try { const next = demoMode ? demoProposal(projectId, periodStart, periodEnd) : await generateScheduleProposal(projectId, { periodStart, periodEnd }); setProposal(next); setSelectedAssignment(next.assignments?.[0] ?? null); setTab("Matriz"); setMessage("Propuesta generada para revisión humana."); setGateProblem(null); if (!demoMode) { void loadRuleState(next.versionId); } } catch (caught) { setError(caught instanceof Error ? caught.message : "No fue posible generar la propuesta."); } finally { setBusy(false); } }
   async function compare() { if (!proposal) return; setBusy(true); setError(null); try { const next = demoMode ? [{ mode: "MINIMUM_IMPACT", changedAssignments: 3, additionalHours: 4, vacancies: 1, exceptions: 1 }, { mode: "GLOBAL", changedAssignments: 8, additionalHours: 0, vacancies: 0, exceptions: 2 }] as ScheduleComparison[] : (await replanSchedule(proposal.versionId, { triggerType: "MANUAL_REVIEW", triggerId: String(proposal.versionId), modes: ["MINIMUM_IMPACT", "GLOBAL"] })).scenarios; setScenarios(next); setTab("Comparar"); } catch (caught) { setError(toProblem(caught).message); } finally { setBusy(false); } }
   // A refused deviation used to leave no trace on screen at all: the panel cleared its spinner and
   // the list simply did not grow, which reads as "nothing happened" rather than "it was refused".
@@ -114,7 +141,7 @@ export function SchedulingPage({ user }: Props) {
     <header className="scheduling-hero"><div><p className="eyebrow">Operaciones · Programación asistida</p><h1>Programación de turnos</h1><p>Configure el periodo, revise la propuesta del motor y mantenga la decisión humana trazable.</p></div><div className="hero-status"><span className="schedule-badge">{demoMode ? "MODO DEMO" : proposal?.status ?? "SIN PROPUESTA"}</span>{/* Visible on every tab and in every state, and it never claims more than is known: the origin
             is only called simulated once a profile has actually said so. */}
         <span className="schedule-badge is-simulated">{simulatedOrigin ? "DATOS SIMULADOS - MVP" : "ORIGEN DE REGLAS SIN CONFIRMAR"}</span><small>{selectedProject?.name ?? "Seleccione un proyecto"}</small></div></header>
-    <section className="scheduling-control-bar" aria-label="Filtros de programación"><label>Proyecto<select value={projectId} onChange={(event) => { const nextId = event.target.value ? Number(event.target.value) : ""; setProjectId(nextId); setProposal(null); setGateProblem(null); const chosen = projects.find((item) => item.id === nextId); if (chosen && !demoMode) void loadRuleProfile(chosen.code, periodStart); else setRuleProfile({ status: "IDLE" }); }}><option value="">Seleccione un proyecto</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><label>Desde<input type="date" value={periodStart} onChange={(event) => { setPeriodStart(event.target.value); reloadProfileFor(event.target.value); }} /></label><label>Hasta<input type="date" value={periodEnd} min={periodStart} onChange={(event) => setPeriodEnd(event.target.value)} /></label>{capabilities.generate && <button className="schedule-primary" disabled={!projectId || busy || Boolean(readOnly)} onClick={generate}>{busy ? "Procesando…" : proposal ? "Regenerar propuesta" : "Generar propuesta"}</button>}</section>
+    <section className="scheduling-control-bar" aria-label="Filtros de programación"><label>Proyecto<select value={projectId} onChange={(event) => { const nextId = event.target.value ? Number(event.target.value) : ""; setProjectId(nextId); setProposal(null); setGateProblem(null); const chosen = projects.find((item) => item.id === nextId); if (chosen && !demoMode) { void loadRuleProfile(chosen.code, periodStart); void loadExisting(nextId as number, periodStart); } else setRuleProfile({ status: "IDLE" }); }}><option value="">Seleccione un proyecto</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><label>Desde<input type="date" value={periodStart} onChange={(event) => { setPeriodStart(event.target.value); setProposal(null); reloadProfileFor(event.target.value); if (projectId) void loadExisting(projectId, event.target.value); }} /></label><label>Hasta<input type="date" value={periodEnd} min={periodStart} onChange={(event) => setPeriodEnd(event.target.value)} /></label>{capabilities.generate && <button className="schedule-primary" disabled={!projectId || busy || Boolean(readOnly)} onClick={generate}>{busy ? "Procesando…" : proposal ? "Regenerar propuesta" : "Generar propuesta"}</button>}</section>
     <div className="schedule-live-region" aria-live="polite">{message && <p className="schedule-alert is-success">{message}</p>}{error && <p className="schedule-alert is-error">{error}</p>}</div>
     {proposal && <section className="schedule-summary" aria-label="Resumen de propuesta"><div><span>Cobertura</span><strong>{proposal.coveragePercent}%</strong></div><div><span>Vacantes</span><strong>{proposal.vacancyCount}</strong></div><div><span>Excepciones</span><strong>{proposal.exceptionCount}</strong></div><div><span>Versión</span><strong>v{proposal.versionNumber}</strong></div><div className="summary-actions">{<button onClick={approve} disabled={approveAction.disabled} aria-describedby="approve-reason">Aprobar</button>}{<button onClick={publish} disabled={publishAction.disabled} aria-describedby="publish-reason">Publicar</button>}{capabilities.export && <><button onClick={() => exportFile("pdf")} disabled={busy}>PDF</button><button onClick={() => exportFile("xlsx")} disabled={busy}>Excel</button></>}{proposal.status === "PUBLICADA" && capabilities.generate && <button onClick={() => { setProposal(null); setTab("Plantillas"); }}>Crear nueva versión</button>}</div><div className="summary-reasons" role="status" aria-live="polite"><small id="approve-reason">{approveAction.reason ?? "Aprobar disponible; la decisión la confirma el servidor."}</small><small id="publish-reason">{publishAction.reason ?? "Publicar disponible; la decisión la confirma el servidor."}</small></div></section>}
     <nav className="scheduling-tabs" aria-label="Secciones de programación">{(capabilities.configure && !demoMode ? ["Proyectos", "Plantillas", "Matriz", "Reglas", "Comparar", "Excepciones"] as Tab[] : ["Plantillas", "Matriz", "Reglas", "Comparar", "Excepciones"] as Tab[]).map((item) => <button key={item} aria-pressed={tab === item} onClick={() => setTab(item)}>{item}</button>)}</nav>

@@ -79,7 +79,7 @@ SchedulingRuleProfile PBoth()=>new(7,"MVP",1,SchedulingRuleOrigin.SIMULATED,Sche
 SchedulingRuleEvaluationBatch E(string f,SchedulingRuleProfile? p=null,IReadOnlySet<string>? h=null)=>e.Evaluate(p??P(),"PROJECT-A",new DateOnly(2026,8,17),J(f),h);
 RuleEvaluation R(SchedulingRuleEvaluationBatch x,string c)=>x.Evaluations.Single(y=>y.RuleCode==c);
 void Q<T>(T x,T y,string n)where T:notnull{if(!EqualityComparer<T>.Default.Equals(x,y))throw new Exception($"{n}: {x}!={y}");}
-SchedulingRuleSeverity S(SchedulingRuleOutcome o)=>o==SchedulingRuleOutcome.COMPLIANT?SchedulingRuleSeverity.INFO:o==SchedulingRuleOutcome.EXCEPTION_REQUIRED?SchedulingRuleSeverity.WARNING:o==SchedulingRuleOutcome.WARNING?SchedulingRuleSeverity.ERROR:SchedulingRuleSeverity.BLOCKING;
+SchedulingRuleSeverity S(SchedulingRuleOutcome o)=>o==SchedulingRuleOutcome.COMPLIANT||o==SchedulingRuleOutcome.NOT_APPLICABLE?SchedulingRuleSeverity.INFO:o==SchedulingRuleOutcome.EXCEPTION_REQUIRED?SchedulingRuleSeverity.WARNING:o==SchedulingRuleOutcome.WARNING?SchedulingRuleSeverity.ERROR:SchedulingRuleSeverity.BLOCKING;
 void C(RuleEvaluation x,SchedulingRuleOutcome o,string c,string n,bool? exception=null){Q(o,x.Outcome,n+" outcome");Q(S(o),x.Severity,n+" severity");Q(exception??(o==SchedulingRuleOutcome.EXCEPTION_REQUIRED),x.ExceptionAllowed,n+" exception");Q(c,x.MessageCode,n+" code");Q(false,string.IsNullOrWhiteSpace(x.Explanation),n+" explanation");if(!Regex.IsMatch(x.ScopeHash,"^[a-f0-9]{64}$"))throw new Exception(n+" hash");if(x.Explanation.Length>1000)throw new Exception(n+" explanation exceeds the persisted limit");}
 string Cell(string guard,string date,string cell,string shift)=>$"{{\"employeeId\":\"{guard}\",\"date\":\"{date}\",\"cell\":\"{cell}\",\"shiftCode\":\"{shift}\"}}";
 string Cells(params string[] items)=>"["+string.Join(",",items)+"]";
@@ -205,11 +205,13 @@ var mixedExpected=Cells(Cell("guard-a","2026-08-17","C1","D"),Cell("guard-b","20
 var mixedProposed=Cells(Cell("guard-a","2026-08-17","C1","N"),Cell("guard-b","2026-08-17","C1","N"));
 T("R07-T22",F(mixedExpected,mixedProposed),SchedulingRuleOutcome.BLOCKED,"I9_R07_MIXED_GUARDS",false,false);
 
-// T23 a disabled R07 never accredits productive compliance.
+// T23 (2026-09-03) a disabled R07 is NOT_APPLICABLE - the profile declares it out of scope, it never
+// accredits compliance itself, but it also never blocks the gate on its own (same as any other
+// NOT_APPLICABLE outcome, e.g. R04's expired-novelty case).
 var t23=E(F(Base(),Base()),P(on:false));
 Q(1,t23.Evaluations.Count,"R07-T23 disabled rule still reports");
-C(R(t23,R7),SchedulingRuleOutcome.WARNING,"I9_R07_DISABLED_UNVERIFIED","R07-T23",false);
-Q(false,t23.Summary.CanApproveOrPublish,"R07-T23 gate stays closed");Done("R07-T23");
+C(R(t23,R7),SchedulingRuleOutcome.NOT_APPLICABLE,"I9_R07_DISABLED_NOT_APPLICABLE","R07-T23",false);
+Q(true,t23.Summary.CanApproveOrPublish,"R07-T23 gate is not held closed by a rule the profile declared out of scope");Done("R07-T23");
 
 // Fail-closed contract: malformed parameters or facts never accredit compliance.
 foreach(var broken in new[]{"{\"compareBy\":[],\"changeInvalidatesApproval\":true}","{\"compareBy\":[\"templateVersion\",\"anchor\",\"cell\"],\"changeInvalidatesApproval\":false}"}){
