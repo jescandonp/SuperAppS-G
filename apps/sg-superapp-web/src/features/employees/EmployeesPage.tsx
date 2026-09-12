@@ -400,10 +400,6 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
 
           {selectedEmployee ? (
             <div className="employee-detail">
-              <h4>{selectedEmployee.fullName}</h4>
-              <p className="muted">
-                {selectedEmployee.identificationType} {selectedEmployee.identificationNumber}
-              </p>
               <div className="employee-detail-groups">
                 <div className="employee-detail-group">
                   <h4>Identificación</h4>
