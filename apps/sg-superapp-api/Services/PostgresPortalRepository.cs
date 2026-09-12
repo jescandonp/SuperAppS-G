@@ -90,16 +90,23 @@ public sealed class PostgresPortalRepository
             ["ALERTS"] = ("Alertas", "Generadores, exportacion y fallback de correo I6.", "Disponible"),
             ["IMPORTS"] = ("Cargas de Datos", "Historial y prevalidacion de cargas I2.", "Disponible"),
             ["NOTIFICATIONS"] = ("Notificaciones", "Bandeja shell de I1.", "Disponible"),
+            ["AUDIT"] = ("Auditoria", "Consulta transversal de eventos I7.", "Disponible"),
             ["SETTINGS"] = ("Configuracion", "Proximamente / En diseno para incrementos futuros.", "Pendiente"),
             ["NOVEDADES"] = ("Novedades", "Proximamente / En diseno para incrementos futuros.", "Pendiente")
         };
+
+    // AUDIT no tiene fila propia en role_permissions: el endpoint /api/portal/audit ya
+    // reutiliza el permiso DASHBOARD/VIEW (ver PortalEndpoints), asi que su visibilidad en el
+    // menu se deriva de ese mismo permiso en vez de requerir una migracion nueva.
+    private const string AuditModuleCode = "AUDIT";
+    private const string DashboardModuleCode = "DASHBOARD";
 
     // Orden de despliegue en el menu lateral, por flujo de trabajo (no alfabetico):
     // vista general -> datos maestros -> operacion -> cumplimiento -> soporte/administracion.
     private static readonly IReadOnlyList<string> ModuleDisplayOrder = new[]
     {
         "DASHBOARD", "EMPLOYEES", "POSITIONS", "SCHEDULING", "CERTIFICATES",
-        "COURSES", "ALERTS", "IMPORTS", "NOTIFICATIONS", "SETTINGS", "NOVEDADES"
+        "COURSES", "ALERTS", "IMPORTS", "NOTIFICATIONS", "AUDIT", "SETTINGS", "NOVEDADES"
     };
 
     private readonly string _connectionString;
@@ -311,6 +318,11 @@ public sealed class PostgresPortalRepository
             allowedModuleCodes.Add(reader.GetString(0).ToUpperInvariant());
         }
 
+        if (allowedModuleCodes.Contains(DashboardModuleCode))
+        {
+            allowedModuleCodes.Add(AuditModuleCode);
+        }
+
         var modules = new List<PortalModuleResponse>();
         foreach (var moduleCode in ModuleDisplayOrder)
         {
@@ -360,7 +372,7 @@ public sealed class PostgresPortalRepository
             unreadNotifications.ToString(CultureInfo.InvariantCulture),
             "Bandeja personal y de rol",
             unreadNotifications > 0 ? "WARNING" : "SUCCESS",
-            "/portal/notificaciones"));
+            null));
 
         if (role is "ADMIN")
         {
@@ -371,7 +383,7 @@ public sealed class PostgresPortalRepository
                 activeUsers.ToString(CultureInfo.InvariantCulture),
                 "Salud de acceso al piloto",
                 "INFO",
-                "/portal/configuracion"));
+                null));
             widgets.Add(new DashboardWidgetResponse(
                 "platform-imports-errors",
                 "Cargas con errores",
@@ -399,7 +411,7 @@ public sealed class PostgresPortalRepository
                 criticalTraining.ToString(CultureInfo.InvariantCulture),
                 "Requisitos con accion prioritaria",
                 criticalTraining > 0 ? "CRITICAL" : "SUCCESS",
-                "/portal/cursos"));
+                "/portal/courses"));
             widgets.Add(new DashboardWidgetResponse(
                 "imports-data-quality",
                 "Cargas con hallazgos",
@@ -439,7 +451,7 @@ public sealed class PostgresPortalRepository
                 expiredTraining.ToString(CultureInfo.InvariantCulture),
                 "Indicador visible sin bloqueo automatico",
                 expiredTraining > 0 ? "CRITICAL" : "SUCCESS",
-                "/portal/cursos"));
+                "/portal/courses"));
             widgets.Add(new DashboardWidgetResponse(
                 "operations-current-assignments",
                 "Asignaciones vigentes",

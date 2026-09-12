@@ -377,8 +377,14 @@ public static class PortalEndpoints
             return updated ? Results.Ok(await repository.GetPositionRequirementAsync(id, cancellationToken)) : Results.NotFound();
         });
 
-        app.MapGet("/api/portal/modules/{role}", async (string role, MockPortalQueryService portalService, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        app.MapGet("/api/portal/modules/{role}", async (string role, PortalAuthorizationService authorization, MockPortalQueryService portalService, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
         {
+            var denied = await authorization.RequireAsync("DASHBOARD", "VIEW", cancellationToken);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
             if (!TryParseRole(role, out var parsedRole))
             {
                 return Results.BadRequest(new { message = "Rol no soportado." });

@@ -54,7 +54,7 @@ function Assert-ModuleOrder {
 
 $workflowOrder = @(
     "dashboard", "employees", "positions", "scheduling", "certificates",
-    "courses", "alerts", "imports", "notifications", "settings", "novedades"
+    "courses", "alerts", "imports", "notifications", "audit", "settings", "novedades"
 )
 
 $adminHeaders = Get-SessionHeaders -Username "admin.sg" -Password "Admin123"
@@ -70,11 +70,18 @@ Assert-ModuleStatus -Modules @($adminModules.Body) -Code "courses" -ExpectedStat
 Assert-ModuleStatus -Modules @($adminModules.Body) -Code "alerts" -ExpectedStatus "Disponible"
 Assert-ModuleStatus -Modules @($adminModules.Body) -Code "scheduling" -ExpectedStatus "Disponible"
 
+# Auditoria (I7) debe aparecer en el menu, derivada del permiso DASHBOARD/VIEW.
+Assert-ModuleStatus -Modules @($adminModules.Body) -Code "audit" -ExpectedStatus "Disponible"
+
 # Modulos sin funcionalidad real deben reportar Pendiente, no Disponible.
 Assert-ModuleStatus -Modules @($adminModules.Body) -Code "settings" -ExpectedStatus "Pendiente"
 Assert-ModuleStatus -Modules @($adminModules.Body) -Code "novedades" -ExpectedStatus "Pendiente"
 
 # El orden debe seguir el flujo de trabajo, no el alfabetico.
 Assert-ModuleOrder -Modules @($adminModules.Body) -ExpectedOrder $workflowOrder
+
+# El catalogo de modulos debe requerir autenticacion, igual que dashboard/auditoria.
+$unauthenticated = Invoke-JsonRequest -Method "GET" -Uri "$ApiBaseUrl/portal/modules/ADMIN" -Headers @{}
+Assert-Status -Response $unauthenticated -ExpectedStatus 401 -Message "El catalogo de modulos debe requerir autenticacion."
 
 Write-Host "Modules catalog verification completed."

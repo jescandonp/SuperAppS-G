@@ -147,3 +147,44 @@ alcance de esta iteracion para incluirlos:
    de `/api/portal/dashboard` y `/api/portal/audit`, este endpoint responde
    200 sin token. Bajo impacto (solo expone metadatos de modulos, no datos de
    negocio) pero es inconsistente con el resto de la API.
+
+### 2026-09-12 - Correccion de los 4 hallazgos cerrada
+
+El usuario confirmo abordar los 4 hallazgos en una iteracion aparte, en la
+misma sesion:
+
+- **Auditoria en el menu:** agregada a `ModuleCatalog` y `ModuleDisplayOrder`
+  (backend). Se investigo si requeria una migracion nueva de
+  `role_permissions` y **no la requiere**: `GET /api/portal/audit` ya
+  reutiliza el permiso `DASHBOARD/VIEW` (concedido a los 4 roles desde
+  `db/seeds/001_roles_and_permissions.sql`), asi que `GetModulesAsync` deriva
+  la visibilidad de Auditoria del mismo permiso en memoria, sin tabla nueva.
+  Se agrego tambien a `MockPortalQueryService` (backend fallback) por
+  consistencia; ya existia en `mock/session.ts` (frontend fallback).
+- **`certifications` -> `certificates`:** corregido en
+  `DashboardPage.tsx` (`resolveActionUrl`).
+- **Links de widgets rotos:** en `PostgresPortalRepository.cs`,
+  "Usuarios activos" (ADMIN) y "Notificaciones sin leer" (SYSTEM) quedan sin
+  `actionUrl` (sin boton "Abrir": no existe una pantalla real de destino
+  hoy); "Cursos criticos o vencidos" (TH/ADMIN) y "Guardas no habilitados"
+  (OPERACIONES) pasan de `/portal/cursos` a `/portal/courses` (la forma que
+  ya se traduce correctamente en el frontend). Se encontro un quinto link
+  roto durante la implementacion, no reportado originalmente: el widget
+  "Notificaciones sin leer" apuntaba a `/portal/notificaciones` (con "es"),
+  que tampoco coincidia con ningun prefijo conocido por el frontend.
+- **Autenticacion en `/api/portal/modules/{role}`:** protegido con el mismo
+  `authorization.RequireAsync("DASHBOARD", "VIEW", ...)` que ya usan
+  dashboard y auditoria - sin permiso nuevo, sin migracion.
+- Verificacion ampliada: `Verify-SgSuperAppModulesCatalog.ps1` ahora exige
+  `audit` en `Disponible`, valida el orden completo incluyendolo, y confirma
+  401 sin autenticacion. `Verify-SgSuperAppI7Dashboard.ps1` ahora valida que
+  ningun widget de ningun rol tenga un `actionUrl` que el frontend no sepa
+  traducir.
+- GREEN: `Verify-SgSuperAppModulesCatalog.ps1`,
+  `Verify-SgSuperAppI7Dashboard.ps1`, `Verify-SgSuperAppI7Audit.ps1`,
+  `Verify-SgSuperAppI7Security.ps1`, `Verify-SgSuperAppI6Security.ps1`.
+- Backend build: `dotnet build` correcto, 0 advertencias, 0 errores.
+- Frontend build: `tsc -b` + `vite build` correcto, 56 modulos transformados.
+- Recorrido visual manual (sesion ADMIN): Auditoria visible y funcional desde
+  el menu con datos reales; widget "Usuarios activos" sin boton "Abrir".
+- `graphify update .` intentado; no disponible en PATH.

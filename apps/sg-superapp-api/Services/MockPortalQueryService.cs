@@ -17,6 +17,7 @@ public sealed class MockPortalQueryService
             new("alerts", "Alertas", "Generadores, exportacion y fallback de correo I6.", true, "Disponible"),
             new("notifications", "Notificaciones", "Bandeja shell de I1.", true, "Disponible"),
             new("imports", "Cargas de Datos", "Historial y prevalidacion CSV inicial I2.", role is RoleCode.Admin or RoleCode.TalentoHumano, "Disponible"),
+            new("audit", "Auditoria", "Consulta transversal de eventos I7.", true, "Disponible"),
             new("settings", "Configuracion", "Proximamente / En diseno para incrementos futuros.", role is RoleCode.Admin, "Pendiente")
         };
 
