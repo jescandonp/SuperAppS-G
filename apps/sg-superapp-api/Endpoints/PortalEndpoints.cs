@@ -633,7 +633,7 @@ public static class PortalEndpoints
             return Results.Ok(notifications);
         });
 
-        app.MapGet("/api/portal/employees", async (string? search, string? status, string? jobTitle, string? completeness, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        app.MapGet("/api/portal/employees", async (string? search, string? status, string? jobTitle, string? completeness, int? page, int? pageSize, HttpContext httpContext, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
         {
             var denied = await authorization.RequireAsync("EMPLOYEES", "VIEW", cancellationToken);
             if (denied is not null)
@@ -646,8 +646,21 @@ public static class PortalEndpoints
                 return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
             }
 
+            // 100_000 is not a real product limit, just an overflow guard: with resolvedPageSize
+            // capped at 100, (100_000 - 1) * 100 stays well within int32 range, so the offset
+            // computed in GetEmployeesAsync can never overflow regardless of the requested page.
+            const int maxPage = 100_000;
+            var resolvedPageSize = pageSize.HasValue ? Math.Clamp(pageSize.Value, 1, 100) : int.MaxValue;
+            // Paging only makes sense once pageSize is actually bounded. When pageSize is omitted,
+            // resolvedPageSize is the "unbounded" sentinel (int.MaxValue) and any page > 1 would
+            // overflow int32 in (page - 1) * pageSize (offset), so ignore the caller's page in that
+            // case and force page 1 — this also preserves the "omit both -> identical to old
+            // unpaginated behavior" guarantee even when only page is supplied without pageSize.
+            var resolvedPage = !pageSize.HasValue ? 1 : (page.HasValue ? Math.Clamp(page.Value, 1, maxPage) : 1);
+
             var includeSalary = await repository.HasPermissionAsync(userContext.User!.Id, "EMPLOYEES", "VIEW_SALARY", cancellationToken);
-            var employees = await repository.GetEmployeesAsync(search, status, jobTitle, completeness, includeSalary, cancellationToken);
+            var (employees, totalCount) = await repository.GetEmployeesAsync(search, status, jobTitle, completeness, includeSalary, resolvedPage, resolvedPageSize, cancellationToken);
+            httpContext.Response.Headers["X-Total-Count"] = totalCount.ToString();
             return Results.Ok(employees);
         });
 

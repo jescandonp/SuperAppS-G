@@ -3,13 +3,14 @@ import {
   createPositionAssignment,
   fetchEmployeeDetail,
   fetchEmployeePositionAssignments,
-  fetchEmployees,
+  fetchEmployeesPage,
   fetchServicePositions,
   finalizePositionAssignment,
   PortalApiError,
   updateEmployee
 } from "../../services/portalApi";
 import type { CurrentUser, EmployeeDetail, EmployeeSummary, PositionAssignment, ServicePosition } from "../../types/portal";
+import { Modal } from "../../components/Modal";
 
 function describeDetailError(error: unknown): string {
   if (error instanceof PortalApiError && error.status === 404) {
@@ -48,6 +49,10 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
   const [status, setStatus] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [completeness, setCompleteness] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalCount, setTotalCount] = useState(0);
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const [employees, setEmployees] = useState<EmployeeSummary[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeDetail | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -65,6 +70,9 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
   const [editNotes, setEditNotes] = useState("");
   const [editSalary, setEditSalary] = useState("");
   const [editSalaryEffectiveFrom, setEditSalaryEffectiveFrom] = useState("");
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
+  const [editErrorMessage, setEditErrorMessage] = useState<string | null>(null);
   const [positionAssignments, setPositionAssignments] = useState<PositionAssignment[]>([]);
   const [availablePositions, setAvailablePositions] = useState<ServicePosition[]>([]);
   const [assignmentPositionId, setAssignmentPositionId] = useState("");
@@ -86,6 +94,15 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
     normalizeText(importedPositionText) !== normalizeText(normalizedPositionName);
 
   useEffect(() => {
+    setPage(1);
+  }, [search, status, jobTitle, completeness]);
+
+  useEffect(() => {
+    setIsEditModalOpen(false);
+    setIsAssignmentModalOpen(false);
+  }, [selectedId]);
+
+  useEffect(() => {
     let ignore = false;
 
     async function loadEmployees() {
@@ -93,28 +110,30 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
       setErrorMessage(null);
 
       try {
-        const data = await fetchEmployees({ search, status, jobTitle, completeness });
+        const { items, totalCount: total } = await fetchEmployeesPage({ search, status, jobTitle, completeness, page, pageSize });
         if (ignore) {
           return;
         }
 
-        setEmployees(data);
+        setEmployees(items);
+        setTotalCount(total);
 
-        if (data.length === 0) {
+        if (items.length === 0) {
           setSelectedId(null);
           setSelectedEmployee(null);
           return;
         }
 
-        const nextId = selectedId !== null && data.some((employee) => employee.id === selectedId)
+        const nextId = selectedId !== null && items.some((employee) => employee.id === selectedId)
           ? selectedId
-          : data[0].id;
+          : items[0].id;
         setSelectedId(nextId);
       } catch (error) {
         if (!ignore) {
           const message = error instanceof Error ? error.message : "No fue posible cargar empleados.";
           setErrorMessage(message);
           setEmployees([]);
+          setTotalCount(0);
           setSelectedId(null);
           setSelectedEmployee(null);
         }
@@ -130,7 +149,7 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
     return () => {
       ignore = true;
     };
-  }, [search, status, jobTitle, completeness, selectedId]);
+  }, [search, status, jobTitle, completeness, selectedId, page, pageSize]);
 
   useEffect(() => {
     if (selectedId === null) {
@@ -156,16 +175,6 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
 
         setSelectedEmployee(data);
         setPositionAssignments(assignments);
-        setEditFullName(data.fullName);
-        setEditEmploymentStatus(data.employmentStatus);
-        setEditJobTitle(data.jobTitle);
-        setEditHireDate(data.hireDate || "");
-        setEditTerminationDate(data.terminationDate || "");
-        setEditTerminationReason(data.terminationReason || "");
-        setEditContractType(data.contractType || "");
-        setEditNotes(data.notes || "");
-        setEditSalary(data.currentBaseSalary?.toString() || "");
-        setEditSalaryEffectiveFrom(data.salaryEffectiveFrom || "");
 
         // Las posiciones activas alimentan el selector de asignacion; si fallan no deben
         // ocultar el detalle del empleado que si cargo, solo dejar el selector vacio.
@@ -208,7 +217,7 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
       return;
     }
 
-    setErrorMessage(null);
+    setEditErrorMessage(null);
     try {
       await updateEmployee(selectedEmployee.id, {
         fullName: editFullName,
@@ -225,9 +234,40 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
       const updated = await fetchEmployeeDetail(selectedEmployee.id);
       setSelectedEmployee(updated);
       setEmployees((current) => current.map((employee) => employee.id === updated.id ? updated : employee));
+      setIsEditModalOpen(false);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "No fue posible actualizar el empleado.");
+      setEditErrorMessage(error instanceof Error ? error.message : "No fue posible actualizar el empleado.");
     }
+  }
+
+  function openEditModal() {
+    if (!selectedEmployee) {
+      return;
+    }
+
+    setEditFullName(selectedEmployee.fullName);
+    setEditEmploymentStatus(selectedEmployee.employmentStatus);
+    setEditJobTitle(selectedEmployee.jobTitle);
+    setEditHireDate(selectedEmployee.hireDate || "");
+    setEditTerminationDate(selectedEmployee.terminationDate || "");
+    setEditTerminationReason(selectedEmployee.terminationReason || "");
+    setEditContractType(selectedEmployee.contractType || "");
+    setEditNotes(selectedEmployee.notes || "");
+    setEditSalary(selectedEmployee.currentBaseSalary?.toString() || "");
+    setEditSalaryEffectiveFrom(selectedEmployee.salaryEffectiveFrom || "");
+    setEditErrorMessage(null);
+    setIsEditModalOpen(true);
+  }
+
+  function openAssignmentModal() {
+    setAssignmentStartDate("");
+    setAssignmentReason("");
+    setAssignmentNotes("");
+    setFinalizeEndDate("");
+    setFinalizeReason("");
+    setFinalizeNotes("");
+    setAssignmentMessage(null);
+    setIsAssignmentModalOpen(true);
   }
 
   async function reloadSelectedEmployee(employeeId: number) {
@@ -269,6 +309,7 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
       setAssignmentNotes("");
       await reloadSelectedEmployee(selectedEmployee.id);
       setAssignmentMessage("Asignacion creada.");
+      setIsAssignmentModalOpen(false);
     } catch (error) {
       setAssignmentMessage(error instanceof Error ? error.message : "No fue posible crear la asignacion.");
     } finally {
@@ -299,6 +340,7 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
       setFinalizeNotes("");
       await reloadSelectedEmployee(selectedEmployee.id);
       setAssignmentMessage("Asignacion finalizada.");
+      setIsAssignmentModalOpen(false);
     } catch (error) {
       setAssignmentMessage(error instanceof Error ? error.message : "No fue posible finalizar la asignacion.");
     } finally {
@@ -310,7 +352,7 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
     <div className="employees-workspace">
       <div className="employees-toolbar">
         <div>
-          <p className="eyebrow">I2 en curso</p>
+          <p className="eyebrow">Empleados y guardas</p>
           <h2>Maestro de empleados y guardas</h2>
         </div>
         <div className="toolbar-filters">
@@ -335,7 +377,7 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
         <section className="panel employee-list-panel">
           <div className="panel-header">
             <h3>Listado</h3>
-            <span>{loading ? "Cargando..." : `${employees.length} registros`}</span>
+            <span>{loading ? "Cargando..." : `${totalCount} registros`}</span>
           </div>
 
           <div className="employee-table">
@@ -364,6 +406,21 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
 
             {!loading && employees.length === 0 ? <div className="panel-empty">No hay registros para los filtros actuales.</div> : null}
           </div>
+
+          <div className="pagination-controls">
+            <button type="button" className="ghost-button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
+              Anterior
+            </button>
+            <span className="muted">{totalCount === 0 ? "Sin resultados" : `Página ${page} de ${totalPages}`}</span>
+            <button type="button" className="ghost-button" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}>
+              Siguiente
+            </button>
+            <select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }}>
+              <option value={25}>25 por página</option>
+              <option value={50}>50 por página</option>
+              <option value={100}>100 por página</option>
+            </select>
+          </div>
         </section>
 
         <aside className="panel employee-detail-panel">
@@ -374,74 +431,101 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
 
           {selectedEmployee ? (
             <div className="employee-detail">
-              <h4>{selectedEmployee.fullName}</h4>
-              <p className="muted">
-                {selectedEmployee.identificationType} {selectedEmployee.identificationNumber}
-              </p>
-              <dl>
-                <div>
-                  <dt>Estado laboral</dt>
-                  <dd>{selectedEmployee.employmentStatus}</dd>
+              {user.role === "ADMIN" || user.role === "TH" ? (
+                <div className="position-form-actions">
+                  <button type="button" onClick={openEditModal}>Editar información</button>
                 </div>
-                <div>
-                  <dt>Estado registro</dt>
-                  <dd>{selectedEmployee.recordStatus}</dd>
+              ) : null}
+
+              {canManageAssignments ? (
+                <div className="position-form-actions">
+                  <button type="button" onClick={openAssignmentModal}>Gestionar asignación</button>
                 </div>
-                <div>
-                  <dt>Cargo</dt>
-                  <dd>{selectedEmployee.jobTitle}</dd>
+              ) : null}
+
+              <div className="employee-detail-groups">
+                <div className="employee-detail-group">
+                  <h4>Identificación</h4>
+                  <dl>
+                    <div>
+                      <dt>Tipo y número</dt>
+                      <dd>{selectedEmployee.identificationType} {selectedEmployee.identificationNumber}</dd>
+                    </div>
+                    <div>
+                      <dt>Nombre completo</dt>
+                      <dd>{selectedEmployee.fullName}</dd>
+                    </div>
+                  </dl>
                 </div>
-                <div>
-                  <dt>Contrato</dt>
-                  <dd>{selectedEmployee.contractType || "No definido"}</dd>
+
+                <div className="employee-detail-group">
+                  <h4>Situación laboral</h4>
+                  <dl>
+                    <div>
+                      <dt>Estado laboral</dt>
+                      <dd>{selectedEmployee.employmentStatus}</dd>
+                    </div>
+                    <div>
+                      <dt>Estado registro</dt>
+                      <dd>{selectedEmployee.recordStatus}</dd>
+                    </div>
+                    <div>
+                      <dt>Cargo</dt>
+                      <dd>{selectedEmployee.jobTitle}</dd>
+                    </div>
+                    <div>
+                      <dt>Contrato</dt>
+                      <dd>{selectedEmployee.contractType || "No definido"}</dd>
+                    </div>
+                    <div>
+                      <dt>Ingreso</dt>
+                      <dd>{selectedEmployee.hireDate || "No definido"}</dd>
+                    </div>
+                    <div>
+                      <dt>Retiro</dt>
+                      <dd>{selectedEmployee.terminationDate || "No aplica"}</dd>
+                    </div>
+                    <div>
+                      <dt>Motivo retiro</dt>
+                      <dd>{selectedEmployee.terminationReason || "No aplica"}</dd>
+                    </div>
+                  </dl>
                 </div>
-                <div>
-                  <dt>Ingreso</dt>
-                  <dd>{selectedEmployee.hireDate || "No definido"}</dd>
+
+                <div className="employee-detail-group">
+                  <h4>Puesto</h4>
+                  <dl>
+                    <div>
+                      <dt>Puesto actual normalizado</dt>
+                      <dd>{selectedEmployee.currentServicePositionName || "Sin puesto normalizado"}</dd>
+                    </div>
+                    <div>
+                      <dt>Texto importado I2</dt>
+                      <dd>{selectedEmployee.currentServicePositionText || "Sin referencia importada"}</dd>
+                    </div>
+                    <div>
+                      <dt>Consistencia</dt>
+                      <dd><span className={`status-chip ${hasDifferentPositionReference ? "status-warning" : "status-ready"}`}>{hasDifferentPositionReference ? "Revisar" : "Consistente"}</span></dd>
+                    </div>
+                  </dl>
                 </div>
-                <div>
-                  <dt>Retiro</dt>
-                  <dd>{selectedEmployee.terminationDate || "No aplica"}</dd>
-                </div>
-                <div>
-                  <dt>Motivo retiro</dt>
-                  <dd>{selectedEmployee.terminationReason || "No aplica"}</dd>
-                </div>
-                <div>
-                  <dt>Puesto actual normalizado</dt>
-                  <dd>{selectedEmployee.currentServicePositionName || "Sin puesto normalizado"}</dd>
-                </div>
-                <div>
-                  <dt>Texto importado I2</dt>
-                  <dd>{selectedEmployee.currentServicePositionText || "Sin referencia importada"}</dd>
-                </div>
-                <div>
-                  <dt>Salario vigente</dt>
-                  <dd>{formatCurrency(selectedEmployee.currentBaseSalary)}</dd>
-                </div>
-                <div>
-                  <dt>Fuente salario</dt>
-                  <dd>{selectedEmployee.salarySource}</dd>
-                </div>
-                <div>
-                  <dt>Notas</dt>
-                  <dd>{selectedEmployee.notes || "Sin observaciones"}</dd>
-                </div>
-              </dl>
-              <div className="employee-history">
-                <h4>Normalizacion asistida</h4>
-                <div className="normalization-compare">
-                  <div>
-                    <span className="eyebrow">Texto importado I2</span>
-                    <strong>{importedPositionText || "Sin referencia importada"}</strong>
-                  </div>
-                  <div>
-                    <span className="eyebrow">Puesto normalizado</span>
-                    <strong>{normalizedPositionName || "Sin puesto normalizado"}</strong>
-                  </div>
-                  <span className={`status-chip ${hasDifferentPositionReference ? "status-warning" : "status-ready"}`}>
-                    {hasDifferentPositionReference ? "Revisar" : "Consistente"}
-                  </span>
+
+                <div className="employee-detail-group">
+                  <h4>Compensación</h4>
+                  <dl>
+                    <div>
+                      <dt>Salario vigente</dt>
+                      <dd>{formatCurrency(selectedEmployee.currentBaseSalary)}</dd>
+                    </div>
+                    <div>
+                      <dt>Fuente salario</dt>
+                      <dd>{selectedEmployee.salarySource}</dd>
+                    </div>
+                    <div>
+                      <dt>Notas</dt>
+                      <dd>{selectedEmployee.notes || "Sin observaciones"}</dd>
+                    </div>
+                  </dl>
                 </div>
               </div>
               <div className="employee-history">
@@ -475,9 +559,44 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
                 ))}
                 {positionAssignments.length === 0 ? <p className="muted">Sin historial de puestos.</p> : null}
               </div>
-              {canManageAssignments ? (
-                <div className="employee-history">
-                  <h4>Gestion de asignacion</h4>
+              <div className="employee-history">
+                <h4>Historial de cambios</h4>
+                {selectedEmployee.changeHistory.map((change) => (
+                  <div key={change.id} className="history-item">
+                    <strong>{change.fieldName}</strong>
+                    <p className="muted">
+                      {change.previousValue || "Sin valor"} → {change.newValue || "Sin valor"}
+                    </p>
+                    <small>{change.actorUsername} · {new Date(change.changedAt).toLocaleString("es-CO")}</small>
+                  </div>
+                ))}
+                {selectedEmployee.changeHistory.length === 0 ? <p className="muted">Sin cambios registrados.</p> : null}
+              </div>
+              {isEditModalOpen ? (
+                <Modal title="Editar información" onClose={() => setIsEditModalOpen(false)}>
+                  <div className="position-form">
+                    {editErrorMessage ? <p className="muted">{editErrorMessage}</p> : null}
+                    <input value={editFullName} onChange={(event) => setEditFullName(event.target.value)} placeholder="Nombre completo" />
+                    <select value={editEmploymentStatus} onChange={(event) => setEditEmploymentStatus(event.target.value as "ACTIVO" | "RETIRADO")}>
+                      <option value="ACTIVO">Activo</option>
+                      <option value="RETIRADO">Retirado</option>
+                    </select>
+                    <input value={editJobTitle} onChange={(event) => setEditJobTitle(event.target.value)} placeholder="Cargo" />
+                    <input type="date" value={editHireDate} onChange={(event) => setEditHireDate(event.target.value)} />
+                    <input type="date" value={editTerminationDate} onChange={(event) => setEditTerminationDate(event.target.value)} />
+                    <input value={editTerminationReason} onChange={(event) => setEditTerminationReason(event.target.value)} placeholder="Motivo de retiro" />
+                    <input value={editContractType} onChange={(event) => setEditContractType(event.target.value)} placeholder="Tipo de contrato" />
+                    <textarea value={editNotes} onChange={(event) => setEditNotes(event.target.value)} placeholder="Observaciones" />
+                    <input type="number" min="0" value={editSalary} onChange={(event) => setEditSalary(event.target.value)} placeholder="Salario base" />
+                    <input type="date" value={editSalaryEffectiveFrom} onChange={(event) => setEditSalaryEffectiveFrom(event.target.value)} />
+                    <div className="position-form-actions">
+                      <button type="button" onClick={() => void saveEmployee()}>Guardar cambios</button>
+                    </div>
+                  </div>
+                </Modal>
+              ) : null}
+              {isAssignmentModalOpen ? (
+                <Modal title="Gestionar asignación" onClose={() => setIsAssignmentModalOpen(false)}>
                   {assignmentMessage ? <p className="muted">{assignmentMessage}</p> : null}
                   {currentAssignment ? (
                     <div className="position-form">
@@ -511,39 +630,7 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
                       </div>
                     </div>
                   )}
-                </div>
-              ) : null}
-              <div className="employee-history">
-                <h4>Historial de cambios</h4>
-                {selectedEmployee.changeHistory.map((change) => (
-                  <div key={change.id} className="history-item">
-                    <strong>{change.fieldName}</strong>
-                    <p className="muted">
-                      {change.previousValue || "Sin valor"} → {change.newValue || "Sin valor"}
-                    </p>
-                    <small>{change.actorUsername} · {new Date(change.changedAt).toLocaleString("es-CO")}</small>
-                  </div>
-                ))}
-                {selectedEmployee.changeHistory.length === 0 ? <p className="muted">Sin cambios registrados.</p> : null}
-              </div>
-              {user.role === "ADMIN" || user.role === "TH" ? (
-                <div className="employee-history">
-                  <h4>Edicion manual</h4>
-                  <input value={editFullName} onChange={(event) => setEditFullName(event.target.value)} placeholder="Nombre completo" />
-                  <select value={editEmploymentStatus} onChange={(event) => setEditEmploymentStatus(event.target.value as "ACTIVO" | "RETIRADO")}>
-                    <option value="ACTIVO">Activo</option>
-                    <option value="RETIRADO">Retirado</option>
-                  </select>
-                  <input value={editJobTitle} onChange={(event) => setEditJobTitle(event.target.value)} placeholder="Cargo" />
-                  <input type="date" value={editHireDate} onChange={(event) => setEditHireDate(event.target.value)} />
-                  <input type="date" value={editTerminationDate} onChange={(event) => setEditTerminationDate(event.target.value)} />
-                  <input value={editTerminationReason} onChange={(event) => setEditTerminationReason(event.target.value)} placeholder="Motivo de retiro" />
-                  <input value={editContractType} onChange={(event) => setEditContractType(event.target.value)} placeholder="Tipo de contrato" />
-                  <textarea value={editNotes} onChange={(event) => setEditNotes(event.target.value)} placeholder="Observaciones" />
-                  <input type="number" min="0" value={editSalary} onChange={(event) => setEditSalary(event.target.value)} placeholder="Salario base" />
-                  <input type="date" value={editSalaryEffectiveFrom} onChange={(event) => setEditSalaryEffectiveFrom(event.target.value)} />
-                  <button type="button" onClick={() => void saveEmployee()}>Guardar cambios</button>
-                </div>
+                </Modal>
               ) : null}
             </div>
           ) : (

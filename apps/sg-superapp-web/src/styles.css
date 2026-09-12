@@ -350,6 +350,44 @@ textarea {
   flex-shrink: 0;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 1.5rem;
+}
+
+.modal-dialog {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 3rem);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h3 {
+  margin: 0;
+}
+
+.modal-body {
+  padding: 1rem;
+}
+
 .icon-button {
   min-height: 36px;
   min-width: 36px;
@@ -900,6 +938,23 @@ textarea {
   justify-items: end;
 }
 
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.pagination-controls select {
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0 0.75rem;
+}
+
 .status-chip {
   display: inline-flex;
   align-items: center;
@@ -959,6 +1014,45 @@ textarea {
 }
 
 .employee-detail dd {
+  margin: 0;
+}
+
+.employee-detail-groups {
+  display: grid;
+  gap: 1rem;
+}
+
+.employee-detail-group {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.85rem;
+}
+
+.employee-detail-group h4 {
+  margin: 0 0 0.65rem;
+  color: var(--accent);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
+
+.employee-detail-group dl {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.employee-detail-group dl div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.employee-detail-group dt {
+  color: var(--primary);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.employee-detail-group dd {
   margin: 0;
 }
 
