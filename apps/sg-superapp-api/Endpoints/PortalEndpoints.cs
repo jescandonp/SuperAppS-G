@@ -633,7 +633,7 @@ public static class PortalEndpoints
             return Results.Ok(notifications);
         });
 
-        app.MapGet("/api/portal/employees", async (string? search, string? status, string? jobTitle, string? completeness, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
+        app.MapGet("/api/portal/employees", async (string? search, string? status, string? jobTitle, string? completeness, int? page, int? pageSize, HttpContext httpContext, PortalAuthorizationService authorization, PostgresPortalRepository repository, RequestUserContext userContext, CancellationToken cancellationToken) =>
         {
             var denied = await authorization.RequireAsync("EMPLOYEES", "VIEW", cancellationToken);
             if (denied is not null)
@@ -646,8 +646,12 @@ public static class PortalEndpoints
                 return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
             }
 
+            var resolvedPage = page.HasValue && page.Value > 0 ? page.Value : 1;
+            var resolvedPageSize = pageSize.HasValue ? Math.Clamp(pageSize.Value, 1, 100) : int.MaxValue;
+
             var includeSalary = await repository.HasPermissionAsync(userContext.User!.Id, "EMPLOYEES", "VIEW_SALARY", cancellationToken);
-            var employees = await repository.GetEmployeesAsync(search, status, jobTitle, completeness, includeSalary, cancellationToken);
+            var (employees, totalCount) = await repository.GetEmployeesAsync(search, status, jobTitle, completeness, includeSalary, resolvedPage, resolvedPageSize, cancellationToken);
+            httpContext.Response.Headers["X-Total-Count"] = totalCount.ToString();
             return Results.Ok(employees);
         });
 

@@ -1111,8 +1111,20 @@ public sealed class PostgresPortalRepository
         return new TrainingAlertGenerationResponse(generatedCount, activeAlertsCount, 0);
     }
 
-    public async Task<IReadOnlyList<EmployeeSummaryResponse>> GetEmployeesAsync(string? search, string? status, string? jobTitle, string? completeness, bool includeSalary, CancellationToken cancellationToken = default)
+    public async Task<(IReadOnlyList<EmployeeSummaryResponse> Items, int TotalCount)> GetEmployeesAsync(string? search, string? status, string? jobTitle, string? completeness, bool includeSalary, int page, int pageSize, CancellationToken cancellationToken = default)
     {
+        const string countSql = @"
+            select count(*)
+            from employees e
+            where (@search is null
+                or e.identification_number ilike '%' || @search || '%'
+                or e.full_name ilike '%' || @search || '%')
+              and (@status is null or upper(e.employment_status) = upper(@status))
+              and (@jobTitle is null or e.job_title ilike '%' || @jobTitle || '%')
+              and (@completeness is null
+                or (upper(@completeness) = 'INCOMPLETO' and e.record_status = 'INCOMPLETO')
+                or (upper(@completeness) = 'COMPLETO' and e.record_status <> 'INCOMPLETO'));";
+
         const string sql = @"
             select
                 e.id,
@@ -1140,15 +1152,26 @@ public sealed class PostgresPortalRepository
               and (@completeness is null
                 or (upper(@completeness) = 'INCOMPLETO' and e.record_status = 'INCOMPLETO')
                 or (upper(@completeness) = 'COMPLETO' and e.record_status <> 'INCOMPLETO'))
-            order by e.full_name;";
+            order by e.full_name
+            limit @pageSize offset @offset;";
 
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
+
+        await using var countCommand = new NpgsqlCommand(countSql, connection);
+        countCommand.Parameters.Add("search", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(search) ? DBNull.Value : search.Trim();
+        countCommand.Parameters.Add("status", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(status) ? DBNull.Value : status.Trim().ToUpperInvariant();
+        countCommand.Parameters.Add("jobTitle", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(jobTitle) ? DBNull.Value : jobTitle.Trim();
+        countCommand.Parameters.Add("completeness", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(completeness) ? DBNull.Value : completeness.Trim().ToUpperInvariant();
+        var totalCount = Convert.ToInt32(await countCommand.ExecuteScalarAsync(cancellationToken));
+
         await using var command = new NpgsqlCommand(sql, connection);
         command.Parameters.Add("search", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(search) ? DBNull.Value : search.Trim();
         command.Parameters.Add("status", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(status) ? DBNull.Value : status.Trim().ToUpperInvariant();
         command.Parameters.Add("jobTitle", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(jobTitle) ? DBNull.Value : jobTitle.Trim();
         command.Parameters.Add("completeness", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(completeness) ? DBNull.Value : completeness.Trim().ToUpperInvariant();
+        command.Parameters.Add("pageSize", NpgsqlDbType.Integer).Value = pageSize;
+        command.Parameters.Add("offset", NpgsqlDbType.Integer).Value = (page - 1) * pageSize;
 
         var employees = new List<EmployeeSummaryResponse>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -1170,7 +1193,7 @@ public sealed class PostgresPortalRepository
                     : reader.GetString(reader.GetOrdinal("current_service_position_text"))));
         }
 
-        return employees;
+        return (employees, totalCount);
     }
 
     public async Task<IReadOnlyList<ServicePositionResponse>> GetServicePositionsAsync(string? search, string? status, CancellationToken cancellationToken = default)
