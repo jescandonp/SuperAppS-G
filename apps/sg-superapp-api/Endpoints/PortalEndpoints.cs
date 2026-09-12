@@ -646,7 +646,11 @@ public static class PortalEndpoints
                 return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
             }
 
-            var resolvedPage = page.HasValue && page.Value > 0 ? page.Value : 1;
+            // 100_000 is not a real product limit, just an overflow guard: with resolvedPageSize
+            // capped at 100, (100_000 - 1) * 100 stays well within int32 range, so the offset
+            // computed in GetEmployeesAsync can never overflow regardless of the requested page.
+            const int maxPage = 100_000;
+            var resolvedPage = page.HasValue ? Math.Clamp(page.Value, 1, maxPage) : 1;
             var resolvedPageSize = pageSize.HasValue ? Math.Clamp(pageSize.Value, 1, 100) : int.MaxValue;
 
             var includeSalary = await repository.HasPermissionAsync(userContext.User!.Id, "EMPLOYEES", "VIEW_SALARY", cancellationToken);

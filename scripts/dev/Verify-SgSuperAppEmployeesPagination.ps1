@@ -52,5 +52,18 @@ $oversized = Invoke-EmployeesRequest -Uri "$ApiBaseUrl/portal/employees?page=1&p
 if ($oversized.Body.Count -gt 100) {
     throw "pageSize debe limitarse a 100 como maximo, devolvio $($oversized.Body.Count)."
 }
+if ($oversized.TotalCount -ne $unpaged.TotalCount) {
+    throw "El total con pageSize fuera de rango ($($oversized.TotalCount)) debe coincidir con el total sin paginar ($($unpaged.TotalCount))."
+}
+
+# page absurdamente grande no debe causar overflow de int32 (offset negativo) ni un 500;
+# debe recortarse a un maximo interno y devolver una pagina vacia con status 200.
+$hugePage = Invoke-EmployeesRequest -Uri "$ApiBaseUrl/portal/employees?page=99999999&pageSize=5" -Headers $headers
+if ($hugePage.Status -ne 200) {
+    throw "Un page absurdamente grande debe devolver 200, devolvio $($hugePage.Status)."
+}
+if ($hugePage.Body.Count -ne 0) {
+    throw "Un page absurdamente grande (mas alla del total de registros) debe devolver un arreglo vacio, devolvio $($hugePage.Body.Count) registros."
+}
 
 Write-Host "Employees pagination verification completed."
