@@ -48,6 +48,11 @@ Excluido:
 - Shell: navegacion, topbar, usuario, contador y notificaciones.
 - Dashboard: resumen por perfil, widgets agrupados y acciones internas.
 - Auditoria: filtros, tabla compacta y detalle estructurado.
+- Pantallas funcionales internas (Empleados/Guardas, Puestos de servicio,
+  Cursos y acreditaciones, Certificaciones, Cargas de datos, Alertas,
+  Programacion de turnos): deben heredar los mismos tokens de superficie
+  clara, contraste y forma que shell/dashboard/auditoria; ver Task 3 del
+  plan I8 para el recorrido y los hallazgos concretos.
 
 ## 5. Criterios De Aceptacion
 
@@ -60,6 +65,10 @@ Excluido:
 7. Acciones primarias usan dorado, acciones secundarias usan azul corporativo o ghost.
 8. Build frontend pasa.
 9. `graphify update .` se intenta despues de modificar codigo.
+10. Programacion de turnos (I9) usa los mismos tokens de superficie clara,
+    texto y borde que el resto de pantallas funcionales; ningun texto queda
+    con contraste insuficiente (texto oscuro sobre fondo oscuro heredado del
+    tema previo, o texto claro/dorado sobre fondo claro).
 
 ## 6. Pruebas Esperadas
 
