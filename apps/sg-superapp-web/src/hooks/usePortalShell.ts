@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchCurrentUser, fetchModules, fetchNotifications, login } from "../services/portalApi";
+import { archiveNotification, fetchCurrentUser, fetchModules, fetchNotificationUnreadCount, fetchNotificationsInbox, login, markNotificationAsRead } from "../services/portalApi";
 import { mockCurrentUser, mockNotifications, modulesByRole } from "../mock/session";
-import type { AppModule, CurrentUser, LoginRequest, NotificationItem } from "../types/portal";
+import type { AppModule, CurrentUser, LoginRequest, NotificationFilters, NotificationItem } from "../types/portal";
 
 const SESSION_USER_KEY = "sg.superapp.currentUser";
 const SESSION_TOKEN_KEY = "sg.superapp.sessionToken";
@@ -10,9 +10,15 @@ interface PortalShellState {
   user: CurrentUser | null;
   modules: AppModule[];
   notifications: NotificationItem[];
+  notificationFilters: NotificationFilters;
+  unreadNotificationCount: number;
   source: "api" | "mock";
   loading: boolean;
   errorMessage: string | null;
+  setNotificationFilters: (filters: NotificationFilters) => void;
+  refreshNotifications: () => Promise<void>;
+  markNotificationRead: (notificationId: number) => Promise<void>;
+  archiveNotificationItem: (notificationId: number) => Promise<void>;
   loginWithCredentials: (request: LoginRequest) => Promise<void>;
   logout: () => void;
 }
@@ -37,6 +43,8 @@ export function usePortalShell(): PortalShellState {
   const [user, setUser] = useState<CurrentUser | null>(() => readStoredUser());
   const [modules, setModules] = useState<AppModule[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notificationFilters, setNotificationFiltersState] = useState<NotificationFilters>({});
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState<number>(0);
   const [source, setSource] = useState<"api" | "mock">("mock");
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -47,34 +55,45 @@ export function usePortalShell(): PortalShellState {
     setUser(null);
     setModules([]);
     setNotifications([]);
+    setUnreadNotificationCount(0);
+    setNotificationFiltersState({});
     setSource("mock");
+    setErrorMessage(null);
+  }, []);
+
+  const loadNotifications = useCallback(async (currentUser: CurrentUser, filters: NotificationFilters) => {
+    const [apiNotifications, unreadCount] = await Promise.all([
+      fetchNotificationsInbox(filters),
+      fetchNotificationUnreadCount()
+    ]);
+    setNotifications(apiNotifications);
+    setUnreadNotificationCount(unreadCount.unreadCount);
+    setSource("api");
     setErrorMessage(null);
   }, []);
 
   const loadShellData = useCallback(async (currentUser: CurrentUser) => {
     setLoading(true);
     try {
-      const [apiUser, apiModules, apiNotifications] = await Promise.all([
+      const [apiUser, apiModules] = await Promise.all([
         fetchCurrentUser(),
-        fetchModules(currentUser.role),
-        fetchNotifications(currentUser.username)
+        fetchModules(currentUser.role)
       ]);
 
       sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(apiUser));
       setUser(apiUser);
       setModules(apiModules);
-      setNotifications(apiNotifications);
-      setSource("api");
-      setErrorMessage(null);
+      await loadNotifications(apiUser, notificationFilters);
     } catch {
       setModules(modulesByRole[currentUser.role]);
       setNotifications(mockNotifications);
+      setUnreadNotificationCount(mockNotifications.filter((item) => item.status === "UNREAD").length);
       setSource("mock");
       setErrorMessage("No fue posible cargar la API. Se muestra fallback local.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadNotifications, notificationFilters]);
 
   // Depende de user?.username, no del objeto user completo: loadShellData termina llamando
   // setUser(apiUser) con un objeto nuevo en cada respuesta, y si el efecto dependiera de la
@@ -89,6 +108,32 @@ export function usePortalShell(): PortalShellState {
     void loadShellData(user);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.username]);
+
+  const setNotificationFilters = useCallback((filters: NotificationFilters) => {
+    setNotificationFiltersState(filters);
+  }, []);
+
+  const refreshNotifications = useCallback(async () => {
+    if (!user) {
+      return;
+    }
+
+    try {
+      await loadNotifications(user, notificationFilters);
+    } catch {
+      setErrorMessage("No fue posible actualizar la bandeja de notificaciones.");
+    }
+  }, [loadNotifications, notificationFilters, user]);
+
+  const markNotificationRead = useCallback(async (notificationId: number) => {
+    await markNotificationAsRead(notificationId);
+    await refreshNotifications();
+  }, [refreshNotifications]);
+
+  const archiveNotificationItem = useCallback(async (notificationId: number) => {
+    await archiveNotification(notificationId);
+    await refreshNotifications();
+  }, [refreshNotifications]);
 
   const loginWithCredentials = useCallback(async (request: LoginRequest) => {
     setLoading(true);
@@ -122,21 +167,18 @@ export function usePortalShell(): PortalShellState {
       user,
       modules,
       notifications,
+      notificationFilters,
+      unreadNotificationCount,
       source,
       loading,
       errorMessage,
+      setNotificationFilters,
+      refreshNotifications,
+      markNotificationRead,
+      archiveNotificationItem,
       loginWithCredentials,
       logout
     }),
-    [
-      user,
-      modules,
-      notifications,
-      source,
-      loading,
-      errorMessage,
-      loginWithCredentials,
-      logout
-    ]
+    [user, modules, notifications, notificationFilters, unreadNotificationCount, source, loading, errorMessage, setNotificationFilters, refreshNotifications, markNotificationRead, archiveNotificationItem, loginWithCredentials, logout]
   );
 }

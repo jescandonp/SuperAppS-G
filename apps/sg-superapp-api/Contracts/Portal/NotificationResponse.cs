@@ -7,5 +7,13 @@ public sealed record NotificationResponse(
     string Title,
     string Body,
     string Status,
-    DateTimeOffset CreatedAt);
-
+    string SourceModule,
+    string Severity,
+    string SourceType,
+    string? SourceId,
+    string? ActionUrl,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? ReadAt,
+    DateTimeOffset? ArchivedAt,
+    DateTimeOffset? ManagedAt,
+    string? ManagedBy);
