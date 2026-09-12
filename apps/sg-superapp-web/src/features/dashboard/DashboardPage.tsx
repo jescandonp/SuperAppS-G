@@ -35,7 +35,7 @@ function resolveActionUrl(actionUrl: string | null): string | null {
     return "/module/courses";
   }
   if (actionUrl.startsWith("/portal/certificates")) {
-    return "/module/certifications";
+    return "/module/certificates";
   }
   if (actionUrl.startsWith("/portal/imports")) {
     return "/module/imports";
