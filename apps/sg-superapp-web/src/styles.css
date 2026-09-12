@@ -306,29 +306,56 @@ textarea {
   cursor: pointer;
 }
 
+.user-block-anchor {
+  position: relative;
+}
+
 .notification-pill {
   min-width: 32px;
   height: 32px;
+  border: none;
   border-radius: 999px;
   display: grid;
   place-items: center;
   background: var(--accent);
   color: #1f1f1f;
   font-weight: 700;
+  font-size: inherit;
+  cursor: pointer;
+  padding: 0;
 }
 
-.notification-tray {
+.notification-popover {
   display: grid;
   gap: 0.85rem;
   align-content: start;
-  position: sticky;
-  top: 96px;
-  max-height: calc(100vh - 120px);
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  right: 0;
+  z-index: 20;
+  width: min(400px, calc(100vw - 2rem));
+  max-height: calc(100vh - 140px);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--surface);
   padding: 1rem;
   overflow: hidden;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
+
+.notification-popover-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.icon-button {
+  min-height: 36px;
+  min-width: 36px;
+  padding: 0;
+  display: grid;
+  place-items: center;
 }
 
 .notification-tray-header {
@@ -428,7 +455,7 @@ textarea {
 
 .shell-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.25rem;
   align-items: start;
   width: min(100%, 1440px);
@@ -1529,9 +1556,11 @@ textarea {
     padding: 1rem;
   }
 
-  .notification-tray {
-    position: static;
-    max-height: none;
+  .notification-popover {
+    left: 0;
+    right: 0;
+    width: auto;
+    max-height: calc(100vh - 160px);
   }
 
   .topbar {

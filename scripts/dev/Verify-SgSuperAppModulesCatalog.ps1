@@ -54,7 +54,7 @@ function Assert-ModuleOrder {
 
 $workflowOrder = @(
     "dashboard", "employees", "positions", "scheduling", "certificates",
-    "courses", "alerts", "imports", "notifications", "audit", "settings", "novedades"
+    "courses", "alerts", "imports", "audit", "settings", "novedades"
 )
 
 $adminHeaders = Get-SessionHeaders -Username "admin.sg" -Password "Admin123"
@@ -79,6 +79,11 @@ Assert-ModuleStatus -Modules @($adminModules.Body) -Code "novedades" -ExpectedSt
 
 # El orden debe seguir el flujo de trabajo, no el alfabetico.
 Assert-ModuleOrder -Modules @($adminModules.Body) -ExpectedOrder $workflowOrder
+
+# Notificaciones dejo de ser un modulo de navegacion: vive como popover del shell, no en el sidebar.
+if (@($adminModules.Body | Where-Object { $_.code -eq "notifications" }).Count -gt 0) {
+    throw "El modulo 'notifications' ya no deberia aparecer en el catalogo de navegacion."
+}
 
 # El catalogo de modulos debe requerir autenticacion, igual que dashboard/auditoria.
 $unauthenticated = Invoke-JsonRequest -Method "GET" -Uri "$ApiBaseUrl/portal/modules/ADMIN" -Headers @{}

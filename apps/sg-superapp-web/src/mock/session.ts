@@ -18,7 +18,6 @@ const baseModules: AppModule[] = [
   { code: "courses", label: "Cursos y Acreditaciones", description: "Tipos de curso, cumplimiento y registros I5.", enabled: true, status: "Disponible" },
   { code: "alerts", label: "Alertas", description: "Generadores, exportacion y fallback de correo I6.", enabled: true, status: "Disponible" },
   { code: "imports", label: "Cargas de Datos", description: "Historial y prevalidacion de cargas I2.", enabled: true, status: "Disponible" },
-  { code: "notifications", label: "Notificaciones", description: "Bandeja shell de I1.", enabled: true, status: "Disponible" },
   { code: "audit", label: "Auditoria", description: "Consulta transversal de eventos I7.", enabled: true, status: "Disponible" },
   { code: "settings", label: "Configuracion", description: "Proximamente / En diseno para incrementos futuros.", enabled: true, status: "Pendiente" },
   { code: "novedades", label: "Novedades", description: "Proximamente / En diseno para incrementos futuros.", enabled: true, status: "Pendiente" }

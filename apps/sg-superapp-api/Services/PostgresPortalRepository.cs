@@ -89,7 +89,6 @@ public sealed class PostgresPortalRepository
             ["COURSES"] = ("Cursos y Acreditaciones", "Tipos de curso, cumplimiento y registros I5.", "Disponible"),
             ["ALERTS"] = ("Alertas", "Generadores, exportacion y fallback de correo I6.", "Disponible"),
             ["IMPORTS"] = ("Cargas de Datos", "Historial y prevalidacion de cargas I2.", "Disponible"),
-            ["NOTIFICATIONS"] = ("Notificaciones", "Bandeja shell de I1.", "Disponible"),
             ["AUDIT"] = ("Auditoria", "Consulta transversal de eventos I7.", "Disponible"),
             ["SETTINGS"] = ("Configuracion", "Proximamente / En diseno para incrementos futuros.", "Pendiente"),
             ["NOVEDADES"] = ("Novedades", "Proximamente / En diseno para incrementos futuros.", "Pendiente")
@@ -106,7 +105,7 @@ public sealed class PostgresPortalRepository
     private static readonly IReadOnlyList<string> ModuleDisplayOrder = new[]
     {
         "DASHBOARD", "EMPLOYEES", "POSITIONS", "SCHEDULING", "CERTIFICATES",
-        "COURSES", "ALERTS", "IMPORTS", "NOTIFICATIONS", "AUDIT", "SETTINGS", "NOVEDADES"
+        "COURSES", "ALERTS", "IMPORTS", "AUDIT", "SETTINGS", "NOVEDADES"
     };
 
     private readonly string _connectionString;
