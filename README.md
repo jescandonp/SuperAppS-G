@@ -44,17 +44,34 @@ Cuando exista contradiccion, prevalece el orden definido en `docs/CONSTITUTION.m
 | I2 | Datos maestros e importacion | Cerrado tecnicamente: pendiente solo recorrido visual manual desktop/movil |
 | I3 | Puestos de servicio y asignaciones | Cerrado tecnicamente |
 | I4 | Certificaciones laborales | Cerrado tecnicamente |
-| I5 | Cursos y acreditaciones | Activo: Task 9 cerrada; retake Task 10 |
-| I6 | Alertas y notificaciones | Pendiente |
-| I7 | Auditoria, dashboard y cierre piloto | Pendiente |
+| I5 | Cursos y acreditaciones | Cerrado tecnicamente |
+| I6 | Alertas y notificaciones | Cerrado tecnicamente |
+| I7 | Auditoria, dashboard y cierre piloto | Activo: Task 7 cerrada; retake Task 8 |
+| I8 | UX/UI Sentinel Enterprise | Activo: Task 2 cerrada; siguiente retake Task 3 |
+| I9 | Programacion asistida de turnos | Cerrado tecnicamente (MVP): reglas R01-R07, piloto real de 4 sitios, gestion de clientes/proyectos y estabilizacion CRUD I2/I3 completos |
 
 El incremento activo, sus decisiones y validaciones obligatorias deben consultarse siempre en `docs/specs/` y `docs/plans/`.
 
 ## Gate Actual
 
-**Incremento activo:** I5 - Cursos y acreditaciones
-**Estado:** I4 cerrado tecnicamente; SPEC I5 y plan I5 aprobados; Task 9 cerrada
-**Implementacion:** autorizada desde Task 10 del plan I5, siguiendo TDD
+**Nota sobre secuencia real:** el trabajo no avanzo en orden estricto de incrementos.
+I9 (Programacion de turnos) se completo tecnicamente en paralelo mientras I7/I8
+quedaban pausados desde el 2026-08-23 - un respaldo de esa fecha con el trabajo
+de I6/I7/I8 nunca llegado a `main` se restauro recien el 2026-09-11. Quedan tres
+hilos abiertos, no uno solo; cual priorizar es una decision de producto pendiente:
+
+- **I7 - Auditoria, dashboard y cierre piloto:** Task 7 cerrada (demo checklist,
+  reporte de cierre piloto, backlog); retake autorizado en Task 8, verificacion
+  integral y cierre I7.
+- **I8 - UX/UI Sentinel Enterprise:** Task 2 cerrada (shell reestructurado,
+  tokens `#003366`/`#FFC700`, notificaciones en bandeja lateral); retake
+  autorizado en Task 3, recorrido visual manual fino y ajuste de pantallas
+  funcionales internas.
+- **I9 - Programacion de turnos:** cerrado tecnicamente en su alcance MVP,
+  incluida la gestion de clientes/proyectos que faltaba. Decision de diseno
+  pendiente y no tocada por decision explicita del usuario: el gate de aprobar
+  rechaza cualquier version de 30 dias reales con `BLOCKED` sin ligar a una
+  asignacion (ver `docs/superpowers/plans/2026-09-10-sg-superapp-i2-i3-i9-estabilizacion-crud-plan.md`).
 
 Documentos obligatorios para la revision:
 
@@ -62,8 +79,17 @@ Documentos obligatorios para la revision:
 - Plan I3 cerrado: `docs/plans/2026-06-04-sg-superapp-i3-puestos-servicio-asignaciones-plan.md`
 - SPEC I4 cerrada: `docs/specs/2026-05-21-sg-superapp-spec-i4-certificaciones-laborales.md`
 - Plan I4 cerrado: `docs/plans/2026-06-05-sg-superapp-i4-certificaciones-laborales-plan.md`
-- SPEC I5: `docs/specs/2026-05-21-sg-superapp-spec-i5-cursos-acreditaciones.md`
-- Plan I5: `docs/plans/2026-06-05-sg-superapp-i5-cursos-acreditaciones-plan.md`
+- SPEC I5 cerrada: `docs/specs/2026-05-21-sg-superapp-spec-i5-cursos-acreditaciones.md`
+- Plan I5 cerrado: `docs/plans/2026-06-05-sg-superapp-i5-cursos-acreditaciones-plan.md`
+- SPEC I6: `docs/specs/2026-06-09-sg-superapp-spec-i6-alertas-notificaciones.md`
+- Plan I6: `docs/plans/2026-06-09-sg-superapp-i6-alertas-notificaciones-plan.md`
+- SPEC I7: `docs/specs/2026-06-11-sg-superapp-spec-i7-auditoria-dashboard-cierre-piloto.md`
+- Plan I7: `docs/plans/2026-06-11-sg-superapp-i7-auditoria-dashboard-cierre-piloto-plan.md`
+- SPEC I8 UX/UI: `docs/specs/2026-06-16-sg-superapp-spec-i8-uxui-sentinel-enterprise.md`
+- Plan I8 UX/UI: `docs/plans/2026-06-16-sg-superapp-i8-uxui-sentinel-enterprise-plan.md`
+- SPEC I9: `docs/specs/2026-07-29-sg-superapp-spec-i9-programacion-turnos.md` y cierre de reglas MVP `docs/specs/2026-08-17-sg-superapp-spec-i9-cierre-mvp-reglas.md`
+- Piloto real I9: `docs/reports/2026-08-31-sg-superapp-i9-piloto-real-anonimizado.md`
+- Estabilizacion CRUD I2/I3/I9: `docs/superpowers/plans/2026-09-10-sg-superapp-i2-i3-i9-estabilizacion-crud-plan.md`
 
 La SPEC I3 y el plan I3 fueron aprobados el 2026-06-04. I3 queda cerrado tecnicamente el 2026-06-05.
 
@@ -113,18 +139,46 @@ ProyectoS&G/
 - I2 cerrado tecnicamente.
 - I3 cerrado tecnicamente con suite completa `Verify-SgSuperAppI3*.ps1`, build backend y build frontend correctos.
 - I4 cerrado tecnicamente con suite completa `Verify-SgSuperAppI4*.ps1`, build backend y build frontend correctos.
-- I5 Task 9 cerrada con persistencia, permisos base, contratos backend de tipos, renovaciones, reglas de fecha, auditoria, estados calculados, habilitacion de servicio, listado/detalle backend, cliente API/tipos frontend, UI de cumplimiento, UI de gestion TH/ADMIN y builds correctos; siguiente retake autorizado en Task 10, verificacion integral y cierre I5.
+- I5 cerrado tecnicamente con suite completa `Verify-SgSuperAppI5*.ps1`, backend build y frontend build correctos.
+- I6 Task 1 cerrada con persistencia de notificaciones/eventos, permisos base y backend build correctos.
+- I6 Task 2 cerrada con bandeja autenticada, contador de no leidas, filtros por estado/severidad/modulo, seguridad backend por rol y backend build correctos.
+- I6 Task 3 cerrada con acciones de marcar como leida y archivar, eventos `READ`/`ARCHIVED`, proteccion por usuario/rol autenticado y backend build correctos.
+- I6 Task 4 cerrada con generador de alertas I5 por vencimiento, severidades `CRITICAL`/`WARNING`/`INFO`, exclusion de `AL_DIA`, dedupe activo, restriccion `NOTIFICATIONS/GENERATE_ALERTS` y backend build correctos; siguiente retake autorizado en Task 5, generadores de alertas I2/I4.
+- I6 Task 5 cerrada con generadores de alertas I2/I4 para importaciones `CON_ERRORES` y certificaciones `GENERADA`/`APROBADA`/`ANULADA`, resumen de errores `INCOMPLETO`/`DUPLICADO`/`ERRONEO`, dedupe activo, eventos `CREATED`, restriccion `NOTIFICATIONS/GENERATE_ALERTS` y backend build correctos; siguiente retake autorizado en Task 6, exportacion fallback y correo opcional.
+- I6 Task 6 cerrada con exportacion CSV filtrable de notificaciones, evento `EXPORTED`, email summary no bloqueante con `EMAIL_ATTEMPTED`/`EMAIL_FAILED`, fallback disponible sin SMTP, restricciones `NOTIFICATIONS/EXPORT` y `NOTIFICATIONS/CONFIGURE_EMAIL`, y backend build correctos; siguiente retake autorizado en Task 7, cliente API y tipos frontend.
+- I6 Task 7 cerrada con tipos TypeScript I6 para notificaciones, filtros, contador, generadores, exportacion y email fallback; cliente API cubre bandeja, contador, acciones, generadores, exportacion y correo opcional; verificacion de contrato frontend y build frontend correctos; siguiente retake autorizado en Task 8, UI de bandeja, contador y acciones.
+- I6 Task 8 cerrada con bandeja operativa en el shell, contador accesible junto al perfil, filtros por estado/severidad/modulo, acciones leer/archivar conectadas al cliente I6, consulta para roles sin configuracion, verificacion UI, seguridad backend y build frontend correctos; siguiente retake autorizado en Task 9, UI TH de alertas y fallback.
+- I6 Task 9 cerrada con panel TH/ADMIN para generar alertas I5/I2/I4, exportar resumen y mostrar estado de correo/fallback sin depender de SMTP; GERENCIA/OPERACIONES quedan en consulta sin generacion/configuracion; build frontend y verificaciones backend correctas; siguiente retake autorizado en Task 10, verificacion integral y cierre I6.
+- I6 cerrado tecnicamente con suite completa `Verify-SgSuperAppI6*.ps1`, backend build, frontend build, matriz 1-20 y riesgos residuales registrados; siguiente retake autorizado en I7 Gate 0.
+- I7 Gate 0 cerrado con SPEC y plan aprobados para auditoria, dashboard y cierre piloto; siguiente retake autorizado en Task 1, contratos backend de dashboard por rol.
+- I7 Task 1 cerrada con endpoint autenticado `GET /api/portal/dashboard`, widgets por ADMIN/TH/GERENCIA/OPERACIONES, contrato `DashboardResponse`, verificacion `Verify-SgSuperAppI7Dashboard.ps1` y backend build correctos; siguiente retake autorizado en Task 2, contratos backend de auditoria y filtros.
+- I7 Task 2 cerrada con endpoint autenticado `GET /api/portal/audit`, contratos `AuditEventResponse`/`AuditEventsResponse`, filtros por modulo/actor/rango de fechas, restricciones por rol ADMIN/TH/GERENCIA/OPERACIONES, verificacion `Verify-SgSuperAppI7Audit.ps1` y backend build correctos; siguiente retake autorizado en Task 3, seguridad I7 por rol.
+- I7 Task 3 cerrada con verificacion `Verify-SgSuperAppI7Security.ps1` para dashboard, auditoria, bloqueo sin autenticacion, ausencia de mutaciones de auditoria y visibilidad ADMIN/TH/GERENCIA/OPERACIONES; backend build correcto; siguiente retake autorizado en Task 4, cliente API y tipos frontend I7.
+- I7 Task 4 cerrada con tipos TypeScript de dashboard, widgets, auditoria y filtros; cliente API `fetchDashboard`/`fetchAuditEvents`; mocks frontend alineados; verificacion `Verify-SgSuperAppI7FrontendApi.ps1` y build frontend correctos; siguiente retake autorizado en Task 5, UI dashboard por perfil.
+- I7 Task 5 cerrada con `DashboardPage`, carga `fetchDashboard`, fallback local, widgets agrupados por perfil/scope, estados de carga/error/vacio, estilos dark/gold compactos, verificacion `Verify-SgSuperAppI7DashboardUi.ps1` y build frontend correctos; siguiente retake autorizado en Task 6, UI consulta de auditoria.
+- I7 Task 6 cerrada con `AuditPage`, filtros por modulo/actor/fechas, tabla compacta de eventos, detalle estructurado, lectura sin acciones de edicion, modulo `audit` en navegacion, verificacion `Verify-SgSuperAppI7AuditUi.ps1` y build frontend correctos; siguiente retake autorizado en Task 7, demo checklist y reporte de cierre piloto.
+- I7 Task 7 cerrada con demo checklist I1-I7, reporte de cierre piloto, backlog priorizado, riesgos residuales y recomendacion de escalamiento documentados; siguiente retake autorizado en Task 8, verificacion integral y cierre I7.
+- I8 Task 1 cerrada con variante Sentinel Enterprise registrada en `docs/DESIGN.md`, SPEC/plan I8 creados, shell React ajustado a consola enterprise, tokens CSS claros `#003366`/`#FFC700`, dashboard/auditoria refinados visualmente, verificacion `Verify-SgSuperAppI8SentinelUx.ps1` y build frontend correctos; `graphify update .` intentado sin disponibilidad en PATH; siguiente retake autorizado en Task 2, refinamiento responsive/accesibilidad y recorrido visual.
+- I8 Task 2 cerrada con refinamiento de espacio en sidebar, topbar, panel lateral de notificaciones y workspace central; se elimino la fila de cards genericos del shell, se agrego `shell-body` con rail de notificaciones de 340px y fallback responsive; verificacion `Verify-SgSuperAppI8SentinelUx.ps1`, build frontend y HTTP 200 en preview local correctos; `graphify update .` intentado sin disponibilidad en PATH; siguiente retake autorizado en Task 3, recorrido visual manual fino y ajuste de pantallas funcionales internas.
 - `graphify update .` es obligatorio despues de modificar codigo cuando la herramienta este disponible.
+- I9 cerrado tecnicamente en su alcance MVP: motor deterministico R01-R07 con perfil de reglas versionado, piloto real de 4 sitios (41 guardas anonimos, 30 dias, 96.11% de cobertura), y gestion de clientes/proyectos que faltaba en el portal; ver `docs/reports/2026-08-31-sg-superapp-i9-piloto-real-anonimizado.md` y `docs/superpowers/plans/2026-09-10-sg-superapp-i2-i3-i9-estabilizacion-crud-plan.md`. Decision de diseno pendiente sin tocar: el gate de aprobar rechaza toda version de 30 dias reales con `BLOCKED` sin ligar.
+- 2026-09-11: restaurado el respaldo huerfano de I6/I7/I8 (`respaldo/main-pendiente-2026-08-23`) que nunca habia llegado a `main` - se fusiono contra el estado actual (post-I9), resolviendo conflictos reales en `usePortalShell.ts`, `ShellLayout.tsx`, `portalApi.ts`, `styles.css` y `docs/DESIGN.md`; se descarto un vaciado accidental del plan I2 presente en el respaldo original y se excluyeron artefactos de scratch (`tmp/pdfs/*`, logs de preview). Verificado en vivo: Dashboard, Alertas y Auditoria funcionan con datos reales sin regresion sobre Empleados, Puestos ni Programacion de turnos.
 
 ## Siguiente Paso Metodologico
 
-Ejecutar Task 10 del plan I5: verificacion integral y cierre I5.
+Tres hilos quedan abiertos simultaneamente tras la restauracion del 2026-09-11;
+priorizar cual retomar primero es una decision de producto, no tecnica:
 
-Condicion de entrada:
+- cierre funcional I7: ejecutar Task 8 del plan I7, verificacion integral y cierre I7;
+- UX/UI I8: ejecutar Task 3 del plan I8, recorrido visual manual fino y ajuste de pantallas funcionales internas;
+- I9: resolver la decision de diseno pendiente sobre el gate de aprobacion de 30 dias (ver arriba), o continuar hacia produccion.
 
-- suite `Verify-SgSuperAppI5*.ps1` completa;
+Condicion de entrada para cerrar I7:
+
+- suite `Verify-SgSuperAppI7*.ps1` completa;
+- regresion relevante I6: seguridad, notificaciones UI y alerts fallback;
 - backend build limpio;
 - frontend build limpio;
 - matriz final 1-20 registrada;
 - riesgos residuales documentados;
-- retake point I6 definido.
+- handoff final creado.

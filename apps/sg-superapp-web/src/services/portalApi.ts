@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "../config";
-import type { AnnulCertificateRequest, AppModule, CertificatePreview, CertificatePreviewRequest, CertificateSigner, CertificateSignerRequest, CertificateSignerStatus, CertificateStatus, CertificateType, CreatePositionAssignmentRequest, CreateTrainingRecordRequest, CurrentUser, EmployeeDetail, EmployeeSummary, FinalizePositionAssignmentRequest, ImportBatchError, ImportBatchRow, ImportBatchSummary, ImportColumnMapping, ImportPrevalidationResponse, ImportRowClassification, LaborCertificate, LaborCertificateHistoryItem, LoginRequest, LoginResponse, NotificationItem, PositionAssignment, RoleCode, ServicePosition, ServicePositionRequest, ServicePositionStatus, TrainingComplianceDetail, TrainingComplianceStatus, TrainingComplianceSummary, TrainingRecord, TrainingRequirementCategory, TrainingRequirementStatus, TrainingRequirementType, TrainingServiceEnablement, TrainingServiceEnablementStatus, UpsertTrainingRequirementTypeRequest } from "../types/portal";
+import type { AnnulCertificateRequest, AppModule, AuditEventsResponse, AuditFilters, CertificatePreview, CertificatePreviewRequest, CertificateSigner, CertificateSignerRequest, CertificateSignerStatus, CertificateStatus, CertificateType, CreatePositionAssignmentRequest, CreateTrainingRecordRequest, CurrentUser, DashboardResponse, EmployeeDetail, EmployeeSummary, FinalizePositionAssignmentRequest, ImportBatchError, ImportBatchRow, ImportBatchSummary, ImportColumnMapping, ImportPrevalidationResponse, ImportRowClassification, LaborCertificate, LaborCertificateHistoryItem, LoginRequest, LoginResponse, NotificationEmailSummaryRequest, NotificationEmailSummaryResponse, NotificationFilters, NotificationGenerationResponse, NotificationItem, NotificationUnreadCountResponse, PositionAssignment, RoleCode, ServicePosition, ServicePositionRequest, ServicePositionStatus, TrainingComplianceDetail, TrainingComplianceStatus, TrainingComplianceSummary, TrainingRecord, TrainingRequirementCategory, TrainingRequirementStatus, TrainingRequirementType, TrainingServiceEnablement, TrainingServiceEnablementStatus, UpsertTrainingRequirementTypeRequest } from "../types/portal";
 import type { ScheduleComparison, ScheduleProposal, SchedulingCapabilities, SchedulingClient, SchedulingConfigurationCreated, SchedulingProject, ShiftTemplate, UpsertSchedulingClientRequest, UpsertSchedulingProjectRequest } from "../types/portal";
 import type { PersistedSchedulingRuleBatch, PreEvaluateSchedulingRulesRequest, SchedulingEnvironmentScope, SchedulingRuleEvaluation, SchedulingRuleGateCode, SchedulingRuleProblem, SchedulingRuleProfile } from "../types/portal";
 
@@ -213,6 +213,65 @@ export async function downloadScheduleXlsx(versionId: number, filters: { positio
   return downloadSchedulingExport(`/portal/scheduling/versions/${versionId}/export.xlsx${query.size ? `?${query}` : ""}`, `programacion-v${versionId}.xlsx`);
 }
 
+async function downloadFile(path: string, fileName: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: getSessionHeaders()
+  });
+  if (!response.ok) {
+    let message: string | undefined;
+    try {
+      const data = (await response.json()) as { message?: string };
+      message = data.message;
+    } catch {
+      message = undefined;
+    }
+    throw new Error(message || `API request failed: ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function buildNotificationQuery(filters: NotificationFilters): string {
+  const params = new URLSearchParams();
+  if (filters.status) {
+    params.set("status", filters.status);
+  }
+  if (filters.severity) {
+    params.set("severity", filters.severity);
+  }
+  if (filters.sourceModule) {
+    params.set("sourceModule", filters.sourceModule);
+  }
+
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+function buildAuditQuery(filters: AuditFilters): string {
+  const params = new URLSearchParams();
+  if (filters.module) {
+    params.set("module", filters.module);
+  }
+  if (filters.actor) {
+    params.set("actor", filters.actor);
+  }
+  if (filters.from) {
+    params.set("from", filters.from);
+  }
+  if (filters.to) {
+    params.set("to", filters.to);
+  }
+
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
 export async function fetchCurrentUser(): Promise<CurrentUser> {
   return getJson<CurrentUser>("/auth/me");
 }
@@ -221,8 +280,52 @@ export async function fetchModules(role: RoleCode): Promise<AppModule[]> {
   return getJson<AppModule[]>(`/portal/modules/${role}`);
 }
 
+export async function fetchDashboard(): Promise<DashboardResponse> {
+  return getJson<DashboardResponse>("/portal/dashboard");
+}
+
+export async function fetchAuditEvents(filters: AuditFilters = {}): Promise<AuditEventsResponse> {
+  return getJson<AuditEventsResponse>(`/portal/audit${buildAuditQuery(filters)}`);
+}
+
 export async function fetchNotifications(username: string): Promise<NotificationItem[]> {
   return getJson<NotificationItem[]>(`/portal/notifications/${username}`);
+}
+
+export async function fetchNotificationsInbox(filters: NotificationFilters = {}): Promise<NotificationItem[]> {
+  return getJson<NotificationItem[]>(`/portal/notifications${buildNotificationQuery(filters)}`);
+}
+
+export async function fetchNotificationUnreadCount(): Promise<NotificationUnreadCountResponse> {
+  return getJson<NotificationUnreadCountResponse>("/portal/notifications/unread-count");
+}
+
+export async function markNotificationAsRead(notificationId: number): Promise<NotificationItem> {
+  return sendJson<NotificationItem>(`/portal/notifications/${notificationId}/read`, "POST");
+}
+
+export async function archiveNotification(notificationId: number): Promise<NotificationItem> {
+  return sendJson<NotificationItem>(`/portal/notifications/${notificationId}/archive`, "POST");
+}
+
+export async function generateTrainingAlerts(): Promise<NotificationGenerationResponse> {
+  return sendJson<NotificationGenerationResponse>("/portal/alerts/training/generate", "POST");
+}
+
+export async function generateImportAlerts(): Promise<NotificationGenerationResponse> {
+  return sendJson<NotificationGenerationResponse>("/portal/alerts/imports/generate", "POST");
+}
+
+export async function generateCertificateAlerts(): Promise<NotificationGenerationResponse> {
+  return sendJson<NotificationGenerationResponse>("/portal/alerts/certificates/generate", "POST");
+}
+
+export async function exportNotificationSummary(filters: NotificationFilters = {}): Promise<void> {
+  return downloadFile(`/portal/notifications-summary/export${buildNotificationQuery(filters)}`, "notification-summary.csv");
+}
+
+export async function sendNotificationEmailSummary(request: NotificationEmailSummaryRequest): Promise<NotificationEmailSummaryResponse> {
+  return sendJson<NotificationEmailSummaryResponse>("/portal/notifications-summary/email", "POST", request);
 }
 
 export async function login(request: LoginRequest): Promise<LoginResponse> {

@@ -30,8 +30,8 @@ public sealed class MockPortalQueryService
     {
         return new List<NotificationResponse>
         {
-            new(1, "USER", username, "Portal base activo", "El shell I1 esta disponible para pruebas internas.", "UNREAD", DateTimeOffset.UtcNow.AddMinutes(-30)),
-            new(2, "ROLE", "ADMIN", "Pendiente backend real", "Se requiere conectar autenticacion y persistencia PostgreSQL.", "UNREAD", DateTimeOffset.UtcNow.AddMinutes(-10))
+            new(1, "USER", username, "Portal base activo", "El shell I1 esta disponible para pruebas internas.", "UNREAD", "SYSTEM", "INFO", "SYSTEM", null, null, DateTimeOffset.UtcNow.AddMinutes(-30), null, null, null, null),
+            new(2, "ROLE", "ADMIN", "Pendiente backend real", "Se requiere conectar autenticacion y persistencia PostgreSQL.", "UNREAD", "SYSTEM", "INFO", "SYSTEM", null, null, DateTimeOffset.UtcNow.AddMinutes(-10), null, null, null, null)
         };
     }
 }

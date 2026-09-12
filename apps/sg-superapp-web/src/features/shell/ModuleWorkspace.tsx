@@ -1,5 +1,7 @@
 import { useParams } from "react-router-dom";
 import type { CurrentUser } from "../../types/portal";
+import { AlertsPage } from "../alerts/AlertsPage";
+import { AuditPage } from "../audit/AuditPage";
 import { CertificatesPage } from "../certificates/CertificatesPage";
 import { CoursesPage } from "../courses/CoursesPage";
 import { EmployeesPage } from "../employees/EmployeesPage";
@@ -36,6 +38,14 @@ export function ModuleWorkspace({ user }: ModuleWorkspaceProps) {
 
   if (moduleCode === "scheduling") {
     return <SchedulingPage user={user} />;
+  }
+
+  if (moduleCode === "alerts") {
+    return <AlertsPage user={user} />;
+  }
+
+  if (moduleCode === "audit") {
+    return <AuditPage user={user} />;
   }
 
   return <div className="panel-empty">Modulo pendiente del siguiente incremento.</div>;
