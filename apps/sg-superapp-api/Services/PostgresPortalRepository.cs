@@ -64,7 +64,8 @@ public sealed class PostgresPortalRepository
             ["NOTIFICATIONS"] = ("Notificaciones", "Bandeja shell de I1.", "Disponible"),
             ["IMPORTS"] = ("Cargas de Datos", "Historial y prevalidacion CSV inicial I2.", "Disponible"),
             ["SETTINGS"] = ("Configuracion", "Administracion base del piloto.", "Disponible"),
-            ["NOVEDADES"] = ("Novedades", "Proximamente / En diseno para incrementos futuros.", "Pendiente")
+            ["NOVEDADES"] = ("Novedades", "Proximamente / En diseno para incrementos futuros.", "Pendiente"),
+            ["SCHEDULING"] = ("Programacion de Turnos", "Generacion asistida y aprobacion de programacion I9.", "Disponible")
         };
 
     private readonly string _connectionString;
