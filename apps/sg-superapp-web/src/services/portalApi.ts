@@ -415,7 +415,11 @@ export async function fetchEmployeesPage(filters: {
   }
 
   const items = (await response.json()) as EmployeeSummary[];
-  const totalCount = Number(response.headers.get("X-Total-Count") ?? items.length);
+  const totalCountHeader = response.headers.get("X-Total-Count");
+  if (totalCountHeader === null) {
+    console.warn("fetchEmployeesPage: falta el header X-Total-Count en la respuesta; usando la longitud de la pagina actual como total.");
+  }
+  const totalCount = Number(totalCountHeader ?? items.length);
   return { items, totalCount };
 }
 

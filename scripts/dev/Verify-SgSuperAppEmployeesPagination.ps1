@@ -80,4 +80,18 @@ if ($pageOnly.TotalCount -ne $unpaged.TotalCount) {
     throw "El total con page=2 sin pageSize ($($pageOnly.TotalCount)) debe coincidir con el total sin paginar ($($unpaged.TotalCount))."
 }
 
+# El total con un filtro activo debe seguir siendo consistente entre la consulta paginada y
+# la sin paginar - esto ejercita que el WHERE de la consulta de conteo y el de la consulta
+# paginada no hayan divergido bajo un filtro real, no solo sin filtros.
+foreach ($filterQuery in @("status=ACTIVO", "completeness=INCOMPLETO")) {
+    $filteredUnpaged = Invoke-EmployeesRequest -Uri "$ApiBaseUrl/portal/employees?$filterQuery" -Headers $headers
+    $filteredPaged = Invoke-EmployeesRequest -Uri "$ApiBaseUrl/portal/employees?$filterQuery&page=1&pageSize=5" -Headers $headers
+    if ($filteredPaged.TotalCount -ne $filteredUnpaged.TotalCount) {
+        throw "Con el filtro '$filterQuery', el total paginado ($($filteredPaged.TotalCount)) debe coincidir con el total sin paginar ($($filteredUnpaged.TotalCount))."
+    }
+    if ($filteredUnpaged.Body.Count -ne $filteredUnpaged.TotalCount) {
+        throw "Con el filtro '$filterQuery' y sin paginar, el arreglo debe tener el mismo tamano que su propio X-Total-Count. Arreglo: $($filteredUnpaged.Body.Count), Total: $($filteredUnpaged.TotalCount)."
+    }
+}
+
 Write-Host "Employees pagination verification completed."

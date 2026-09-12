@@ -40,7 +40,7 @@
 - Produces: `PostgresPortalRepository.GetEmployeesAsync(string? search, string? status, string? jobTitle, string? completeness, bool includeSalary, int page, int pageSize, CancellationToken cancellationToken = default)` devuelve `Task<(IReadOnlyList<EmployeeSummaryResponse> Items, int TotalCount)>`. Con `page = 1` y `pageSize = int.MaxValue` el resultado es idéntico al método actual (todo el conjunto, mismo orden).
 - Produces: `GET /api/portal/employees` acepta `page`/`pageSize` opcionales (query string) y agrega el header de respuesta `X-Total-Count` con el total de registros que matchean los filtros (independiente de la página pedida).
 
-- [ ] **Step 1: Modificar `GetEmployeesAsync` para aceptar paginación y devolver el total**
+- [x] **Step 1: Modificar `GetEmployeesAsync` para aceptar paginación y devolver el total**
 
 Reemplazar el método completo (líneas 1114-1174 de `PostgresPortalRepository.cs`) por:
 
@@ -133,7 +133,7 @@ Reemplazar el método completo (líneas 1114-1174 de `PostgresPortalRepository.c
 
 Nota: cuando el llamador pasa `pageSize = int.MaxValue` y `page = 1`, `offset` es `0` y `limit int.MaxValue` no recorta nada — el resultado es idéntico al método actual sin paginación.
 
-- [ ] **Step 2: Actualizar el endpoint para resolver page/pageSize, llamar al repositorio y exponer el total**
+- [x] **Step 2: Actualizar el endpoint para resolver page/pageSize, llamar al repositorio y exponer el total**
 
 Reemplazar el bloque actual (líneas 636-652 de `PortalEndpoints.cs`) por:
 
@@ -161,7 +161,7 @@ Reemplazar el bloque actual (líneas 636-652 de `PortalEndpoints.cs`) por:
         });
 ```
 
-- [ ] **Step 3: Exponer el header `X-Total-Count` en la política CORS**
+- [x] **Step 3: Exponer el header `X-Total-Count` en la política CORS**
 
 Por defecto, CORS solo expone a JavaScript un puñado de headers "simples" (no incluye headers personalizados) aunque el request esté permitido — sin este cambio, `response.headers.get("X-Total-Count")` devolvería `null` en el navegador aunque el header sí viaje por la red (esto no lo detecta un test con `Invoke-WebRequest` de PowerShell, que no aplica reglas de CORS; solo se ve en un navegador real).
 
@@ -181,7 +181,7 @@ builder.Services.AddCors(options =>
 });
 ```
 
-- [ ] **Step 4: Compilar el backend**
+- [x] **Step 4: Compilar el backend**
 
 ```powershell
 $env:DOTNET_CLI_HOME = "C:\tmp\dotnet-home"
@@ -190,7 +190,7 @@ $env:DOTNET_CLI_HOME = "C:\tmp\dotnet-home"
 
 Esperado: `Compilación correcta. 0 Advertencia(s). 0 Errores.`
 
-- [ ] **Step 5: Reiniciar la API con el binario recién compilado**
+- [x] **Step 5: Reiniciar la API con el binario recién compilado**
 
 ```powershell
 $pid = (netstat -ano | Select-String ":5080.*LISTENING") -replace '.*\s(\d+)$','$1' | Select-Object -First 1
@@ -201,7 +201,7 @@ Start-Process -FilePath "C:\tmp\dotnet6\dotnet.exe" -ArgumentList "run","--urls"
 Start-Sleep -Seconds 6
 ```
 
-- [ ] **Step 6: Crear el verificador de paginación**
+- [x] **Step 6: Crear el verificador de paginación**
 
 Crear `scripts/dev/Verify-SgSuperAppEmployeesPagination.ps1`:
 
@@ -264,7 +264,7 @@ if ($oversized.Body.Count -gt 100) {
 Write-Host "Employees pagination verification completed."
 ```
 
-- [ ] **Step 7: Ejecutar el verificador**
+- [x] **Step 7: Ejecutar el verificador**
 
 ```bash
 pwsh -File scripts/dev/Verify-SgSuperAppEmployeesPagination.ps1
@@ -272,7 +272,7 @@ pwsh -File scripts/dev/Verify-SgSuperAppEmployeesPagination.ps1
 
 Esperado: `Employees pagination verification completed.` sin excepciones.
 
-- [ ] **Step 8: Confirmar que el picker de Certificaciones no se rompió (regresión sin paginar)**
+- [x] **Step 8: Confirmar que el picker de Certificaciones no se rompió (regresión sin paginar)**
 
 ```bash
 pwsh -File scripts/dev/Verify-SgSuperAppI2EmployeeFilters.ps1
@@ -280,7 +280,7 @@ pwsh -File scripts/dev/Verify-SgSuperAppI2EmployeeFilters.ps1
 
 Esperado: `I2 employee filter verification completed.` (este script llama `/api/portal/employees?completeness=...` sin `page`/`pageSize`, exactamente como lo hace `CertificatesPage.tsx`).
 
-- [ ] **Step 9: Confirmar en un navegador real que el header es legible desde `fetch` (CORS)**
+- [x] **Step 9: Confirmar en un navegador real que el header es legible desde `fetch` (CORS)**
 
 Con el frontend en `http://localhost:3000` y sesión iniciada, en la consola del navegador (o vía `javascript_tool`):
 
@@ -292,7 +292,7 @@ fetch("http://localhost:5080/api/portal/employees?page=1&pageSize=5", {
 
 Esperado: un número (string), no `null`. Si devuelve `null`, el Step 3 (CORS) no se aplicó correctamente — revisar que la API se haya reiniciado con el `Program.cs` actualizado.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add apps/sg-superapp-api/Services/PostgresPortalRepository.cs apps/sg-superapp-api/Endpoints/PortalEndpoints.cs apps/sg-superapp-api/Program.cs scripts/dev/Verify-SgSuperAppEmployeesPagination.ps1
@@ -312,7 +312,7 @@ git commit -m "feat(portal): paginacion real en GET /api/portal/employees"
 - Consumes: nada de la Task 1 salvo el contrato HTTP ya confirmado (`page`/`pageSize` opcionales, header `X-Total-Count`).
 - Produces: `fetchEmployeesPage(filters: { search?: string; status?: string; jobTitle?: string; completeness?: string; page: number; pageSize: number }): Promise<EmployeesPageResult>` donde `EmployeesPageResult = { items: EmployeeSummary[]; totalCount: number }`. Las Tasks 3-5 siguen usando `employees`/`selectedEmployee`/`selectedId` tal como ya existen en `EmployeesPage`.
 
-- [ ] **Step 1: Agregar `fetchEmployeesPage` en `portalApi.ts`**
+- [x] **Step 1: Agregar `fetchEmployeesPage` en `portalApi.ts`**
 
 Inmediatamente después de la función `fetchEmployees` existente (después de su cierre, antes de `fetchEmployeeDetail`), agregar:
 
@@ -365,7 +365,7 @@ export async function fetchEmployeesPage(filters: {
 }
 ```
 
-- [ ] **Step 2: Quitar la etiqueta stale y agregar estado de paginación en `EmployeesPage.tsx`**
+- [x] **Step 2: Quitar la etiqueta stale y agregar estado de paginación en `EmployeesPage.tsx`**
 
 En el import de `portalApi` (línea 2-11), agregar `fetchEmployeesPage` a la lista de imports.
 
@@ -384,7 +384,7 @@ Agregar, junto a los demás `useState` del listado (después de `const [complete
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 ```
 
-- [ ] **Step 3: Reiniciar a página 1 cuando cambian los filtros**
+- [x] **Step 3: Reiniciar a página 1 cuando cambian los filtros**
 
 Agregar un efecto nuevo, antes del efecto que carga empleados:
 
@@ -394,7 +394,7 @@ Agregar un efecto nuevo, antes del efecto que carga empleados:
   }, [search, status, jobTitle, completeness]);
 ```
 
-- [ ] **Step 4: Usar `fetchEmployeesPage` en el efecto de carga y guardar el total**
+- [x] **Step 4: Usar `fetchEmployeesPage` en el efecto de carga y guardar el total**
 
 Reemplazar el cuerpo de `loadEmployees` (dentro del primer `useEffect`, que hoy llama `fetchEmployees({ search, status, jobTitle, completeness })`) por:
 
@@ -440,7 +440,7 @@ Y agregar `page` y `pageSize` al arreglo de dependencias de ese `useEffect` (hoy
   }, [search, status, jobTitle, completeness, selectedId, page, pageSize]);
 ```
 
-- [ ] **Step 5: Agregar los controles de paginación bajo la tabla**
+- [x] **Step 5: Agregar los controles de paginación bajo la tabla**
 
 Dentro de `.employee-list-panel`, inmediatamente después del bloque:
 
@@ -469,7 +469,7 @@ Dentro de `.employee-list-panel`, inmediatamente después del bloque:
           </div>
 ```
 
-- [ ] **Step 6: Agregar el estilo de los controles de paginación**
+- [x] **Step 6: Agregar el estilo de los controles de paginación**
 
 En `styles.css`, después del bloque `.employee-row-meta` (o cualquier punto dentro de la sección de Empleados), agregar:
 
@@ -492,7 +492,7 @@ En `styles.css`, después del bloque `.employee-row-meta` (o cualquier punto den
 }
 ```
 
-- [ ] **Step 7: Compilar el frontend**
+- [x] **Step 7: Compilar el frontend**
 
 ```powershell
 Set-Location "apps\sg-superapp-web"
@@ -502,11 +502,11 @@ node ".\node_modules\vite\bin\vite.js" build
 
 Esperado: ambos comandos terminan sin errores.
 
-- [ ] **Step 8: Verificación manual en el navegador**
+- [x] **Step 8: Verificación manual en el navegador**
 
 Con la API de la Task 1 corriendo y el frontend con HMR activo: iniciar sesión como `admin.sg`, ir a Empleados / Guardas, confirmar: el encabezado ya no dice "I2 en curso"; el listado muestra como máximo 25 filas; el indicador dice "Página 1 de N" con N > 1 (hay ~44 empleados sembrados, así que con 25 por página deben ser 2 páginas); "Anterior" está deshabilitado en la página 1; hacer clic en "Siguiente" cambia el conjunto de filas mostradas y el indicador pasa a "Página 2 de N"; cambiar el filtro de estado reinicia a "Página 1".
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add apps/sg-superapp-web/src/services/portalApi.ts apps/sg-superapp-web/src/features/employees/EmployeesPage.tsx apps/sg-superapp-web/src/styles.css
@@ -525,7 +525,7 @@ git commit -m "feat(employees): listado paginado y etiqueta de estado corregida"
 - Consumes: `selectedEmployee: EmployeeDetail | null` (ya existe, sin cambios de tipo).
 - Produces: ninguna interfaz nueva — es una reorganización visual del mismo `selectedEmployee`. Las Tasks 4-5 agregan los botones de acción justo antes de este bloque.
 
-- [ ] **Step 1: Reemplazar la `dl` de 12 campos por 4 bloques agrupados**
+- [x] **Step 1: Reemplazar la `dl` de 12 campos por 4 bloques agrupados**
 
 Reemplazar el elemento `<dl>...</dl>` completo (dentro de `.employee-detail`, el que va desde `<dl>` hasta su `</dl>` de cierre, con los 12 pares `dt`/`dd`) por:
 
@@ -615,7 +615,7 @@ Reemplazar el elemento `<dl>...</dl>` completo (dentro de `.employee-detail`, el
 
 No se toca nada de lo que sigue (`Normalización asistida`, `Historial de puestos`, `Gestión de asignación`, `Historial de cambios`, `Edición manual`) en esta tarea — eso lo mueven las Tasks 4 y 5.
 
-- [ ] **Step 2: Estilos de los bloques agrupados**
+- [x] **Step 2: Estilos de los bloques agrupados**
 
 En `styles.css`, después del bloque `.employee-detail dd` (el que cierra la `dl` plana original), agregar:
 
@@ -660,7 +660,7 @@ En `styles.css`, después del bloque `.employee-detail dd` (el que cierra la `dl
 }
 ```
 
-- [ ] **Step 3: Compilar el frontend**
+- [x] **Step 3: Compilar el frontend**
 
 ```powershell
 Set-Location "apps\sg-superapp-web"
@@ -668,11 +668,11 @@ node ".\node_modules\typescript\bin\tsc" -b .
 node ".\node_modules\vite\bin\vite.js" build
 ```
 
-- [ ] **Step 4: Verificación manual**
+- [x] **Step 4: Verificación manual**
 
 Seleccionar un empleado en el listado y confirmar que el panel de Detalle muestra 4 bloques con encabezado propio (Identificación, Situación laboral, Puesto, Compensación) con los mismos datos que antes, y que el resto del panel (asignación, historiales, edición manual) sigue visible debajo sin cambios.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/sg-superapp-web/src/features/employees/EmployeesPage.tsx apps/sg-superapp-web/src/styles.css
@@ -692,7 +692,7 @@ git commit -m "feat(employees): panel de detalle reorganizado en bloques agrupad
 - Produces: `Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode })` — componente exportado desde `apps/sg-superapp-web/src/components/Modal.tsx`. Cierra al hacer clic en el backdrop, en el botón "✕", o al presionar Escape (llamando a `onClose` en los tres casos). No gestiona estado de formulario ni bloquea el scroll del body — cada consumidor decide cuándo montarlo/desmontarlo condicionalmente.
 - Consumes (Task 5): el mismo componente `Modal`, sin cambios.
 
-- [ ] **Step 1: Crear el componente `Modal`**
+- [x] **Step 1: Crear el componente `Modal`**
 
 Crear `apps/sg-superapp-web/src/components/Modal.tsx`:
 
@@ -736,7 +736,7 @@ export function Modal({ title, onClose, children }: ModalProps) {
 }
 ```
 
-- [ ] **Step 2: Estilos del modal**
+- [x] **Step 2: Estilos del modal**
 
 En `styles.css`, agregar (por ejemplo junto a los estilos de `.notification-popover`, ya que comparten lenguaje visual):
 
@@ -780,7 +780,7 @@ En `styles.css`, agregar (por ejemplo junto a los estilos de `.notification-popo
 }
 ```
 
-- [ ] **Step 3: Agregar estado del modal y una función de apertura que refresca los campos**
+- [x] **Step 3: Agregar estado del modal y una función de apertura que refresca los campos**
 
 En `EmployeesPage.tsx`, agregar el import: `import { Modal } from "../../components/Modal";`.
 
@@ -814,7 +814,7 @@ Agregar una función `openEditModal`, después de la declaración de `saveEmploy
   }
 ```
 
-- [ ] **Step 4: Hacer que `saveEmployee` use el error del modal y cierre al guardar**
+- [x] **Step 4: Hacer que `saveEmployee` use el error del modal y cierre al guardar**
 
 Reemplazar el cuerpo de `saveEmployee` (la función existente) por:
 
@@ -848,7 +848,7 @@ Reemplazar el cuerpo de `saveEmployee` (la función existente) por:
   }
 ```
 
-- [ ] **Step 5: Agregar el botón "Editar información" y mover el formulario al modal**
+- [x] **Step 5: Agregar el botón "Editar información" y mover el formulario al modal**
 
 Inmediatamente antes de `<div className="employee-detail-groups">` (agregado en la Task 3), agregar el botón (solo si el usuario puede editar):
 
@@ -889,7 +889,7 @@ Quitar por completo el bloque actual de "Edición manual" (el `<div className="e
               ) : null}
 ```
 
-- [ ] **Step 6: Compilar el frontend**
+- [x] **Step 6: Compilar el frontend**
 
 ```powershell
 Set-Location "apps\sg-superapp-web"
@@ -897,11 +897,11 @@ node ".\node_modules\typescript\bin\tsc" -b .
 node ".\node_modules\vite\bin\vite.js" build
 ```
 
-- [ ] **Step 7: Verificación manual**
+- [x] **Step 7: Verificación manual**
 
 Con sesión `admin.sg` o `th.sg`: seleccionar un empleado, clic en "Editar información" — debe abrir un modal centrado con fondo oscurecido, con el formulario mostrando los mismos estilos que ya usa "Asignar puesto" (inputs con borde y fondo, no controles crudos del navegador). Cerrar con "✕", reabrir y cerrar con clic fuera del modal, reabrir y cerrar con Escape. Reabrir, cambiar el salario, guardar — el modal debe cerrarse solo y el bloque "Compensación" del resumen debe reflejar el nuevo valor sin recargar la página.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add apps/sg-superapp-web/src/components/Modal.tsx apps/sg-superapp-web/src/features/employees/EmployeesPage.tsx apps/sg-superapp-web/src/styles.css
@@ -918,7 +918,7 @@ git commit -m "feat(employees): componente Modal compartido y edicion de emplead
 **Interfaces:**
 - Consumes: `Modal` de la Task 4, sin cambios.
 
-- [ ] **Step 1: Agregar estado del modal de asignación**
+- [x] **Step 1: Agregar estado del modal de asignación**
 
 Junto al estado agregado en la Task 4:
 
@@ -935,7 +935,7 @@ Agregar una función `openAssignmentModal`, cerca de `openEditModal`:
   }
 ```
 
-- [ ] **Step 2: Cerrar el modal cuando una acción de asignación termina con éxito**
+- [x] **Step 2: Cerrar el modal cuando una acción de asignación termina con éxito**
 
 En `assignPosition`, después de la línea `setAssignmentMessage("Asignacion creada.");`, agregar:
 
@@ -949,7 +949,7 @@ En `finalizeCurrentAssignment`, después de la línea `setAssignmentMessage("Asi
       setIsAssignmentModalOpen(false);
 ```
 
-- [ ] **Step 3: Agregar el botón "Gestionar asignación" y envolver el formulario existente en el modal**
+- [x] **Step 3: Agregar el botón "Gestionar asignación" y envolver el formulario existente en el modal**
 
 Inmediatamente después del bloque `.position-form-actions` del botón "Editar información" agregado en la Task 4, en un `.position-form-actions` propio (se mantienen como dos grupos de acción separados, no un solo `<div>` compartido), si `canManageAssignments` es verdadero:
 
@@ -1003,7 +1003,7 @@ Quitar el `<div className="employee-history"><h4>Gestion de asignacion</h4>...</
               ) : null}
 ```
 
-- [ ] **Step 4: Compilar el frontend**
+- [x] **Step 4: Compilar el frontend**
 
 ```powershell
 Set-Location "apps\sg-superapp-web"
@@ -1011,11 +1011,11 @@ node ".\node_modules\typescript\bin\tsc" -b .
 node ".\node_modules\vite\bin\vite.js" build
 ```
 
-- [ ] **Step 5: Verificación manual**
+- [x] **Step 5: Verificación manual**
 
 Seleccionar un empleado sin asignación vigente, clic en "Gestionar asignación" — debe abrir el modal con el formulario "Asignar puesto"; completar y guardar — el modal se cierra, "Historial de puestos" muestra la nueva asignación vigente. Reabrir "Gestionar asignación" — ahora debe mostrar "Finalizar asignación" (porque ya hay una vigente); finalizarla y confirmar que el modal se cierra y el historial refleja el cambio.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/sg-superapp-web/src/features/employees/EmployeesPage.tsx
@@ -1031,7 +1031,7 @@ git commit -m "feat(employees): gestion de asignacion como modal"
 
 **Interfaces:** Ninguna — tarea de verificación y documentación.
 
-- [ ] **Step 1: Build completo de backend y frontend**
+- [x] **Step 1: Build completo de backend y frontend**
 
 ```powershell
 $env:DOTNET_CLI_HOME = "C:\tmp\dotnet-home"
@@ -1043,7 +1043,7 @@ node ".\node_modules\vite\bin\vite.js" build
 
 Esperado: los tres comandos terminan sin errores.
 
-- [ ] **Step 2: Ejecutar los verificadores relacionados**
+- [x] **Step 2: Ejecutar los verificadores relacionados**
 
 ```bash
 pwsh -File scripts/dev/Verify-SgSuperAppEmployeesPagination.ps1
@@ -1054,13 +1054,22 @@ pwsh -File scripts/dev/Verify-SgSuperAppI2EmployeeHistory.ps1
 
 Esperado: los cuatro terminan con su mensaje de "...verification completed." sin excepciones.
 
-- [ ] **Step 3: Recorrido manual final end-to-end**
+- [x] **Step 3: Recorrido manual final end-to-end**
 
 Con sesión `admin.sg`: navegar a Empleados / Guardas; confirmar encabezado sin "I2 en curso"; paginar entre página 1 y 2; seleccionar un empleado y confirmar los 4 bloques del resumen; abrir "Editar información", cambiar un campo, guardar, confirmar que el resumen se actualiza; abrir "Gestionar asignación" y confirmar que muestra la opción correcta (asignar o finalizar) según el estado actual; probar el cierre de ambos modales por las tres vías; probar en viewport 375px que ningún modal se desborda.
 
-- [ ] **Step 4: Agregar el registro de ejecución a este plan**
+- [x] **Step 4: Agregar el registro de ejecución a este plan**
 
-Agregar al final de este archivo:
+Agregar al final de este archivo la sección `## Execution Log`.
+
+- [x] **Step 5: Commit final**
+
+```bash
+git add docs/superpowers/plans/2026-09-12-sg-empleados-ux-paginacion-modales-plan.md
+git commit -m "docs(plan): cerrar registro de ejecucion - UX empleados paginacion y modales"
+```
+
+---
 
 ## Execution Log
 
@@ -1086,10 +1095,3 @@ Agregar al final de este archivo:
 - Recorrido manual completo en navegador (admin.sg login, page 1 y 2,
   4 detail blocks, edit flow with save+refresh, assignment modal, close via
   button/backdrop/Escape, 375px viewport responsive), incluyendo 375px.
-
-- [ ] **Step 5: Commit final**
-
-```bash
-git add docs/superpowers/plans/2026-09-12-sg-empleados-ux-paginacion-modales-plan.md
-git commit -m "docs(plan): cerrar registro de ejecucion - UX empleados paginacion y modales"
-```

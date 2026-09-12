@@ -3,7 +3,6 @@ import {
   createPositionAssignment,
   fetchEmployeeDetail,
   fetchEmployeePositionAssignments,
-  fetchEmployees,
   fetchEmployeesPage,
   fetchServicePositions,
   finalizePositionAssignment,
@@ -99,6 +98,11 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
   }, [search, status, jobTitle, completeness]);
 
   useEffect(() => {
+    setIsEditModalOpen(false);
+    setIsAssignmentModalOpen(false);
+  }, [selectedId]);
+
+  useEffect(() => {
     let ignore = false;
 
     async function loadEmployees() {
@@ -171,16 +175,6 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
 
         setSelectedEmployee(data);
         setPositionAssignments(assignments);
-        setEditFullName(data.fullName);
-        setEditEmploymentStatus(data.employmentStatus);
-        setEditJobTitle(data.jobTitle);
-        setEditHireDate(data.hireDate || "");
-        setEditTerminationDate(data.terminationDate || "");
-        setEditTerminationReason(data.terminationReason || "");
-        setEditContractType(data.contractType || "");
-        setEditNotes(data.notes || "");
-        setEditSalary(data.currentBaseSalary?.toString() || "");
-        setEditSalaryEffectiveFrom(data.salaryEffectiveFrom || "");
 
         // Las posiciones activas alimentan el selector de asignacion; si fallan no deben
         // ocultar el detalle del empleado que si cargo, solo dejar el selector vacio.
@@ -266,6 +260,12 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
   }
 
   function openAssignmentModal() {
+    setAssignmentStartDate("");
+    setAssignmentReason("");
+    setAssignmentNotes("");
+    setFinalizeEndDate("");
+    setFinalizeReason("");
+    setFinalizeNotes("");
     setAssignmentMessage(null);
     setIsAssignmentModalOpen(true);
   }
@@ -377,7 +377,7 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
         <section className="panel employee-list-panel">
           <div className="panel-header">
             <h3>Listado</h3>
-            <span>{loading ? "Cargando..." : `${employees.length} registros`}</span>
+            <span>{loading ? "Cargando..." : `${totalCount} registros`}</span>
           </div>
 
           <div className="employee-table">
@@ -411,7 +411,7 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
             <button type="button" className="ghost-button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
               Anterior
             </button>
-            <span className="muted">Página {totalCount === 0 ? 0 : page} de {totalPages}</span>
+            <span className="muted">{totalCount === 0 ? "Sin resultados" : `Página ${page} de ${totalPages}`}</span>
             <button type="button" className="ghost-button" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}>
               Siguiente
             </button>
@@ -503,6 +503,10 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
                       <dt>Texto importado I2</dt>
                       <dd>{selectedEmployee.currentServicePositionText || "Sin referencia importada"}</dd>
                     </div>
+                    <div>
+                      <dt>Consistencia</dt>
+                      <dd><span className={`status-chip ${hasDifferentPositionReference ? "status-warning" : "status-ready"}`}>{hasDifferentPositionReference ? "Revisar" : "Consistente"}</span></dd>
+                    </div>
                   </dl>
                 </div>
 
@@ -522,22 +526,6 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
                       <dd>{selectedEmployee.notes || "Sin observaciones"}</dd>
                     </div>
                   </dl>
-                </div>
-              </div>
-              <div className="employee-history">
-                <h4>Normalizacion asistida</h4>
-                <div className="normalization-compare">
-                  <div>
-                    <span className="eyebrow">Texto importado I2</span>
-                    <strong>{importedPositionText || "Sin referencia importada"}</strong>
-                  </div>
-                  <div>
-                    <span className="eyebrow">Puesto normalizado</span>
-                    <strong>{normalizedPositionName || "Sin puesto normalizado"}</strong>
-                  </div>
-                  <span className={`status-chip ${hasDifferentPositionReference ? "status-warning" : "status-ready"}`}>
-                    {hasDifferentPositionReference ? "Revisar" : "Consistente"}
-                  </span>
                 </div>
               </div>
               <div className="employee-history">
