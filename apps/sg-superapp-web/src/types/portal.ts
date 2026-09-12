@@ -24,6 +24,36 @@ export interface SchedulingProject {
   status: "ACTIVO" | "INACTIVO";
 }
 
+export interface SchedulingClient {
+  id: number;
+  code: string;
+  name: string;
+  status: "ACTIVO" | "INACTIVO";
+}
+
+// The create endpoints for clients/projects/coverage-rules/position-requirements share one
+// backend helper that only echoes the new id and its status, never the full entity - the
+// caller must re-fetch by id for the rest of the fields.
+export interface SchedulingConfigurationCreated {
+  id: number;
+  status: "ACTIVO" | "INACTIVO";
+}
+
+export interface UpsertSchedulingClientRequest {
+  code: string;
+  name: string;
+  status: "ACTIVO" | "INACTIVO";
+}
+
+export interface UpsertSchedulingProjectRequest {
+  clientId: number;
+  code: string;
+  name: string;
+  status: "ACTIVO" | "INACTIVO";
+  effectiveFrom: string;
+  effectiveTo: string | null;
+}
+
 export interface ScheduleAssignment {
   id: number;
   date: string;

@@ -1,6 +1,18 @@
 import { useEffect, useState } from "react";
-import { createServicePosition, fetchServicePositionAssignments, fetchServicePositionDetail, fetchServicePositions, inactivateServicePosition, updateServicePosition } from "../../services/portalApi";
+import { createServicePosition, fetchServicePositionAssignments, fetchServicePositionDetail, fetchServicePositions, inactivateServicePosition, PortalApiError, updateServicePosition } from "../../services/portalApi";
 import type { CurrentUser, PositionAssignment, ServicePosition, ServicePositionRequest, ServicePositionStatus } from "../../types/portal";
+
+function describeDetailError(error: unknown): string {
+  if (error instanceof PortalApiError && error.status === 404) {
+    return "Este puesto ya no existe o fue removido.";
+  }
+
+  if (error instanceof PortalApiError && error.status === 403) {
+    return "No tiene permiso para ver el detalle de este puesto.";
+  }
+
+  return error instanceof Error ? error.message : "No fue posible cargar el detalle del puesto.";
+}
 
 interface PositionsPageProps {
   user: CurrentUser;
@@ -28,6 +40,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [detailErrorMessage, setDetailErrorMessage] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionPending, setActionPending] = useState(false);
   const [formMode, setFormMode] = useState<"edit" | "create">("edit");
@@ -95,6 +108,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
 
     async function loadDetail() {
       setDetailLoading(true);
+      setDetailErrorMessage(null);
 
       try {
         const [position, positionAssignments] = await Promise.all([
@@ -106,10 +120,11 @@ export function PositionsPage({ user }: PositionsPageProps) {
           setSelectedPosition(position);
           setAssignments(positionAssignments);
         }
-      } catch {
+      } catch (error) {
         if (!ignore) {
           setSelectedPosition(null);
           setAssignments([]);
+          setDetailErrorMessage(describeDetailError(error));
         }
       } finally {
         if (!ignore) {
@@ -264,6 +279,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
                 setSelectedId(null);
                 setSelectedPosition(null);
                 setAssignments([]);
+                setDetailErrorMessage(null);
                 clearForm();
                 setActionMessage(null);
               }}
@@ -311,8 +327,10 @@ export function PositionsPage({ user }: PositionsPageProps) {
         <aside className="panel employee-detail-panel">
           <div className="panel-header">
             <h3>Detalle</h3>
-            <span>{detailLoading ? "Cargando..." : selectedPosition ? "Disponible" : "Sin seleccion"}</span>
+            <span>{detailLoading ? "Cargando..." : selectedPosition ? "Disponible" : detailErrorMessage ? "Error" : "Sin seleccion"}</span>
           </div>
+
+          {detailErrorMessage ? <div className="panel-empty">{detailErrorMessage}</div> : null}
 
           {selectedPosition || formMode === "create" ? (
             <div className="employee-detail">

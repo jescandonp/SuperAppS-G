@@ -119,6 +119,18 @@ public static class PortalEndpoints
         app.MapGet("/api/portal/scheduling/versions/{versionId:long}/export.pdf",async(long versionId,long? positionId,long? employeeId,PortalAuthorizationService authorization,SchedulingExportService exporter,RequestUserContext userContext,CancellationToken ct)=>await ExportScheduleAsync(versionId,"pdf",positionId,employeeId,authorization,exporter,userContext,ct));
         app.MapGet("/api/portal/scheduling/versions/{versionId:long}/export.xlsx",async(long versionId,long? positionId,long? employeeId,PortalAuthorizationService authorization,SchedulingExportService exporter,RequestUserContext userContext,CancellationToken ct)=>await ExportScheduleAsync(versionId,"xlsx",positionId,employeeId,authorization,exporter,userContext,ct));
 
+        app.MapGet("/api/portal/scheduling/clients", async (string? status,
+            PortalAuthorizationService authorization, PostgresPortalRepository repository,
+            RequestUserContext userContext, CancellationToken cancellationToken) =>
+        {
+            var denied = await RequireSchedulingConfigurationAsync(authorization, userContext, cancellationToken);
+            if (denied is not null) return denied;
+            var normalizedStatus = status?.Trim().ToUpperInvariant();
+            if (normalizedStatus is not null && !IsActiveStatus(normalizedStatus))
+                return Results.BadRequest(new { message = "El estado de cliente no es valido." });
+            return Results.Ok(await repository.GetSchedulingClientsAsync(normalizedStatus, cancellationToken));
+        });
+
         app.MapPost("/api/portal/scheduling/clients", async (UpsertSchedulingClientRequest request,
             PortalAuthorizationService authorization, PostgresPortalRepository repository,
             RequestUserContext userContext, CancellationToken cancellationToken) =>
@@ -1191,8 +1203,7 @@ public static class PortalEndpoints
         CancellationToken cancellationToken)
     {
         if (userContext.User is null) return Results.Unauthorized();
-        var action = userContext.User.Role.Equals("ADMIN", StringComparison.OrdinalIgnoreCase) ? "CONFIGURE" : "GENERATE";
-        return await authorization.RequireAsync("SCHEDULING", action, cancellationToken);
+        return await authorization.RequireAsync("SCHEDULING", "CONFIGURE", cancellationToken);
     }
 
     private static bool IsActiveStatus(string? status) =>

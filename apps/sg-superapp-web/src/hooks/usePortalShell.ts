@@ -43,6 +43,7 @@ export function usePortalShell(): PortalShellState {
 
   const logout = useCallback(() => {
     sessionStorage.removeItem(SESSION_USER_KEY);
+    sessionStorage.removeItem(SESSION_TOKEN_KEY);
     setUser(null);
     setModules([]);
     setNotifications([]);

@@ -2930,6 +2930,20 @@ public sealed class PostgresPortalRepository
             ? new SchedulingClientResponse(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)) : null;
     }
 
+    public async Task<IReadOnlyList<SchedulingClientResponse>> GetSchedulingClientsAsync(string? status, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            "select id,code,name,status from clients where (@status is null or status=@status) order by status, name", connection);
+        command.Parameters.Add("status", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(status) ? DBNull.Value : status.Trim().ToUpperInvariant();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var clients = new List<SchedulingClientResponse>();
+        while (await reader.ReadAsync(cancellationToken))
+            clients.Add(new SchedulingClientResponse(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)));
+        return clients;
+    }
+
     // An assignment is only written when every rule verdict the caller declared for the chosen
     // candidate is one this schedule version actually persisted, with the same outcome, the same
     // scope and the same profile version. Without this the caller could declare its own compliance

@@ -6,9 +6,22 @@ import {
   fetchEmployees,
   fetchServicePositions,
   finalizePositionAssignment,
+  PortalApiError,
   updateEmployee
 } from "../../services/portalApi";
 import type { CurrentUser, EmployeeDetail, EmployeeSummary, PositionAssignment, ServicePosition } from "../../types/portal";
+
+function describeDetailError(error: unknown): string {
+  if (error instanceof PortalApiError && error.status === 404) {
+    return "Este empleado ya no existe o fue removido.";
+  }
+
+  if (error instanceof PortalApiError && error.status === 403) {
+    return "No tiene permiso para ver el detalle de este empleado.";
+  }
+
+  return error instanceof Error ? error.message : "No fue posible cargar el detalle del empleado.";
+}
 
 function formatCurrency(value: number | null): string {
   if (value === null) {
@@ -41,6 +54,7 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [detailErrorMessage, setDetailErrorMessage] = useState<string | null>(null);
   const [editFullName, setEditFullName] = useState("");
   const [editEmploymentStatus, setEditEmploymentStatus] = useState<"ACTIVO" | "RETIRADO">("ACTIVO");
   const [editJobTitle, setEditJobTitle] = useState("");
@@ -129,34 +143,51 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
     async function loadDetail() {
       setDetailLoading(true);
       setAssignmentMessage(null);
+      setDetailErrorMessage(null);
 
       try {
-        const [data, assignments, positions] = await Promise.all([
+        const [data, assignments] = await Promise.all([
           fetchEmployeeDetail(employeeId),
-          fetchEmployeePositionAssignments(employeeId),
-          fetchServicePositions({ status: "ACTIVO" })
+          fetchEmployeePositionAssignments(employeeId)
         ]);
-        if (!ignore) {
-          setSelectedEmployee(data);
-          setPositionAssignments(assignments);
-          setAvailablePositions(positions);
-          setAssignmentPositionId(positions[0]?.id.toString() || "");
-          setEditFullName(data.fullName);
-          setEditEmploymentStatus(data.employmentStatus);
-          setEditJobTitle(data.jobTitle);
-          setEditHireDate(data.hireDate || "");
-          setEditTerminationDate(data.terminationDate || "");
-          setEditTerminationReason(data.terminationReason || "");
-          setEditContractType(data.contractType || "");
-          setEditNotes(data.notes || "");
-          setEditSalary(data.currentBaseSalary?.toString() || "");
-          setEditSalaryEffectiveFrom(data.salaryEffectiveFrom || "");
+        if (ignore) {
+          return;
         }
-      } catch {
+
+        setSelectedEmployee(data);
+        setPositionAssignments(assignments);
+        setEditFullName(data.fullName);
+        setEditEmploymentStatus(data.employmentStatus);
+        setEditJobTitle(data.jobTitle);
+        setEditHireDate(data.hireDate || "");
+        setEditTerminationDate(data.terminationDate || "");
+        setEditTerminationReason(data.terminationReason || "");
+        setEditContractType(data.contractType || "");
+        setEditNotes(data.notes || "");
+        setEditSalary(data.currentBaseSalary?.toString() || "");
+        setEditSalaryEffectiveFrom(data.salaryEffectiveFrom || "");
+
+        // Las posiciones activas alimentan el selector de asignacion; si fallan no deben
+        // ocultar el detalle del empleado que si cargo, solo dejar el selector vacio.
+        try {
+          const positions = await fetchServicePositions({ status: "ACTIVO" });
+          if (!ignore) {
+            setAvailablePositions(positions);
+            setAssignmentPositionId(positions[0]?.id.toString() || "");
+          }
+        } catch {
+          if (!ignore) {
+            setAvailablePositions([]);
+            setAssignmentPositionId("");
+            setAssignmentMessage("No fue posible cargar los puestos activos disponibles para asignar.");
+          }
+        }
+      } catch (error) {
         if (!ignore) {
           setSelectedEmployee(null);
           setPositionAssignments([]);
           setAvailablePositions([]);
+          setDetailErrorMessage(describeDetailError(error));
         }
       } finally {
         if (!ignore) {
@@ -338,7 +369,7 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
         <aside className="panel employee-detail-panel">
           <div className="panel-header">
             <h3>Detalle</h3>
-            <span>{detailLoading ? "Cargando..." : selectedEmployee ? "Disponible" : "Sin seleccion"}</span>
+            <span>{detailLoading ? "Cargando..." : selectedEmployee ? "Disponible" : detailErrorMessage ? "Error" : "Sin seleccion"}</span>
           </div>
 
           {selectedEmployee ? (
@@ -495,7 +526,7 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
                 ))}
                 {selectedEmployee.changeHistory.length === 0 ? <p className="muted">Sin cambios registrados.</p> : null}
               </div>
-              {user.role === "TH" ? (
+              {user.role === "ADMIN" || user.role === "TH" ? (
                 <div className="employee-history">
                   <h4>Edicion manual</h4>
                   <input value={editFullName} onChange={(event) => setEditFullName(event.target.value)} placeholder="Nombre completo" />
@@ -516,7 +547,7 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
               ) : null}
             </div>
           ) : (
-            <div className="panel-empty">Seleccione un empleado para ver su detalle.</div>
+            <div className="panel-empty">{detailErrorMessage || "Seleccione un empleado para ver su detalle."}</div>
           )}
         </aside>
       </div>

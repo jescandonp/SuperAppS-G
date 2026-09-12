@@ -32,6 +32,7 @@ WITH permission_matrix AS (
         VALUES
             ('ADMIN', 'EMPLOYEES', 'VIEW'),
             ('ADMIN', 'EMPLOYEES', 'VIEW_SALARY'),
+            ('ADMIN', 'EMPLOYEES', 'EDIT'),
             ('ADMIN', 'IMPORTS', 'VIEW'),
             ('ADMIN', 'IMPORTS', 'VIEW_ERRORS'),
             ('TH', 'EMPLOYEES', 'VIEW'),

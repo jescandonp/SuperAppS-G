@@ -1,6 +1,6 @@
 import { API_BASE_URL } from "../config";
 import type { AnnulCertificateRequest, AppModule, CertificatePreview, CertificatePreviewRequest, CertificateSigner, CertificateSignerRequest, CertificateSignerStatus, CertificateStatus, CertificateType, CreatePositionAssignmentRequest, CreateTrainingRecordRequest, CurrentUser, EmployeeDetail, EmployeeSummary, FinalizePositionAssignmentRequest, ImportBatchError, ImportBatchRow, ImportBatchSummary, ImportColumnMapping, ImportPrevalidationResponse, ImportRowClassification, LaborCertificate, LaborCertificateHistoryItem, LoginRequest, LoginResponse, NotificationItem, PositionAssignment, RoleCode, ServicePosition, ServicePositionRequest, ServicePositionStatus, TrainingComplianceDetail, TrainingComplianceStatus, TrainingComplianceSummary, TrainingRecord, TrainingRequirementCategory, TrainingRequirementStatus, TrainingRequirementType, TrainingServiceEnablement, TrainingServiceEnablementStatus, UpsertTrainingRequirementTypeRequest } from "../types/portal";
-import type { ScheduleComparison, ScheduleProposal, SchedulingCapabilities, SchedulingProject, ShiftTemplate } from "../types/portal";
+import type { ScheduleComparison, ScheduleProposal, SchedulingCapabilities, SchedulingClient, SchedulingConfigurationCreated, SchedulingProject, ShiftTemplate, UpsertSchedulingClientRequest, UpsertSchedulingProjectRequest } from "../types/portal";
 import type { PersistedSchedulingRuleBatch, PreEvaluateSchedulingRulesRequest, SchedulingEnvironmentScope, SchedulingRuleEvaluation, SchedulingRuleGateCode, SchedulingRuleProblem, SchedulingRuleProfile } from "../types/portal";
 
 const SESSION_TOKEN_KEY = "sg.superapp.sessionToken";
@@ -117,6 +117,46 @@ export async function fetchSchedulingCapabilities(): Promise<SchedulingCapabilit
 
 export async function fetchSchedulingProjects(): Promise<SchedulingProject[]> {
   return getJson<SchedulingProject[]>("/portal/scheduling/projects");
+}
+
+export async function fetchSchedulingProjectDetail(projectId: number): Promise<SchedulingProject> {
+  return getJson<SchedulingProject>(`/portal/scheduling/projects/${projectId}`);
+}
+
+// The shared create-configuration backend helper only echoes {id, status}: fetch the full
+// project separately when the caller needs the rest of the fields.
+export async function createSchedulingProject(request: UpsertSchedulingProjectRequest): Promise<SchedulingConfigurationCreated> {
+  return sendJson<SchedulingConfigurationCreated>("/portal/scheduling/projects", "POST", request);
+}
+
+export async function updateSchedulingProject(projectId: number, request: UpsertSchedulingProjectRequest): Promise<SchedulingProject> {
+  return sendJson<SchedulingProject>(`/portal/scheduling/projects/${projectId}`, "PUT", request);
+}
+
+export async function inactivateSchedulingProject(projectId: number): Promise<SchedulingProject> {
+  return sendJson<SchedulingProject>(`/portal/scheduling/projects/${projectId}/inactivate`, "POST");
+}
+
+export async function fetchSchedulingClients(status?: "ACTIVO" | "INACTIVO"): Promise<SchedulingClient[]> {
+  const query = status ? `?status=${status}` : "";
+  return getJson<SchedulingClient[]>(`/portal/scheduling/clients${query}`);
+}
+
+export async function fetchSchedulingClientDetail(clientId: number): Promise<SchedulingClient> {
+  return getJson<SchedulingClient>(`/portal/scheduling/clients/${clientId}`);
+}
+
+// Same minimal-response backend helper as createSchedulingProject: only {id, status} comes back.
+export async function createSchedulingClient(request: UpsertSchedulingClientRequest): Promise<SchedulingConfigurationCreated> {
+  return sendJson<SchedulingConfigurationCreated>("/portal/scheduling/clients", "POST", request);
+}
+
+export async function updateSchedulingClient(clientId: number, request: UpsertSchedulingClientRequest): Promise<SchedulingClient> {
+  return sendJson<SchedulingClient>(`/portal/scheduling/clients/${clientId}`, "PUT", request);
+}
+
+export async function inactivateSchedulingClient(clientId: number): Promise<SchedulingClient> {
+  return sendJson<SchedulingClient>(`/portal/scheduling/clients/${clientId}/inactivate`, "POST");
 }
 
 export async function fetchShiftTemplates(): Promise<ShiftTemplate[]> {
