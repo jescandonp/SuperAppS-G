@@ -6,7 +6,7 @@
 **SPEC:** `docs/specs/2026-06-11-sg-superapp-spec-i7-auditoria-dashboard-cierre-piloto.md`  
 **Estado del plan:** Revisado y aprobado  
 **Fecha de aprobacion:** 2026-06-11  
-**Gate actual:** Task 7 cerrada; implementacion autorizada desde Task 8  
+**Gate actual:** Task 8 cerrada; I7 cerrado tecnicamente  
 
 ## 1. Objetivo
 
@@ -26,16 +26,16 @@ I7 debe consolidar I1-I6 sin reabrir su alcance funcional.
 
 ## 3. Gate De Cierre I7
 
-- [ ] Criterios de aceptacion 1-20 cubiertos.
-- [ ] Suite funcional I7 ejecutada.
-- [ ] Suite de regresion relevante I6 ejecutada o justificada.
-- [ ] Backend build limpio.
-- [ ] Frontend build limpio.
+- [x] Criterios de aceptacion 1-20 cubiertos.
+- [x] Suite funcional I7 ejecutada.
+- [x] Suite de regresion relevante I6 ejecutada o justificada.
+- [x] Backend build limpio.
+- [x] Frontend build limpio.
 - [x] Demo checklist documentado.
 - [x] Reporte de cierre piloto creado.
 - [x] Backlog priorizado documentado.
 - [x] Riesgos residuales documentados.
-- [ ] Retake final definido.
+- [x] Retake final definido: I7 cerrado tecnicamente; siguiente decision de producto es priorizar I9 (ver `README.md`).
 
 ## 4. Alcance
 
@@ -204,21 +204,52 @@ I7 debe consolidar I1-I6 sin reabrir su alcance funcional.
 
 **Aceptacion:**
 
-- [ ] Suite `Verify-SgSuperAppI7*.ps1` completa pasa.
-- [ ] Regresion relevante I6 pasa o queda justificada.
-- [ ] Backend build pasa.
-- [ ] Frontend build pasa.
-- [ ] Matriz final 1-20 queda registrada.
-- [ ] Riesgos residuales quedan documentados.
-- [ ] Handoff final queda creado.
+- [x] Suite `Verify-SgSuperAppI7*.ps1` completa pasa.
+- [x] Regresion relevante I6 pasa o queda justificada.
+- [x] Backend build pasa.
+- [x] Frontend build pasa.
+- [x] Matriz final 1-20 queda registrada.
+- [x] Riesgos residuales quedan documentados.
+- [x] Handoff final queda creado.
 
 **Verificacion:**
 
-- [ ] `C:\tmp\dotnet6\dotnet.exe build apps/sg-superapp-api/sg-superapp-api.csproj`
-- [ ] `npm run build` en `apps/sg-superapp-web`
-- [ ] `scripts/dev/Verify-SgSuperAppI7*.ps1`
-- [ ] regresion I6 seleccionada: seguridad, notificaciones UI y alerts fallback
-- [ ] `graphify update .` cuando la herramienta este disponible.
+- [x] `C:\tmp\dotnet6\dotnet.exe build apps/sg-superapp-api/sg-superapp-api.csproj`
+- [x] `npm run build` en `apps/sg-superapp-web`
+- [x] `scripts/dev/Verify-SgSuperAppI7*.ps1`
+- [x] regresion I6 seleccionada: seguridad, notificaciones UI y alerts fallback
+- [x] `graphify update .` intentado; no disponible en PATH.
+
+**Matriz Final 1-20:**
+
+| # | Criterio | Estado | Evidencia |
+|---|----------|--------|-----------|
+| 1 | Dashboard muestra widgets segun rol/permisos | PASS | `Verify-SgSuperAppI7Dashboard.ps1`, `Verify-SgSuperAppI7DashboardUi.ps1` |
+| 2 | ADMIN ve salud de plataforma, usuarios, cargas y trazabilidad | PASS | `Verify-SgSuperAppI7Dashboard.ps1`, `Verify-SgSuperAppI7Security.ps1` |
+| 3 | TH ve certificaciones, cursos/acreditaciones, importaciones y alertas | PASS | `Verify-SgSuperAppI7Dashboard.ps1`, recorrido manual Dashboard TH |
+| 4 | Operaciones ve habilitacion/no habilitacion y puestos/asignaciones | PASS | `Verify-SgSuperAppI7Dashboard.ps1`, `Verify-SgSuperAppI7Security.ps1` |
+| 5 | Gerencia ve indicadores ejecutivos de valor del piloto | PASS | `Verify-SgSuperAppI7Dashboard.ps1`, `Verify-SgSuperAppI7Security.ps1` |
+| 6 | Widgets no exponen acciones fuera de permisos | PASS | `Verify-SgSuperAppI7Security.ps1` |
+| 7 | Indicadores de certificaciones (generadas/aprobadas/anuladas) | PASS | `Verify-SgSuperAppI7Dashboard.ps1` |
+| 8 | Indicadores de cursos/acreditaciones (VENCIDO/CRITICO/PREVENTIVO/INFORMATIVO/AL_DIA) | PASS | `Verify-SgSuperAppI7Dashboard.ps1` |
+| 9 | Indicadores de importacion (validos/incompletos/duplicados/erroneos) | PASS | `Verify-SgSuperAppI7Dashboard.ps1` |
+| 10 | Indicadores de notificaciones (no leidas/severidad/gestion) | PASS | `Verify-SgSuperAppI7Dashboard.ps1` |
+| 11 | Auditoria lista eventos con fecha, actor, modulo, accion y entidad | PASS | `Verify-SgSuperAppI7Audit.ps1`, `Verify-SgSuperAppI7AuditUi.ps1` |
+| 12 | Auditoria filtra por modulo | PASS | `Verify-SgSuperAppI7Audit.ps1` |
+| 13 | Auditoria filtra por actor | PASS | `Verify-SgSuperAppI7Audit.ps1` |
+| 14 | Auditoria filtra por rango de fechas | PASS | `Verify-SgSuperAppI7Audit.ps1` |
+| 15 | Auditoria respeta restricciones por rol | PASS | `Verify-SgSuperAppI7Security.ps1` |
+| 16 | Eventos existentes de importacion/certificacion/notificacion consultables | PASS | `Verify-SgSuperAppI7Audit.ps1` |
+| 17 | Demo checklist cubre flujos I1-I7 | PASS | `docs/demo/2026-06-11-sg-superapp-demo-checklist.md` |
+| 18 | Reporte de cierre piloto registra alcance y evidencia | PASS | `docs/reports/2026-06-11-sg-superapp-cierre-piloto.md` |
+| 19 | Backlog priorizado para siguiente fase documentado | PASS | `docs/backlog/2026-06-11-sg-superapp-backlog-siguiente-fase.md` |
+| 20 | Riesgos residuales y recomendacion de escalamiento documentados | PASS | `docs/reports/2026-06-11-sg-superapp-cierre-piloto.md` seccion 5-6 |
+
+Regresion I6 seleccionada (seguridad, notificaciones UI, alerts fallback) — las
+tres criticas para no reabrir un incremento cerrado que Dashboard/Auditoria
+consumen indirectamente (notificaciones no leidas, generadores de alertas):
+`Verify-SgSuperAppI6Security.ps1`, `Verify-SgSuperAppI6NotificationsUi.ps1` y
+`Verify-SgSuperAppI6AlertsFallbackUi.ps1`, las tres GREEN.
 
 ## 6. Checkpoints
 
@@ -247,8 +278,8 @@ Despues de Tasks 7-8:
 - [x] demo checklist creado;
 - [x] reporte de cierre piloto creado;
 - [x] backlog priorizado creado;
-- [ ] suite integral I7 pasa;
-- [ ] cierre piloto documentado.
+- [x] suite integral I7 pasa;
+- [x] cierre piloto documentado.
 
 ## 7. Matriz De Trazabilidad
 
@@ -391,3 +422,35 @@ Decisiones de Gate 0:
 - Verificacion documental: `Select-String` confirmo cobertura de I1-I7, demo, reporte, backlog, riesgos, recomendacion, escalamiento y prioridades P0/P1.
 - No se modifico codigo en Task 7; `graphify update .` no aplica a esta tarea documental.
 - Retake point: Task 8, verificacion integral y cierre I7.
+
+### 2026-09-11 - Task 8 verificacion integral y cierre I7 cerrada
+
+- Contexto: I7 quedo con Task 7 cerrada y Task 8 pendiente desde 2026-06-12; el
+  trabajo se retomo tras el cierre de I8 (Sentinel Enterprise Task 3), sobre
+  `main` en `41d5133` mas el respaldo huerfano de I6/I7/I8 restaurado el
+  2026-09-11.
+- Backend build: `C:\tmp\dotnet6\dotnet.exe build apps\sg-superapp-api\sg-superapp-api.csproj`
+  fallo primero por lock de archivo (la API de dev seguia corriendo); se detuvo
+  el proceso, se reconstruyo limpio (0 advertencias, 0 errores) y se reinicio
+  la API para las verificaciones.
+- Frontend build: `tsc -b` + `vite build` en `apps/sg-superapp-web` correctos,
+  56 modulos transformados.
+- Suite `Verify-SgSuperAppI7*.ps1` completa (Dashboard, Audit, Security,
+  FrontendApi, DashboardUi, AuditUi) GREEN contra el stack local (API `:5080`,
+  sesiones ADMIN/TH/GERENCIA/OPERACIONES reales).
+- Regresion I6 seleccionada (seguridad, notificaciones UI, alerts fallback)
+  GREEN: `Verify-SgSuperAppI6Security.ps1`, `Verify-SgSuperAppI6NotificationsUi.ps1`,
+  `Verify-SgSuperAppI6AlertsFallbackUi.ps1`.
+- Matriz final 1-20 registrada arriba: los 20 criterios de SPEC I7 quedan en
+  PASS con evidencia trazada a script o documento.
+- Riesgos residuales: se reconfirmaron los de
+  `docs/reports/2026-06-11-sg-superapp-cierre-piloto.md` seccion 5; el riesgo
+  "recorrido visual manual pendiente en algunos modulos" quedo mitigado por
+  el cierre de I8 Task 3 (2026-09-11), que ya hizo ese recorrido sobre todas
+  las pantallas del piloto, incluida Auditoria.
+- Reporte de cierre piloto actualizado (seccion 3 evidencia, seccion 5
+  riesgos, seccion 7 decision) para reflejar el cierre real de Task 8.
+- Handoff final de I7 creado: `docs/handoff/handoff-20260911-i7-task8-closed.md`.
+- `graphify update .` intentado; no ejecuta porque `graphify` no esta
+  disponible en PATH (consistente con todas las tareas de codigo previas).
+- I7 queda cerrado tecnicamente: Task 1 a 8 completas.

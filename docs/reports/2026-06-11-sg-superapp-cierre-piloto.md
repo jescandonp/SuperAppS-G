@@ -1,11 +1,11 @@
 # Reporte De Cierre Piloto - S&G Super App Talento Humano
 
 **Fecha base:** 2026-06-11  
-**Actualizacion:** 2026-06-12  
+**Actualizacion:** 2026-09-11  
 **Producto:** S&G Super App  
 **Cliente:** Seguridad & Gestion Ltda.  
 **Piloto:** Talento Humano  
-**Estado:** Cierre documental I7 Task 7  
+**Estado:** Cierre tecnico I7 Task 8 (verificacion integral completa)  
 
 ## 1. Resumen Ejecutivo
 
@@ -35,9 +35,11 @@ La solucion demuestra que los quick wins de Talento Humano pueden operar sobre u
 | Frontend contratos I7 | `Verify-SgSuperAppI7FrontendApi.ps1` GREEN |
 | Dashboard UI | `Verify-SgSuperAppI7DashboardUi.ps1` GREEN |
 | Auditoria UI | `Verify-SgSuperAppI7AuditUi.ps1` GREEN |
-| Backend build | `C:\tmp\dotnet6\dotnet.exe build apps\sg-superapp-api\sg-superapp-api.csproj` correcto en Tasks 1-3 |
-| Frontend build | `npm.cmd run build` correcto con permisos elevados en Tasks 4-6 |
+| Backend build | `C:\tmp\dotnet6\dotnet.exe build apps\sg-superapp-api\sg-superapp-api.csproj` correcto en Tasks 1-3 y en Task 8 (0 advertencias, 0 errores) |
+| Frontend build | `npm.cmd run build` correcto con permisos elevados en Tasks 4-6; `tsc -b` + `vite build` correctos en Task 8 |
 | Preview local | `/dashboard` y `/module/audit` respondieron HTTP 200 |
+| Regresion I6 (Task 8) | `Verify-SgSuperAppI6Security.ps1`, `Verify-SgSuperAppI6NotificationsUi.ps1`, `Verify-SgSuperAppI6AlertsFallbackUi.ps1` GREEN |
+| Cierre integral I7 (Task 8, 2026-09-11) | Suite completa `Verify-SgSuperAppI7*.ps1` (6 scripts) GREEN contra el stack local; matriz final 1-20 registrada en `docs/plans/2026-06-11-sg-superapp-i7-auditoria-dashboard-cierre-piloto-plan.md` |
 
 Notas de entorno:
 
@@ -72,7 +74,7 @@ Puede consultar habilitacion, puestos/asignaciones e informacion operativa relev
 | Dependencia de build elevado en esta maquina | Bajo | Validar pipeline o ambiente CI sin sandbox local |
 | Graphify no disponible | Bajo | Instalar herramienta o retirar obligatoriedad operativa si no sera usada |
 | SMTP no confirmado | Medio | Mantener fallback exportable hasta validar correo real |
-| Recorrido visual manual pendiente en algunos modulos | Medio | Ejecutar checklist con sponsor y registrar observaciones |
+| Recorrido visual manual pendiente en algunos modulos | Resuelto (2026-09-11) | Ejecutado en I8 Task 3: recorrido de todas las pantallas del piloto contra Sentinel Enterprise, con hallazgo y correccion de bajo contraste en Programacion de turnos y tres controles sueltos |
 
 ## 6. Recomendacion De Escalamiento
 
@@ -92,4 +94,12 @@ Prioridades recomendadas:
 
 **Condicion:** no iniciar integraciones externas ni modulos nuevos sin SPEC y plan aprobados.
 
-**Siguiente hito:** cierre integral I7 Task 8 con suite completa, regresion relevante I6, matriz final 1-20, riesgos residuales y handoff final.
+**Cierre I7 (2026-09-11):** Task 8 completada. Suite integral I7 (6 scripts),
+regresion relevante I6 (seguridad, notificaciones UI, alerts fallback),
+backend y frontend build limpios, matriz final 1-20 en PASS y handoff final
+creado (`docs/handoff/handoff-20260911-i7-task8-closed.md`). I7 queda cerrado
+tecnicamente.
+
+**Siguiente hito:** decision de producto pendiente entre retomar I9 (decision
+de diseno del gate de aprobacion de 30 dias) o avanzar hacia produccion — ver
+`README.md`.

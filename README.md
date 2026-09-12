@@ -46,7 +46,7 @@ Cuando exista contradiccion, prevalece el orden definido en `docs/CONSTITUTION.m
 | I4 | Certificaciones laborales | Cerrado tecnicamente |
 | I5 | Cursos y acreditaciones | Cerrado tecnicamente |
 | I6 | Alertas y notificaciones | Cerrado tecnicamente |
-| I7 | Auditoria, dashboard y cierre piloto | Activo: Task 7 cerrada; retake Task 8 |
+| I7 | Auditoria, dashboard y cierre piloto | Cerrado tecnicamente: Task 1 a 8 completas |
 | I8 | UX/UI Sentinel Enterprise | Cerrado tecnicamente: Task 1, 2 y 3 completas |
 | I9 | Programacion asistida de turnos | Cerrado tecnicamente (MVP): reglas R01-R07, piloto real de 4 sitios, gestion de clientes/proyectos y estabilizacion CRUD I2/I3 completos |
 
@@ -57,12 +57,15 @@ El incremento activo, sus decisiones y validaciones obligatorias deben consultar
 **Nota sobre secuencia real:** el trabajo no avanzo en orden estricto de incrementos.
 I9 (Programacion de turnos) se completo tecnicamente en paralelo mientras I7/I8
 quedaban pausados desde el 2026-08-23 - un respaldo de esa fecha con el trabajo
-de I6/I7/I8 nunca llegado a `main` se restauro recien el 2026-09-11. Quedan dos
-hilos abiertos, no uno solo; cual priorizar es una decision de producto pendiente:
+de I6/I7/I8 nunca llegado a `main` se restauro recien el 2026-09-11, y ambos se
+cerraron tecnicamente ese mismo dia. Solo queda un hilo con decision pendiente:
 
-- **I7 - Auditoria, dashboard y cierre piloto:** Task 7 cerrada (demo checklist,
-  reporte de cierre piloto, backlog); retake autorizado en Task 8, verificacion
-  integral y cierre I7.
+- **I7 - Auditoria, dashboard y cierre piloto:** cerrado tecnicamente
+  (2026-09-11). Task 8 ejecuto la suite integral `Verify-SgSuperAppI7*.ps1`
+  completa, la regresion I6 seleccionada (seguridad, notificaciones UI, alerts
+  fallback), backend/frontend build limpios, matriz final 1-20 en PASS y
+  handoff final (`docs/handoff/handoff-20260911-i7-task8-closed.md`). Ver Task 8
+  del plan I7 para el detalle.
 - **I8 - UX/UI Sentinel Enterprise:** cerrado tecnicamente. Task 3 (2026-09-11)
   hizo el recorrido visual manual de todas las pantallas del piloto y corrigio
   la unica pantalla que habia quedado fuera de la migracion a Sentinel
@@ -162,6 +165,7 @@ ProyectoS&G/
 - I7 Task 5 cerrada con `DashboardPage`, carga `fetchDashboard`, fallback local, widgets agrupados por perfil/scope, estados de carga/error/vacio, estilos dark/gold compactos, verificacion `Verify-SgSuperAppI7DashboardUi.ps1` y build frontend correctos; siguiente retake autorizado en Task 6, UI consulta de auditoria.
 - I7 Task 6 cerrada con `AuditPage`, filtros por modulo/actor/fechas, tabla compacta de eventos, detalle estructurado, lectura sin acciones de edicion, modulo `audit` en navegacion, verificacion `Verify-SgSuperAppI7AuditUi.ps1` y build frontend correctos; siguiente retake autorizado en Task 7, demo checklist y reporte de cierre piloto.
 - I7 Task 7 cerrada con demo checklist I1-I7, reporte de cierre piloto, backlog priorizado, riesgos residuales y recomendacion de escalamiento documentados; siguiente retake autorizado en Task 8, verificacion integral y cierre I7.
+- I7 Task 8 cerrada (2026-09-11) con suite integral `Verify-SgSuperAppI7*.ps1` completa (Dashboard, Audit, Security, FrontendApi, DashboardUi, AuditUi), regresion I6 seleccionada (`Verify-SgSuperAppI6Security.ps1`, `Verify-SgSuperAppI6NotificationsUi.ps1`, `Verify-SgSuperAppI6AlertsFallbackUi.ps1`) y backend/frontend build correctos; matriz final 1-20 registrada en el plan I7 con los 20 criterios en PASS; riesgos residuales reconfirmados (el de recorrido visual manual quedo resuelto por I8 Task 3); handoff final creado en `docs/handoff/handoff-20260911-i7-task8-closed.md`; `graphify update .` intentado sin disponibilidad en PATH. I7 queda cerrado tecnicamente.
 - I8 Task 1 cerrada con variante Sentinel Enterprise registrada en `docs/DESIGN.md`, SPEC/plan I8 creados, shell React ajustado a consola enterprise, tokens CSS claros `#003366`/`#FFC700`, dashboard/auditoria refinados visualmente, verificacion `Verify-SgSuperAppI8SentinelUx.ps1` y build frontend correctos; `graphify update .` intentado sin disponibilidad en PATH; siguiente retake autorizado en Task 2, refinamiento responsive/accesibilidad y recorrido visual.
 - I8 Task 2 cerrada con refinamiento de espacio en sidebar, topbar, panel lateral de notificaciones y workspace central; se elimino la fila de cards genericos del shell, se agrego `shell-body` con rail de notificaciones de 340px y fallback responsive; verificacion `Verify-SgSuperAppI8SentinelUx.ps1`, build frontend y HTTP 200 en preview local correctos; `graphify update .` intentado sin disponibilidad en PATH; siguiente retake autorizado en Task 3, recorrido visual manual fino y ajuste de pantallas funcionales internas.
 - I8 Task 3 cerrada (2026-09-11) con recorrido visual manual de todas las pantallas del piloto contra Sentinel Enterprise; unico hallazgo real: Programacion de turnos (I9) habia quedado fuera de la migracion de Task 1/2 y conservaba texto de bajo contraste (confirmado con estilos computados en navegador) en `.scheduling-hero`, `.scheduling-control-bar`, `.scheduling-tabs`, `.schedule-badge` y `.schedule-alert`; tambien se corrigieron `.positions-filters button`, `.position-form-actions .secondary-action` e `.import-actions .secondary-action` con el mismo patron; `scripts/dev/Verify-SgSuperAppI8SentinelUx.ps1` ampliada, SPEC I8 actualizada (pantallas y criterio 10), build frontend correcto y `graphify update .` intentado sin disponibilidad en PATH. I8 queda cerrado tecnicamente.
@@ -171,18 +175,8 @@ ProyectoS&G/
 
 ## Siguiente Paso Metodologico
 
-Dos hilos quedan abiertos tras el cierre tecnico de I8 (2026-09-11);
-priorizar cual retomar primero es una decision de producto, no tecnica:
+Con I7 e I8 cerrados tecnicamente (2026-09-11), el unico hilo abierto es I9, y
+la decision de como seguir sigue siendo de producto, no tecnica:
 
-- cierre funcional I7: ejecutar Task 8 del plan I7, verificacion integral y cierre I7;
-- I9: resolver la decision de diseno pendiente sobre el gate de aprobacion de 30 dias (ver arriba), o continuar hacia produccion.
-
-Condicion de entrada para cerrar I7:
-
-- suite `Verify-SgSuperAppI7*.ps1` completa;
-- regresion relevante I6: seguridad, notificaciones UI y alerts fallback;
-- backend build limpio;
-- frontend build limpio;
-- matriz final 1-20 registrada;
-- riesgos residuales documentados;
-- handoff final creado.
+- I9: resolver la decision de diseno pendiente sobre el gate de aprobacion de 30 dias (ver arriba);
+- o continuar hacia produccion: hardening de despliegue, backups y datos demo/productivos controlados (ver `docs/reports/2026-06-11-sg-superapp-cierre-piloto.md` seccion 6, recomendacion de escalamiento).
