@@ -47,7 +47,7 @@ Cuando exista contradiccion, prevalece el orden definido en `docs/CONSTITUTION.m
 | I5 | Cursos y acreditaciones | Cerrado tecnicamente |
 | I6 | Alertas y notificaciones | Cerrado tecnicamente |
 | I7 | Auditoria, dashboard y cierre piloto | Activo: Task 7 cerrada; retake Task 8 |
-| I8 | UX/UI Sentinel Enterprise | Activo: Task 2 cerrada; siguiente retake Task 3 |
+| I8 | UX/UI Sentinel Enterprise | Cerrado tecnicamente: Task 1, 2 y 3 completas |
 | I9 | Programacion asistida de turnos | Cerrado tecnicamente (MVP): reglas R01-R07, piloto real de 4 sitios, gestion de clientes/proyectos y estabilizacion CRUD I2/I3 completos |
 
 El incremento activo, sus decisiones y validaciones obligatorias deben consultarse siempre en `docs/specs/` y `docs/plans/`.
@@ -57,16 +57,20 @@ El incremento activo, sus decisiones y validaciones obligatorias deben consultar
 **Nota sobre secuencia real:** el trabajo no avanzo en orden estricto de incrementos.
 I9 (Programacion de turnos) se completo tecnicamente en paralelo mientras I7/I8
 quedaban pausados desde el 2026-08-23 - un respaldo de esa fecha con el trabajo
-de I6/I7/I8 nunca llegado a `main` se restauro recien el 2026-09-11. Quedan tres
+de I6/I7/I8 nunca llegado a `main` se restauro recien el 2026-09-11. Quedan dos
 hilos abiertos, no uno solo; cual priorizar es una decision de producto pendiente:
 
 - **I7 - Auditoria, dashboard y cierre piloto:** Task 7 cerrada (demo checklist,
   reporte de cierre piloto, backlog); retake autorizado en Task 8, verificacion
   integral y cierre I7.
-- **I8 - UX/UI Sentinel Enterprise:** Task 2 cerrada (shell reestructurado,
-  tokens `#003366`/`#FFC700`, notificaciones en bandeja lateral); retake
-  autorizado en Task 3, recorrido visual manual fino y ajuste de pantallas
-  funcionales internas.
+- **I8 - UX/UI Sentinel Enterprise:** cerrado tecnicamente. Task 3 (2026-09-11)
+  hizo el recorrido visual manual de todas las pantallas del piloto y corrigio
+  la unica pantalla que habia quedado fuera de la migracion a Sentinel
+  Enterprise: Programacion de turnos (I9) conservaba su identidad oscura previa
+  con texto ilegible por bajo contraste (titulo, descripcion, pestanas y
+  campos), confirmado con estilos computados en navegador, no solo visualmente;
+  tambien se corrigieron tres botones sueltos con el mismo patron en Puestos y
+  Cargas de datos. Ver Task 3 del plan I8 para el detalle.
 - **I9 - Programacion de turnos:** cerrado tecnicamente en su alcance MVP,
   incluida la gestion de clientes/proyectos que faltaba. Decision de diseno
   pendiente y no tocada por decision explicita del usuario: el gate de aprobar
@@ -160,17 +164,17 @@ ProyectoS&G/
 - I7 Task 7 cerrada con demo checklist I1-I7, reporte de cierre piloto, backlog priorizado, riesgos residuales y recomendacion de escalamiento documentados; siguiente retake autorizado en Task 8, verificacion integral y cierre I7.
 - I8 Task 1 cerrada con variante Sentinel Enterprise registrada en `docs/DESIGN.md`, SPEC/plan I8 creados, shell React ajustado a consola enterprise, tokens CSS claros `#003366`/`#FFC700`, dashboard/auditoria refinados visualmente, verificacion `Verify-SgSuperAppI8SentinelUx.ps1` y build frontend correctos; `graphify update .` intentado sin disponibilidad en PATH; siguiente retake autorizado en Task 2, refinamiento responsive/accesibilidad y recorrido visual.
 - I8 Task 2 cerrada con refinamiento de espacio en sidebar, topbar, panel lateral de notificaciones y workspace central; se elimino la fila de cards genericos del shell, se agrego `shell-body` con rail de notificaciones de 340px y fallback responsive; verificacion `Verify-SgSuperAppI8SentinelUx.ps1`, build frontend y HTTP 200 en preview local correctos; `graphify update .` intentado sin disponibilidad en PATH; siguiente retake autorizado en Task 3, recorrido visual manual fino y ajuste de pantallas funcionales internas.
+- I8 Task 3 cerrada (2026-09-11) con recorrido visual manual de todas las pantallas del piloto contra Sentinel Enterprise; unico hallazgo real: Programacion de turnos (I9) habia quedado fuera de la migracion de Task 1/2 y conservaba texto de bajo contraste (confirmado con estilos computados en navegador) en `.scheduling-hero`, `.scheduling-control-bar`, `.scheduling-tabs`, `.schedule-badge` y `.schedule-alert`; tambien se corrigieron `.positions-filters button`, `.position-form-actions .secondary-action` e `.import-actions .secondary-action` con el mismo patron; `scripts/dev/Verify-SgSuperAppI8SentinelUx.ps1` ampliada, SPEC I8 actualizada (pantallas y criterio 10), build frontend correcto y `graphify update .` intentado sin disponibilidad en PATH. I8 queda cerrado tecnicamente.
 - `graphify update .` es obligatorio despues de modificar codigo cuando la herramienta este disponible.
 - I9 cerrado tecnicamente en su alcance MVP: motor deterministico R01-R07 con perfil de reglas versionado, piloto real de 4 sitios (41 guardas anonimos, 30 dias, 96.11% de cobertura), y gestion de clientes/proyectos que faltaba en el portal; ver `docs/reports/2026-08-31-sg-superapp-i9-piloto-real-anonimizado.md` y `docs/superpowers/plans/2026-09-10-sg-superapp-i2-i3-i9-estabilizacion-crud-plan.md`. Decision de diseno pendiente sin tocar: el gate de aprobar rechaza toda version de 30 dias reales con `BLOCKED` sin ligar.
 - 2026-09-11: restaurado el respaldo huerfano de I6/I7/I8 (`respaldo/main-pendiente-2026-08-23`) que nunca habia llegado a `main` - se fusiono contra el estado actual (post-I9), resolviendo conflictos reales en `usePortalShell.ts`, `ShellLayout.tsx`, `portalApi.ts`, `styles.css` y `docs/DESIGN.md`; se descarto un vaciado accidental del plan I2 presente en el respaldo original y se excluyeron artefactos de scratch (`tmp/pdfs/*`, logs de preview). Verificado en vivo: Dashboard, Alertas y Auditoria funcionan con datos reales sin regresion sobre Empleados, Puestos ni Programacion de turnos.
 
 ## Siguiente Paso Metodologico
 
-Tres hilos quedan abiertos simultaneamente tras la restauracion del 2026-09-11;
+Dos hilos quedan abiertos tras el cierre tecnico de I8 (2026-09-11);
 priorizar cual retomar primero es una decision de producto, no tecnica:
 
 - cierre funcional I7: ejecutar Task 8 del plan I7, verificacion integral y cierre I7;
-- UX/UI I8: ejecutar Task 3 del plan I8, recorrido visual manual fino y ajuste de pantallas funcionales internas;
 - I9: resolver la decision de diseno pendiente sobre el gate de aprobacion de 30 dias (ver arriba), o continuar hacia produccion.
 
 Condicion de entrada para cerrar I7:
