@@ -404,56 +404,87 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
               <p className="muted">
                 {selectedEmployee.identificationType} {selectedEmployee.identificationNumber}
               </p>
-              <dl>
-                <div>
-                  <dt>Estado laboral</dt>
-                  <dd>{selectedEmployee.employmentStatus}</dd>
+              <div className="employee-detail-groups">
+                <div className="employee-detail-group">
+                  <h4>Identificación</h4>
+                  <dl>
+                    <div>
+                      <dt>Tipo y número</dt>
+                      <dd>{selectedEmployee.identificationType} {selectedEmployee.identificationNumber}</dd>
+                    </div>
+                    <div>
+                      <dt>Nombre completo</dt>
+                      <dd>{selectedEmployee.fullName}</dd>
+                    </div>
+                  </dl>
                 </div>
-                <div>
-                  <dt>Estado registro</dt>
-                  <dd>{selectedEmployee.recordStatus}</dd>
+
+                <div className="employee-detail-group">
+                  <h4>Situación laboral</h4>
+                  <dl>
+                    <div>
+                      <dt>Estado laboral</dt>
+                      <dd>{selectedEmployee.employmentStatus}</dd>
+                    </div>
+                    <div>
+                      <dt>Estado registro</dt>
+                      <dd>{selectedEmployee.recordStatus}</dd>
+                    </div>
+                    <div>
+                      <dt>Cargo</dt>
+                      <dd>{selectedEmployee.jobTitle}</dd>
+                    </div>
+                    <div>
+                      <dt>Contrato</dt>
+                      <dd>{selectedEmployee.contractType || "No definido"}</dd>
+                    </div>
+                    <div>
+                      <dt>Ingreso</dt>
+                      <dd>{selectedEmployee.hireDate || "No definido"}</dd>
+                    </div>
+                    <div>
+                      <dt>Retiro</dt>
+                      <dd>{selectedEmployee.terminationDate || "No aplica"}</dd>
+                    </div>
+                    <div>
+                      <dt>Motivo retiro</dt>
+                      <dd>{selectedEmployee.terminationReason || "No aplica"}</dd>
+                    </div>
+                  </dl>
                 </div>
-                <div>
-                  <dt>Cargo</dt>
-                  <dd>{selectedEmployee.jobTitle}</dd>
+
+                <div className="employee-detail-group">
+                  <h4>Puesto</h4>
+                  <dl>
+                    <div>
+                      <dt>Puesto actual normalizado</dt>
+                      <dd>{selectedEmployee.currentServicePositionName || "Sin puesto normalizado"}</dd>
+                    </div>
+                    <div>
+                      <dt>Texto importado I2</dt>
+                      <dd>{selectedEmployee.currentServicePositionText || "Sin referencia importada"}</dd>
+                    </div>
+                  </dl>
                 </div>
-                <div>
-                  <dt>Contrato</dt>
-                  <dd>{selectedEmployee.contractType || "No definido"}</dd>
+
+                <div className="employee-detail-group">
+                  <h4>Compensación</h4>
+                  <dl>
+                    <div>
+                      <dt>Salario vigente</dt>
+                      <dd>{formatCurrency(selectedEmployee.currentBaseSalary)}</dd>
+                    </div>
+                    <div>
+                      <dt>Fuente salario</dt>
+                      <dd>{selectedEmployee.salarySource}</dd>
+                    </div>
+                    <div>
+                      <dt>Notas</dt>
+                      <dd>{selectedEmployee.notes || "Sin observaciones"}</dd>
+                    </div>
+                  </dl>
                 </div>
-                <div>
-                  <dt>Ingreso</dt>
-                  <dd>{selectedEmployee.hireDate || "No definido"}</dd>
-                </div>
-                <div>
-                  <dt>Retiro</dt>
-                  <dd>{selectedEmployee.terminationDate || "No aplica"}</dd>
-                </div>
-                <div>
-                  <dt>Motivo retiro</dt>
-                  <dd>{selectedEmployee.terminationReason || "No aplica"}</dd>
-                </div>
-                <div>
-                  <dt>Puesto actual normalizado</dt>
-                  <dd>{selectedEmployee.currentServicePositionName || "Sin puesto normalizado"}</dd>
-                </div>
-                <div>
-                  <dt>Texto importado I2</dt>
-                  <dd>{selectedEmployee.currentServicePositionText || "Sin referencia importada"}</dd>
-                </div>
-                <div>
-                  <dt>Salario vigente</dt>
-                  <dd>{formatCurrency(selectedEmployee.currentBaseSalary)}</dd>
-                </div>
-                <div>
-                  <dt>Fuente salario</dt>
-                  <dd>{selectedEmployee.salarySource}</dd>
-                </div>
-                <div>
-                  <dt>Notas</dt>
-                  <dd>{selectedEmployee.notes || "Sin observaciones"}</dd>
-                </div>
-              </dl>
+              </div>
               <div className="employee-history">
                 <h4>Normalizacion asistida</h4>
                 <div className="normalization-compare">

@@ -979,6 +979,45 @@ textarea {
   margin: 0;
 }
 
+.employee-detail-groups {
+  display: grid;
+  gap: 1rem;
+}
+
+.employee-detail-group {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.85rem;
+}
+
+.employee-detail-group h4 {
+  margin: 0 0 0.65rem;
+  color: var(--accent);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
+
+.employee-detail-group dl {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.employee-detail-group dl div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.employee-detail-group dt {
+  color: var(--primary);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.employee-detail-group dd {
+  margin: 0;
+}
+
 .position-detail-section {
   display: grid;
   gap: 0.65rem;
