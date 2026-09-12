@@ -900,6 +900,23 @@ textarea {
   justify-items: end;
 }
 
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.pagination-controls select {
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0 0.75rem;
+}
+
 .status-chip {
   display: inline-flex;
   align-items: center;

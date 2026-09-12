@@ -4,6 +4,7 @@ import {
   fetchEmployeeDetail,
   fetchEmployeePositionAssignments,
   fetchEmployees,
+  fetchEmployeesPage,
   fetchServicePositions,
   finalizePositionAssignment,
   PortalApiError,
@@ -48,6 +49,10 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
   const [status, setStatus] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [completeness, setCompleteness] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalCount, setTotalCount] = useState(0);
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const [employees, setEmployees] = useState<EmployeeSummary[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeDetail | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -86,6 +91,10 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
     normalizeText(importedPositionText) !== normalizeText(normalizedPositionName);
 
   useEffect(() => {
+    setPage(1);
+  }, [search, status, jobTitle, completeness]);
+
+  useEffect(() => {
     let ignore = false;
 
     async function loadEmployees() {
@@ -93,28 +102,30 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
       setErrorMessage(null);
 
       try {
-        const data = await fetchEmployees({ search, status, jobTitle, completeness });
+        const { items, totalCount: total } = await fetchEmployeesPage({ search, status, jobTitle, completeness, page, pageSize });
         if (ignore) {
           return;
         }
 
-        setEmployees(data);
+        setEmployees(items);
+        setTotalCount(total);
 
-        if (data.length === 0) {
+        if (items.length === 0) {
           setSelectedId(null);
           setSelectedEmployee(null);
           return;
         }
 
-        const nextId = selectedId !== null && data.some((employee) => employee.id === selectedId)
+        const nextId = selectedId !== null && items.some((employee) => employee.id === selectedId)
           ? selectedId
-          : data[0].id;
+          : items[0].id;
         setSelectedId(nextId);
       } catch (error) {
         if (!ignore) {
           const message = error instanceof Error ? error.message : "No fue posible cargar empleados.";
           setErrorMessage(message);
           setEmployees([]);
+          setTotalCount(0);
           setSelectedId(null);
           setSelectedEmployee(null);
         }
@@ -130,7 +141,7 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
     return () => {
       ignore = true;
     };
-  }, [search, status, jobTitle, completeness, selectedId]);
+  }, [search, status, jobTitle, completeness, selectedId, page, pageSize]);
 
   useEffect(() => {
     if (selectedId === null) {
@@ -310,7 +321,7 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
     <div className="employees-workspace">
       <div className="employees-toolbar">
         <div>
-          <p className="eyebrow">I2 en curso</p>
+          <p className="eyebrow">Empleados y guardas</p>
           <h2>Maestro de empleados y guardas</h2>
         </div>
         <div className="toolbar-filters">
@@ -363,6 +374,21 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
             ))}
 
             {!loading && employees.length === 0 ? <div className="panel-empty">No hay registros para los filtros actuales.</div> : null}
+          </div>
+
+          <div className="pagination-controls">
+            <button type="button" className="ghost-button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
+              Anterior
+            </button>
+            <span className="muted">Página {totalCount === 0 ? 0 : page} de {totalPages}</span>
+            <button type="button" className="ghost-button" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}>
+              Siguiente
+            </button>
+            <select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }}>
+              <option value={25}>25 por página</option>
+              <option value={50}>50 por página</option>
+              <option value={100}>100 por página</option>
+            </select>
           </div>
         </section>
 

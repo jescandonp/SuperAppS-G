@@ -372,6 +372,53 @@ export async function fetchEmployees(filters: { search?: string; status?: string
   return getJson<EmployeeSummary[]>(`/portal/employees${query ? `?${query}` : ""}`);
 }
 
+export interface EmployeesPageResult {
+  items: EmployeeSummary[];
+  totalCount: number;
+}
+
+export async function fetchEmployeesPage(filters: {
+  search?: string;
+  status?: string;
+  jobTitle?: string;
+  completeness?: string;
+  page: number;
+  pageSize: number;
+}): Promise<EmployeesPageResult> {
+  const params = new URLSearchParams();
+
+  if (filters.search) {
+    params.set("search", filters.search);
+  }
+
+  if (filters.status) {
+    params.set("status", filters.status);
+  }
+
+  if (filters.jobTitle) {
+    params.set("jobTitle", filters.jobTitle);
+  }
+
+  if (filters.completeness) {
+    params.set("completeness", filters.completeness);
+  }
+
+  params.set("page", String(filters.page));
+  params.set("pageSize", String(filters.pageSize));
+
+  const response = await fetch(`${API_BASE_URL}/portal/employees?${params.toString()}`, {
+    headers: getSessionHeaders()
+  });
+
+  if (!response.ok) {
+    throw new PortalApiError(await readProblem(response));
+  }
+
+  const items = (await response.json()) as EmployeeSummary[];
+  const totalCount = Number(response.headers.get("X-Total-Count") ?? items.length);
+  return { items, totalCount };
+}
+
 export async function fetchEmployeeDetail(employeeId: number): Promise<EmployeeDetail> {
   return getJson<EmployeeDetail>(`/portal/employees/${employeeId}`);
 }
