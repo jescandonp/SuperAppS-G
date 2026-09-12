@@ -72,6 +72,7 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
   const [editSalary, setEditSalary] = useState("");
   const [editSalaryEffectiveFrom, setEditSalaryEffectiveFrom] = useState("");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
   const [editErrorMessage, setEditErrorMessage] = useState<string | null>(null);
   const [positionAssignments, setPositionAssignments] = useState<PositionAssignment[]>([]);
   const [availablePositions, setAvailablePositions] = useState<ServicePosition[]>([]);
@@ -264,6 +265,11 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
     setIsEditModalOpen(true);
   }
 
+  function openAssignmentModal() {
+    setAssignmentMessage(null);
+    setIsAssignmentModalOpen(true);
+  }
+
   async function reloadSelectedEmployee(employeeId: number) {
     const [updated, assignments] = await Promise.all([
       fetchEmployeeDetail(employeeId),
@@ -303,6 +309,7 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
       setAssignmentNotes("");
       await reloadSelectedEmployee(selectedEmployee.id);
       setAssignmentMessage("Asignacion creada.");
+      setIsAssignmentModalOpen(false);
     } catch (error) {
       setAssignmentMessage(error instanceof Error ? error.message : "No fue posible crear la asignacion.");
     } finally {
@@ -333,6 +340,7 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
       setFinalizeNotes("");
       await reloadSelectedEmployee(selectedEmployee.id);
       setAssignmentMessage("Asignacion finalizada.");
+      setIsAssignmentModalOpen(false);
     } catch (error) {
       setAssignmentMessage(error instanceof Error ? error.message : "No fue posible finalizar la asignacion.");
     } finally {
@@ -426,6 +434,12 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
               {user.role === "ADMIN" || user.role === "TH" ? (
                 <div className="position-form-actions">
                   <button type="button" onClick={openEditModal}>Editar información</button>
+                </div>
+              ) : null}
+
+              {canManageAssignments ? (
+                <div className="position-form-actions">
+                  <button type="button" onClick={openAssignmentModal}>Gestionar asignación</button>
                 </div>
               ) : null}
 
@@ -557,44 +571,6 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
                 ))}
                 {positionAssignments.length === 0 ? <p className="muted">Sin historial de puestos.</p> : null}
               </div>
-              {canManageAssignments ? (
-                <div className="employee-history">
-                  <h4>Gestion de asignacion</h4>
-                  {assignmentMessage ? <p className="muted">{assignmentMessage}</p> : null}
-                  {currentAssignment ? (
-                    <div className="position-form">
-                      <p className="muted">Para asignar otro puesto primero finalice la asignacion vigente.</p>
-                      <input type="date" value={finalizeEndDate} onChange={(event) => setFinalizeEndDate(event.target.value)} />
-                      <input value={finalizeReason} onChange={(event) => setFinalizeReason(event.target.value)} placeholder="Motivo de cierre opcional" />
-                      <textarea value={finalizeNotes} onChange={(event) => setFinalizeNotes(event.target.value)} placeholder="Notas opcionales" />
-                      <div className="position-form-actions">
-                        <button type="button" disabled={assignmentPending} onClick={() => void finalizeCurrentAssignment()}>
-                          Finalizar asignacion
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="position-form">
-                      <select value={assignmentPositionId} onChange={(event) => setAssignmentPositionId(event.target.value)}>
-                        <option value="">Seleccione puesto activo</option>
-                        {availablePositions.map((position) => (
-                          <option key={position.id} value={position.id}>
-                            {position.name} {position.code ? `(${position.code})` : ""}
-                          </option>
-                        ))}
-                      </select>
-                      <input type="date" value={assignmentStartDate} onChange={(event) => setAssignmentStartDate(event.target.value)} />
-                      <input value={assignmentReason} onChange={(event) => setAssignmentReason(event.target.value)} placeholder="Motivo opcional" />
-                      <textarea value={assignmentNotes} onChange={(event) => setAssignmentNotes(event.target.value)} placeholder="Notas opcionales" />
-                      <div className="position-form-actions">
-                        <button type="button" disabled={assignmentPending} onClick={() => void assignPosition()}>
-                          Asignar puesto
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : null}
               <div className="employee-history">
                 <h4>Historial de cambios</h4>
                 {selectedEmployee.changeHistory.map((change) => (
@@ -629,6 +605,43 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
                       <button type="button" onClick={() => void saveEmployee()}>Guardar cambios</button>
                     </div>
                   </div>
+                </Modal>
+              ) : null}
+              {isAssignmentModalOpen ? (
+                <Modal title="Gestionar asignación" onClose={() => setIsAssignmentModalOpen(false)}>
+                  {assignmentMessage ? <p className="muted">{assignmentMessage}</p> : null}
+                  {currentAssignment ? (
+                    <div className="position-form">
+                      <p className="muted">Para asignar otro puesto primero finalice la asignacion vigente.</p>
+                      <input type="date" value={finalizeEndDate} onChange={(event) => setFinalizeEndDate(event.target.value)} />
+                      <input value={finalizeReason} onChange={(event) => setFinalizeReason(event.target.value)} placeholder="Motivo de cierre opcional" />
+                      <textarea value={finalizeNotes} onChange={(event) => setFinalizeNotes(event.target.value)} placeholder="Notas opcionales" />
+                      <div className="position-form-actions">
+                        <button type="button" disabled={assignmentPending} onClick={() => void finalizeCurrentAssignment()}>
+                          Finalizar asignacion
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="position-form">
+                      <select value={assignmentPositionId} onChange={(event) => setAssignmentPositionId(event.target.value)}>
+                        <option value="">Seleccione puesto activo</option>
+                        {availablePositions.map((position) => (
+                          <option key={position.id} value={position.id}>
+                            {position.name} {position.code ? `(${position.code})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <input type="date" value={assignmentStartDate} onChange={(event) => setAssignmentStartDate(event.target.value)} />
+                      <input value={assignmentReason} onChange={(event) => setAssignmentReason(event.target.value)} placeholder="Motivo opcional" />
+                      <textarea value={assignmentNotes} onChange={(event) => setAssignmentNotes(event.target.value)} placeholder="Notas opcionales" />
+                      <div className="position-form-actions">
+                        <button type="button" disabled={assignmentPending} onClick={() => void assignPosition()}>
+                          Asignar puesto
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </Modal>
               ) : null}
             </div>
