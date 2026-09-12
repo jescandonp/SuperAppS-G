@@ -21,6 +21,14 @@ public sealed class SchedulingRecommendationEngine
             throw new ArgumentException("Debe existir al menos un turno requerido.");
 
         var assignedCounts = new Dictionary<long, int>();
+        // Un required_shift con required_quantity>1 pide N cupos concurrentes del mismo turno; el
+        // descuento por AdditionalHoursPenalty en Score() normalmente basta para que cada cupo caiga
+        // en un candidato distinto, pero es un freno blando, no una exclusion. Cuando el pool real se
+        // reduce (p.ej. un candidato queda BLOCKED por exceder el tope semanal real), el mismo
+        // candidato puede volver a ganar el cupo hermano - la base lo rechaza
+        // (schedule_assignments_employee_unique) y antes tumbaba la generacion completa con un 500 en
+        // vez de dejar el cupo VACANTE con un motivo honesto. usedForShift hace la exclusion dura.
+        var usedForShift = new Dictionary<long, HashSet<long>>();
         var assignments = new List<ScheduleAssignmentRecommendation>();
         foreach (var shift in request.Shifts
                      .OrderBy(ParseDate)
@@ -28,6 +36,7 @@ public sealed class SchedulingRecommendationEngine
                      .ThenBy(x => x.PositionId)
                      .ThenBy(x => x.RequiredShiftId))
         {
+            var alreadyUsed = usedForShift.TryGetValue(shift.RequiredShiftId, out var used) ? used : null;
             var candidates = shift.Candidates ?? Array.Empty<EligibleCandidate>();
             var judged = candidates
                 .Select(candidate => new
@@ -37,7 +46,7 @@ public sealed class SchedulingRecommendationEngine
                 })
                 .ToArray();
             var ranked = judged
-                .Where(x => x.Verdict.Eligible)
+                .Where(x => x.Verdict.Eligible && (alreadyUsed is null || !alreadyUsed.Contains(x.Candidate.EmployeeId)))
                 .Select(x => new
                 {
                     x.Candidate,
@@ -57,13 +66,19 @@ public sealed class SchedulingRecommendationEngine
                     .Select(x => $"{x.Code}: {x.Message}")
                     .Distinct(StringComparer.Ordinal)
                     .ToArray();
+                var allEligibleAlreadyUsed = alreadyUsed is not null && judged.Any(x => x.Verdict.Eligible);
                 assignments.Add(new(shift.RequiredShiftId, shift.PositionId, shift.Date, shift.StartsAt,
-                    null, "VACANTE", null, reasons.Length == 0 ? new[] { "NO_ELIGIBLE_CANDIDATES" } : reasons));
+                    null, "VACANTE", null, reasons.Length > 0 ? reasons
+                        : allEligibleAlreadyUsed ? new[] { "ALREADY_ASSIGNED_SAME_SHIFT" } : new[] { "NO_ELIGIBLE_CANDIDATES" }));
                 continue;
             }
 
             assignedCounts[selected.Candidate.EmployeeId] =
                 assignedCounts.GetValueOrDefault(selected.Candidate.EmployeeId) + 1;
+            (usedForShift.TryGetValue(shift.RequiredShiftId, out var set)
+                ? set
+                : usedForShift[shift.RequiredShiftId] = new HashSet<long>())
+                .Add(selected.Candidate.EmployeeId);
             var explanation = new List<string>
             {
                 $"SCORE={selected.Score:0.####}",

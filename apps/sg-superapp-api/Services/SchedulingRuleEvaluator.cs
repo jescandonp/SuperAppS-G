@@ -180,13 +180,25 @@ public sealed class SchedulingRuleEvaluator
         var sanitizedFacts = SanitizeFacts(entry.RuleCode, facts);
         var scopeHash = ComputeScopeHash(profile, entry, projectCode, period, sanitizedFacts);
         if (!entry.Enabled)
+            // Un perfil declara explicita y auditablemente que esta regla queda fuera de su alcance -
+            // distinto de que la regla se evaluara y no supiera decidir (eso sigue siendo WARNING en
+            // cada archivo de regla individual). NOT_APPLICABLE nunca aprueba por omision: sigue siendo
+            // una fila real en scheduling_rule_evaluations, con su scopeHash y su version de perfil,
+            // auditable igual que cualquier otro veredicto - solo que este perfil, con esta version,
+            // declaro que esta regla no aplica aqui. Antes de este cambio (2026-09-03) una regla
+            // deshabilitada devolvia WARNING, que SchedulingEligibilityService.Project() proyecta
+            // siempre como bloqueante: "deshabilitar" una regla nunca dejaba de bloquear, solo cambiaba
+            // el texto del motivo - decision de disenio original documentada como salvaguarda contra
+            // "aprobar por omision". El cambio a NOT_APPLICABLE es la misma salvaguarda aplicada de
+            // otra forma: la decision de excluir la regla queda en el perfil versionado (auditable,
+            // reversible, requiere una nueva version activa), nunca en el llamador ni en un valor vacio.
             return new RuleEvaluation(
                 entry.RuleCode,
                 profile.Version,
-                SchedulingRuleOutcome.WARNING,
-                SchedulingRuleSeverity.ERROR,
-                entry.RuleCode.Replace("-", "_", StringComparison.Ordinal) + "_DISABLED_UNVERIFIED",
-                "La regla esta desactivada y no produce una decision de cumplimiento.",
+                SchedulingRuleOutcome.NOT_APPLICABLE,
+                SchedulingRuleSeverity.INFO,
+                entry.RuleCode.Replace("-", "_", StringComparison.Ordinal) + "_DISABLED_NOT_APPLICABLE",
+                "El perfil de reglas vigente declara esta regla fuera de alcance; no participa en la decision de elegibilidad.",
                 scopeHash,
                 entry.Parameters.Clone(),
                 sanitizedFacts,

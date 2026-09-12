@@ -472,9 +472,12 @@ INSERT INTO schedule_exceptions(schedule_version_id,assignment_id,exception_type
     $unmarked = Call 'Post' "$base/portal/scheduling/proposals/$unmarkedVersion/approve" $headers @{ expectedVersion=1 }
     Q ($unmarked.Status -eq 409 -and $unmarked.Content -match 'RULE_EVALUATION_MISSING') 'WF-T17 a profile-bound version is gated even when it is not marked simulated'
 
-    # A WARNING is what a disabled or unimplemented rule produces, and it accredits nothing. It is
-    # reported as its own state, not as a hard block, because the remedy is different.
-    & $psql -X -w -v ON_ERROR_STOP=1 -c "insert into scheduling_rule_evaluations(schedule_version_id,assignment_id,rule_profile_id,rule_code,outcome,severity,message_code,explanation,parameters_snapshot,facts_snapshot,scope_hash,exception_allowed,exception_status,correlation_id,evaluated_at,audit_actor) select sv.id,a.id,sv.rule_profile_id,'I9-R07','WARNING','ERROR','I9_R07_DISABLED_UNVERIFIED','Regla desactivada.',jsonb_build_object('changeInvalidatesApproval',true),jsonb_build_object('templateCode','T'),repeat('7',64),FALSE,'NOT_REQUIRED','i9-mvpwf-008',now(),'operaciones.sg' from schedule_versions sv join schedule_assignments a on a.schedule_version_id=sv.id where sv.id=$unevaluatedVersionId" | Out-Null
+    # A WARNING is what a genuinely unverifiable rule produces (e.g. no template/version the catalog
+    # recognises), and it accredits nothing. It is reported as its own state, not as a hard block,
+    # because the remedy is different. (2026-09-03: a *disabled* rule no longer produces WARNING - it
+    # produces NOT_APPLICABLE, which does not gate approve/publish on its own - so this fixture uses
+    # R07's own genuine "template unavailable" WARNING instead of the now-removed disabled-rule one.)
+    & $psql -X -w -v ON_ERROR_STOP=1 -c "insert into scheduling_rule_evaluations(schedule_version_id,assignment_id,rule_profile_id,rule_code,outcome,severity,message_code,explanation,parameters_snapshot,facts_snapshot,scope_hash,exception_allowed,exception_status,correlation_id,evaluated_at,audit_actor) select sv.id,a.id,sv.rule_profile_id,'I9-R07','WARNING','ERROR','I9_R07_TEMPLATE_UNAVAILABLE','No hay plantilla vigente.',jsonb_build_object('changeInvalidatesApproval',true),jsonb_build_object('templateCode','T'),repeat('7',64),FALSE,'NOT_REQUIRED','i9-mvpwf-008',now(),'operaciones.sg' from schedule_versions sv join schedule_assignments a on a.schedule_version_id=sv.id where sv.id=$unevaluatedVersionId" | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'could not add the unverified rule' }
     $warned = Call 'Post' "$base/portal/scheduling/proposals/$unevaluatedVersionId/approve" $headers @{ expectedVersion=1 }
     Q ($warned.Status -eq 409 -and $warned.Content -match 'RULE_UNVERIFIED') 'WF-T18 an unverified rule is refused as its own state'

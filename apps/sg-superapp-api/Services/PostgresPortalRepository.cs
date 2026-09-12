@@ -3,6 +3,7 @@ using NpgsqlTypes;
 using System.Text;
 using System.Text.Json;
 using System.Data;
+using System.Globalization;
 using Sg.SuperApp.Api.Configuration;
 using Sg.SuperApp.Api.Contracts.Auth;
 using Sg.SuperApp.Api.Contracts.Portal;
@@ -63,15 +64,28 @@ public sealed class PostgresPortalRepository
             ["NOTIFICATIONS"] = ("Notificaciones", "Bandeja shell de I1.", "Disponible"),
             ["IMPORTS"] = ("Cargas de Datos", "Historial y prevalidacion CSV inicial I2.", "Disponible"),
             ["SETTINGS"] = ("Configuracion", "Administracion base del piloto.", "Disponible"),
-            ["NOVEDADES"] = ("Novedades", "Proximamente / En diseno para incrementos futuros.", "Pendiente")
+            ["NOVEDADES"] = ("Novedades", "Proximamente / En diseno para incrementos futuros.", "Pendiente"),
+            ["SCHEDULING"] = ("Programacion de Turnos", "Generacion asistida y aprobacion de programacion I9.", "Disponible")
         };
 
     private readonly string _connectionString;
+    private readonly SchedulingRuleEvaluator _ruleEvaluator;
+    private readonly SchedulingRuleProfileRepository _ruleProfileRepository;
+    private readonly SchedulingRuleHttpRepository _ruleHttpRepository;
+    private readonly SchedulingEligibilityService _eligibilityService;
+    private readonly SchedulingRecommendationEngine _recommendationEngine;
 
-    public PostgresPortalRepository(IConfiguration configuration)
+    public PostgresPortalRepository(IConfiguration configuration, SchedulingRuleEvaluator ruleEvaluator,
+        SchedulingRuleProfileRepository ruleProfileRepository, SchedulingRuleHttpRepository ruleHttpRepository,
+        SchedulingEligibilityService eligibilityService, SchedulingRecommendationEngine recommendationEngine)
     {
         _connectionString = configuration.GetConnectionString("Postgres")
             ?? throw new InvalidOperationException("Connection string 'Postgres' not configured.");
+        _ruleEvaluator = ruleEvaluator;
+        _ruleProfileRepository = ruleProfileRepository;
+        _ruleHttpRepository = ruleHttpRepository;
+        _eligibilityService = eligibilityService;
+        _recommendationEngine = recommendationEngine;
     }
 
     public async Task<bool> CanConnectAsync(CancellationToken cancellationToken = default)
@@ -3184,8 +3198,396 @@ where t.status='ACTIVO' order by t.code,s.step_order", connection);
         long versionId;
         await using (var cmd = new NpgsqlCommand("insert into schedule_versions(schedule_id,version_number,status,source_snapshot,created_by) select @s,coalesce(max(version_number),0)+1,'PROPUESTA',jsonb_build_object('acceptedVacancy',@v),@a from schedule_versions where schedule_id=@s returning id", cn, tx))
         { cmd.Parameters.AddWithValue("s",scheduleId); cmd.Parameters.AddWithValue("v",acceptedVacancy); cmd.Parameters.AddWithValue("a",actor); versionId=(long)(await cmd.ExecuteScalarAsync(ct) ?? throw new InvalidOperationException("No fue posible crear la propuesta.")); }
-        await InsertAuditLogAsync(cn,tx,actorId,actor,"SCHEDULE_PROPOSAL_CREATED","SCHEDULE_VERSION",versionId.ToString(),"jsonb_build_object('acceptedVacancy',@vacancy)",c=>c.Parameters.AddWithValue("vacancy",acceptedVacancy),ct);
-        await tx.CommitAsync(ct); return (await GetScheduleVersionAsync(versionId,ct))!;
+        var expanded = await ExpandRequiredShiftsAsync(cn, tx, versionId, projectId, from, to, ct);
+        await InsertAuditLogAsync(cn,tx,actorId,actor,"SCHEDULE_PROPOSAL_CREATED","SCHEDULE_VERSION",versionId.ToString(),"jsonb_build_object('acceptedVacancy',@vacancy,'requiredShiftsGenerated',@shifts)",c=>{c.Parameters.AddWithValue("vacancy",acceptedVacancy);c.Parameters.AddWithValue("shifts",expanded);},ct);
+        await tx.CommitAsync(ct);
+        // M3+M4: se ejecuta despues de comprometer la transaccion, nunca dentro de ella.
+        // PersistEvaluationsAsync/PersistScheduleRecommendationAsync abren su propia conexion y exigen
+        // encontrar la version ya en estado PROPUESTA; llamarlos con la transaccion de creacion todavia
+        // abierta la dejaria invisible (aislamiento de Postgres entre conexiones) y cada intento
+        // fallaria con "La propuesta no acepta esta evaluacion o perfil de reglas."
+        await EvaluateCandidatesForRequiredShiftsAsync(versionId, projectId, from, to, actor, ct);
+        // Las metricas de la version (coverage_percent/vacancy_count) solo tienen sentido despues de
+        // que M4 haya escrito las asignaciones reales - antes de este punto no habia ninguna.
+        await using (var metricsConnection = new NpgsqlConnection(_connectionString))
+        {
+            await metricsConnection.OpenAsync(ct);
+            await using var metricsTx = await metricsConnection.BeginTransactionAsync(ct);
+            await RefreshScheduleMetricsAsync(metricsConnection, metricsTx, versionId, ct);
+            await metricsTx.CommitAsync(ct);
+        }
+        return (await GetScheduleVersionAsync(versionId,ct))!;
+    }
+
+    // M2: expande los turnos requeridos desde la cobertura configurada (position_coverage_rules),
+    // determinista sobre el periodo pedido. Ya no asigna ni deja un VACANTE placeholder aqui - eso lo
+    // decide M4 (EvaluateCandidatesForRequiredShiftsAsync), rankeando candidatos reales o dejando la
+    // vacante real con su motivo. Solo se expande la cobertura cuyo weekday_scope sea exactamente
+    // 'TODOS' (insensible a mayusculas/espacios); un ambito semanal parcial (solo entre semana, etc.)
+    // no tiene una convencion definida en ningun lugar de este codebase (ver
+    // UpsertCoverageRuleRequest, solo exige que el texto no este vacio) y esta deliberadamente fuera
+    // de este alcance en vez de adivinado.
+    private static async Task<int> ExpandRequiredShiftsAsync(
+        NpgsqlConnection cn, NpgsqlTransaction tx, long versionId, long projectId, DateOnly from, DateOnly to, CancellationToken ct)
+    {
+        const string sql = @"
+insert into required_shifts(schedule_version_id, position_id, shift_date, starts_at, ends_at, required_quantity, source_snapshot)
+select @versionId, pcr.position_id, d::date, pcr.starts_at, pcr.ends_at, pcr.required_quantity,
+       jsonb_build_object('fuente', 'position_coverage_rules', 'coverageRuleId', pcr.id, 'templateCode', st.code, 'templateVersion', st.version)
+from position_coverage_rules pcr
+join service_positions sp on sp.id = pcr.position_id
+join shift_templates st on st.id = pcr.template_id
+cross join generate_series(@from::date, @to::date, interval '1 day') as d
+where sp.project_id = @projectId
+  and sp.status = 'ACTIVO'
+  and pcr.status = 'ACTIVO'
+  and pcr.effective_from <= d::date
+  and (pcr.effective_to is null or pcr.effective_to >= d::date)
+  and upper(btrim(pcr.weekday_scope)) = 'TODOS'
+on conflict (schedule_version_id, position_id, shift_date, starts_at, ends_at) do nothing";
+        await using var cmd = new NpgsqlCommand(sql, cn, tx);
+        cmd.Parameters.AddWithValue("versionId", versionId);
+        cmd.Parameters.AddWithValue("projectId", projectId);
+        cmd.Parameters.AddWithValue("from", from);
+        cmd.Parameters.AddWithValue("to", to);
+        return await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    // M3: por cada turno requerido que M2 acaba de expandir, evalua a cada candidato vigente del puesto
+    // (employee_position_assignments) contra las siete reglas con hechos reales - nunca fabricados - y
+    // persiste el veredicto sin atarlo a ninguna asignacion (assignmentId=null). M4: con el mismo batch
+    // ya evaluado (nunca se reevalua) arma un EligibleCandidate real por candidato y, al terminar todos
+    // los turnos, rankea con SchedulingRecommendationEngine y persiste la asignacion real (o la vacante
+    // real con su motivo) via PersistScheduleRecommendationAsync - los mismos metodos ya probados en
+    // Verify-SgSuperAppI9MvpGeneration.ps1, aqui solo se les da entrada real. Si no hay perfil de reglas
+    // ACTIVE para el proyecto, no evalua ni asigna nada - un estado ya conocido en la interfaz
+    // (RuleProfileState "UNCONFIGURED"), no un error que deba tumbar la generacion completa. Costo
+    // aceptado: una conexion por evaluacion (mismo patron que PersistEvaluationsAsync ya usa); no es
+    // apto para produccion a gran escala, solo MVP_TEST.
+    private async Task EvaluateCandidatesForRequiredShiftsAsync(
+        long versionId, long projectId, DateOnly from, DateOnly to, string actor, CancellationToken ct)
+    {
+        await using var cn = new NpgsqlConnection(_connectionString);
+        await cn.OpenAsync(ct);
+
+        string projectCode;
+        await using (var cmd = new NpgsqlCommand("select code from service_projects where id=@id", cn))
+        { cmd.Parameters.AddWithValue("id", projectId); projectCode = (string)(await cmd.ExecuteScalarAsync(ct))!; }
+
+        SchedulingRuleProfile profile;
+        try { profile = await _ruleProfileRepository.LoadActiveAsync(projectCode, from, SchedulingEnvironmentScope.MVP_TEST, ct); }
+        catch (InvalidOperationException)
+        {
+            // Sin perfil de reglas ACTIVE no hay nada que evaluar ni rankear - pero M2 ya garantizaba
+            // que cada turno requerido queda visible en la propuesta. Sin este insert directo, esa
+            // garantia se rompe (los required_shifts existirian sin ninguna fila en schedule_assignments,
+            // invisibles para la UI). Se deja una vacante real con un motivo honesto, nunca se inventa
+            // un veredicto de reglas que no existe.
+            await using var cmd = new NpgsqlCommand(@"
+insert into schedule_assignments(schedule_version_id,required_shift_id,employee_id,status,score,reasons)
+select @versionId, rs.id, null, 'VACANTE', null, '[""RULE_PROFILE_UNCONFIGURED""]'::jsonb
+from required_shifts rs cross join generate_series(1, rs.required_quantity)
+where rs.schedule_version_id=@versionId", cn);
+            cmd.Parameters.AddWithValue("versionId", versionId);
+            await cmd.ExecuteNonQueryAsync(ct);
+            return;
+        }
+
+        var shifts = new List<(long RequiredShiftId, long PositionId, DateOnly Date, TimeOnly StartsAt, TimeOnly EndsAt, string? TemplateCode, int? TemplateVersion, DateOnly? AnchorDate, int RequiredQuantity)>();
+        await using (var cmd = new NpgsqlCommand(@"
+select rs.id, rs.position_id, rs.shift_date, rs.starts_at, rs.ends_at,
+       rs.source_snapshot->>'templateCode', (rs.source_snapshot->>'templateVersion')::int, pcr.effective_from,
+       rs.required_quantity
+from required_shifts rs
+left join position_coverage_rules pcr on pcr.id = (rs.source_snapshot->>'coverageRuleId')::bigint
+where rs.schedule_version_id=@id", cn))
+        {
+            cmd.Parameters.AddWithValue("id", versionId);
+            await using var rd = await cmd.ExecuteReaderAsync(ct);
+            while (await rd.ReadAsync(ct))
+                shifts.Add((rd.GetInt64(0), rd.GetInt64(1), rd.GetFieldValue<DateOnly>(2), rd.GetFieldValue<TimeOnly>(3), rd.GetFieldValue<TimeOnly>(4),
+                    rd.IsDBNull(5) ? null : rd.GetString(5), rd.IsDBNull(6) ? null : rd.GetInt32(6),
+                    rd.IsDBNull(7) ? null : rd.GetFieldValue<DateOnly>(7), rd.GetInt32(8)));
+        }
+
+        if (shifts.Count == 0) return;
+
+        var templateSequences = new Dictionary<string, IReadOnlyList<string>>();
+        async Task<IReadOnlyList<string>> LoadSequenceAsync(string templateCode, int templateVersion)
+        {
+            var key = $"{templateCode}|{templateVersion}";
+            if (templateSequences.TryGetValue(key, out var cached)) return cached;
+            var steps = new List<string>();
+            await using var cmd = new NpgsqlCommand(@"select sts.shift_code from shift_template_steps sts
+join shift_templates st on st.id=sts.template_id where st.code=@code and st.version=@version order by sts.step_order", cn);
+            cmd.Parameters.AddWithValue("code", templateCode); cmd.Parameters.AddWithValue("version", templateVersion);
+            await using var rd = await cmd.ExecuteReaderAsync(ct);
+            while (await rd.ReadAsync(ct)) steps.Add(rd.GetString(0));
+            templateSequences[key] = steps;
+            return steps;
+        }
+
+        // "Vivo" usa el mismo criterio que R03/R05 ya aplican en BuildCandidateFactsAsync: cualquier
+        // version que no este CANCELADA ni REEMPLAZADA cuenta, sin importar si es borrador o publicada.
+        async Task<bool> WorkedPreviousCalendarDayAsync(long employeeId, DateOnly date)
+        {
+            await using var cmd = new NpgsqlCommand(@"
+select count(*) from schedule_assignments sa
+join required_shifts rs on rs.id = sa.required_shift_id
+join schedule_versions sv on sv.id = sa.schedule_version_id
+where sa.employee_id=@employeeId and sa.status='ASIGNADA' and sv.status not in ('CANCELADA','REEMPLAZADA')
+  and rs.shift_date = @previousDate", cn);
+            cmd.Parameters.AddWithValue("employeeId", employeeId);
+            cmd.Parameters.AddWithValue("previousDate", date.AddDays(-1));
+            return (long)(await cmd.ExecuteScalarAsync(ct))! > 0;
+        }
+
+        async Task<int> CountAssignedShiftsInPeriodAsync(long employeeId)
+        {
+            await using var cmd = new NpgsqlCommand(@"
+select count(*) from schedule_assignments sa
+join required_shifts rs on rs.id = sa.required_shift_id
+join schedule_versions sv on sv.id = sa.schedule_version_id
+where sa.employee_id=@employeeId and sa.status='ASIGNADA' and sv.status not in ('CANCELADA','REEMPLAZADA')
+  and rs.shift_date >= @from and rs.shift_date <= @to", cn);
+            cmd.Parameters.AddWithValue("employeeId", employeeId);
+            cmd.Parameters.AddWithValue("from", from);
+            cmd.Parameters.AddWithValue("to", to);
+            return (int)(long)(await cmd.ExecuteScalarAsync(ct))!;
+        }
+
+        var projector = new ShiftCycleProjector();
+        // El motor rankea sobre veredictos sin atar a ninguna asignacion (M3: la asignacion real todavia
+        // no existe cuando se evalua). Una vez el motor elige un ganador, ese mismo veredicto ya
+        // computado (nunca uno recalculado) se vuelve a persistir mas abajo, esta vez atado al id real
+        // de schedule_assignments - sin esto, aprobar o publicar la version fallaba con
+        // RULE_ASSIGNMENT_UNEVALUATED porque el gate exige un veredicto ligado a la asignacion real, y
+        // ninguno lo estaba nunca.
+        var batchesByShiftEmployee = new Dictionary<(long RequiredShiftId, long EmployeeId), SchedulingRuleEvaluationBatch>();
+        var weights = new SchedulingWeights(1m, 1m, 0.1m, 0.1m, 5m, 0.1m);
+        // Generar y persistir un dia a la vez -no todo el periodo en un solo lote al final- es lo que
+        // permite que BuildCandidateFactsAsync (dailyHours/weeklyHours/rest) y
+        // WorkedPreviousCalendarDayAsync/CountAssignedShiftsInPeriodAsync (continuidad/equidad) vean de
+        // verdad lo que esta misma generacion ya decidio en dias anteriores del mismo periodo: esas
+        // consultas siempre leyeron schedule_assignments ya persistidas, pero antes de este cambio nada
+        // de la corrida en curso se persistia hasta el final (un solo Generate()+Persist para los 30
+        // dias), asi que para cualquier periodo nuevo (sin version previa) esos hechos siempre volvian en
+        // cero sin importar cuantos dias consecutivos ya se hubieran asignado dentro de la misma corrida.
+        // Hallazgo real (2026-09-06): sobre el piloto real de 30 dias, un sitio con exactamente tantos
+        // guardas como cupos concurrentes por dia (GRATAMIRA-II, 4 guardas para 2+2 cupos) terminaba con
+        // los 4 trabajando el mes completo sin ningun descanso, y I9-R01 nunca escalaba a BLOCKED
+        // (ABSOLUTE_MAX_EXCEEDED) porque weeklyHours siempre valia 12 -las horas del propio turno, nunca
+        // acumuladas- sin importar cuantos dias seguidos ya llevara trabajados esa misma persona.
+        foreach (var shiftsForDate in shifts.GroupBy(s => s.Date).OrderBy(g => g.Key))
+        {
+            var shiftInputs = new List<RequiredShiftRecommendationInput>();
+            foreach (var shift in shiftsForDate)
+            {
+            var candidates = new List<long>();
+            await using (var cmd = new NpgsqlCommand(@"select employee_id from employee_position_assignments
+where position_id=@position and status='VIGENTE' and start_date<=@date and (end_date is null or end_date>=@date)", cn))
+            {
+                cmd.Parameters.AddWithValue("position", shift.PositionId); cmd.Parameters.AddWithValue("date", shift.Date);
+                await using var rd = await cmd.ExecuteReaderAsync(ct);
+                while (await rd.ReadAsync(ct)) candidates.Add(rd.GetInt64(0));
+            }
+
+            // Un turno sin candidatos sigue en la lista con Candidates=[] para que el motor lo marque
+            // VACANTE/NO_ELIGIBLE_CANDIDATES en vez de desaparecer silenciosamente del ranking.
+            var eligibleCandidates = new List<EligibleCandidate>();
+            if (candidates.Count > 0)
+            {
+                var positionCode = await ResolvePositionCodeAsync(cn, shift.PositionId, ct);
+                var proposedStart = shift.Date.ToDateTime(shift.StartsAt);
+                var proposedEnd = shift.Date.ToDateTime(shift.EndsAt);
+                if (shift.EndsAt <= shift.StartsAt) proposedEnd = proposedEnd.AddDays(1);
+
+                string? expectedShiftCode = null;
+                if (shift.TemplateCode is not null && shift.TemplateVersion is not null && shift.AnchorDate is not null)
+                {
+                    var sequence = await LoadSequenceAsync(shift.TemplateCode, shift.TemplateVersion.Value);
+                    if (sequence.Count > 0)
+                    {
+                        var projected = projector.Project(new ShiftCycleRequest(sequence, shift.AnchorDate.Value, shift.Date, shift.Date, 0));
+                        expectedShiftCode = projected.Count > 0 ? projected[0].ShiftCode : null;
+                    }
+                }
+                var proposedShiftCode = DeriveShiftCode(shift.StartsAt, shift.EndsAt);
+
+                foreach (var employeeId in candidates)
+                {
+                    var facts = await BuildCandidateFactsAsync(cn, employeeId, positionCode, shift.Date, proposedStart, proposedEnd,
+                        shift.TemplateCode, shift.TemplateVersion, shift.AnchorDate, expectedShiftCode, proposedShiftCode, ct);
+                    var batch = _ruleEvaluator.Evaluate(profile, projectCode, from, facts);
+                    await _ruleHttpRepository.PersistEvaluationsAsync(versionId, null, projectCode, batch, actor, ct);
+                    batchesByShiftEmployee[(shift.RequiredShiftId, employeeId)] = batch;
+
+                    var references = SchedulingEligibilityService.ToReferences(batch);
+                    var eligibility = _eligibilityService.Evaluate(new GuardSchedulingFacts(
+                        true, batch.RuleProfileId, batch.ProfileVersion, batch.Simulated, references, null));
+
+                    var continuity = await WorkedPreviousCalendarDayAsync(employeeId, shift.Date) ? 1m : 0m;
+                    var assignedInPeriod = await CountAssignedShiftsInPeriodAsync(employeeId);
+                    var equity = 1m / (1m + assignedInPeriod);
+
+                    // AdditionalHours/DistancePenalty/PublishedScheduleChange: sin fuente real hoy (no
+                    // hay dato de ubicacion ni de publicacion previa en el esquema) - se dejan en 0,
+                    // hueco de datos documentado, no un valor inventado que finja precision.
+                    eligibleCandidates.Add(new EligibleCandidate(
+                        employeeId, eligibility, continuity, equity, 0m, 0m, 0m, references));
+                }
+            }
+
+            // Un required_shift con required_quantity>1 pide N cupos concurrentes (mismo puesto y
+            // horario) - el motor no modela "cupos" como concepto propio, asi que se le pasan N
+            // RequiredShiftRecommendationInput independientes con el mismo RequiredShiftId y el mismo
+            // pool de candidatos ya evaluado una sola vez. El unico freno contra que un mismo candidato
+            // gane dos cupos hermanos es el mismo que ya usa el motor entre turnos distintos
+            // (assignedCounts penaliza AdditionalHours por cada asignacion previa, no la prohibe) - una
+            // limitacion heredada del motor ya existente y probado (Verify-SgSuperAppI9MvpGeneration.ps1
+            // nunca ejercito quantity>1), no algo que M4 podia resolver sin rediseñar el motor.
+            for (var slot = 0; slot < shift.RequiredQuantity; slot++)
+                shiftInputs.Add(new RequiredShiftRecommendationInput(
+                    shift.RequiredShiftId, shift.PositionId,
+                    shift.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    shift.StartsAt.ToString("HH:mm:ss", CultureInfo.InvariantCulture),
+                    eligibleCandidates));
+            }
+
+            if (shiftInputs.Count == 0) continue;
+            // Idempotency key por dia (no por version): cada dia es su propia corrida de
+            // schedule_generation_runs, persistida antes de evaluar el dia siguiente.
+            var dayKey = shiftsForDate.Key.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
+            var request = new ScheduleRecommendationRequest(
+                versionId, $"generation-{versionId}-{dayKey}", weights, shiftInputs);
+            var result = _recommendationEngine.Generate(request);
+            await PersistScheduleRecommendationAsync(request, result, ct);
+        }
+
+        // Atar el veredicto ya computado del ganador a la asignacion real que se acaba de crear. Solo
+        // ASIGNADA lo necesita: una VACANTE no tiene un candidato cuyo cumplimiento haya que certificar,
+        // sus motivos reales ya quedan en schedule_assignments.reasons (union de lo que bloqueo a cada
+        // candidato juzgado), no en un veredicto atado.
+        var asignadas = new List<(long AssignmentId, long RequiredShiftId, long EmployeeId)>();
+        await using (var cmd = new NpgsqlCommand(
+            "select id, required_shift_id, employee_id from schedule_assignments where schedule_version_id=@v and status='ASIGNADA'", cn))
+        {
+            cmd.Parameters.AddWithValue("v", versionId);
+            await using var rd = await cmd.ExecuteReaderAsync(ct);
+            while (await rd.ReadAsync(ct)) asignadas.Add((rd.GetInt64(0), rd.GetInt64(1), rd.GetInt64(2)));
+        }
+        foreach (var (assignmentId, requiredShiftId, employeeId) in asignadas)
+            if (batchesByShiftEmployee.TryGetValue((requiredShiftId, employeeId), out var winningBatch))
+                await _ruleHttpRepository.PersistEvaluationsAsync(versionId, assignmentId, projectCode, winningBatch, actor, ct);
+    }
+
+    private static async Task<string> ResolvePositionCodeAsync(NpgsqlConnection cn, long positionId, CancellationToken ct)
+    {
+        await using var cmd = new NpgsqlCommand("select code from service_positions where id=@id", cn);
+        cmd.Parameters.AddWithValue("id", positionId);
+        var code = (string?)await cmd.ExecuteScalarAsync(ct);
+        return string.IsNullOrWhiteSpace(code) ? $"POS-{positionId}" : code;
+    }
+
+    // Hechos de un candidato para un turno requerido. R01/R02/R03/R05/R07 se calculan de datos reales ya
+    // persistidos en I9; R04/R06 llegan con arreglos vacios a proposito - no existe hoy una integracion
+    // real con las novedades de I2/I6 ni los requisitos de puesto de I5 que produzca el catalogo que esas
+    // reglas exigen, y un arreglo vacio produce el veredicto honesto (_UNVERIFIED/_MISSING), nunca uno
+    // fabricado. "writtenAgreement" se envia true: Legal confirmo (2026-09-03) que es una clausula
+    // estandar del contrato de todo guarda, no un dato pendiente de verificar por candidato.
+    private static async Task<JsonElement> BuildCandidateFactsAsync(
+        NpgsqlConnection cn, long employeeId, string destinationPositionCode, DateOnly shiftDate,
+        DateTime proposedStart, DateTime proposedEnd, string? templateCode, int? templateVersion,
+        DateOnly? anchorDate, string? expectedShiftCode, string proposedShiftCode, CancellationToken ct)
+    {
+        var rows = new List<(string PositionCode, DateOnly Date, TimeOnly Starts, TimeOnly Ends, string VersionStatus)>();
+        await using (var cmd = new NpgsqlCommand(@"
+select coalesce(sp.code, 'POS-' || sp.id), rs.shift_date, rs.starts_at, rs.ends_at, sv.status
+from schedule_assignments sa
+join required_shifts rs on rs.id = sa.required_shift_id
+join schedule_versions sv on sv.id = sa.schedule_version_id
+join service_positions sp on sp.id = rs.position_id
+where sa.employee_id = @employeeId and sa.status = 'ASIGNADA' and sv.status not in ('CANCELADA','REEMPLAZADA')", cn))
+        {
+            cmd.Parameters.AddWithValue("employeeId", employeeId);
+            await using var rd = await cmd.ExecuteReaderAsync(ct);
+            while (await rd.ReadAsync(ct))
+                rows.Add((rd.GetString(0), rd.GetFieldValue<DateOnly>(1), rd.GetFieldValue<TimeOnly>(2), rd.GetFieldValue<TimeOnly>(3), rd.GetString(4)));
+        }
+
+        DateTime IntervalStart((string PositionCode, DateOnly Date, TimeOnly Starts, TimeOnly Ends, string VersionStatus) r) => r.Date.ToDateTime(r.Starts);
+        DateTime IntervalEnd((string PositionCode, DateOnly Date, TimeOnly Starts, TimeOnly Ends, string VersionStatus) r)
+        { var end = r.Date.ToDateTime(r.Ends); return r.Ends <= r.Starts ? end.AddDays(1) : end; }
+
+        var intervals = rows.Select(r => new { Row = r, Start = IntervalStart(r), End = IntervalEnd(r) }).ToList();
+        var previous = intervals.Where(i => i.End <= proposedStart).OrderByDescending(i => i.End).FirstOrDefault();
+
+        var weekOffset = ((int)shiftDate.DayOfWeek + 6) % 7;
+        var weekStart = shiftDate.AddDays(-weekOffset);
+        var weekEnd = weekStart.AddDays(7);
+        var proposedHours = (decimal)(proposedEnd - proposedStart).TotalHours;
+        var dailyHours = proposedHours + (decimal)intervals.Where(i => i.Row.Date == shiftDate).Sum(i => (i.End - i.Start).TotalHours);
+        var weeklyHours = proposedHours + (decimal)intervals.Where(i => i.Row.Date >= weekStart && i.Row.Date < weekEnd).Sum(i => (i.End - i.Start).TotalHours);
+
+        var employeeCode = employeeId.ToString(CultureInfo.InvariantCulture);
+        var noAgreementAnchor = proposedStart.AddDays(-30);
+        // SchedulingTemplateDeviationRule.TryReadCells exige {employeeId,date,cell,shiftCode} por celda
+        // - no {cell,expected}/{cell,proposed} como se enviaba antes. Ese desajuste de forma hacia que
+        // I9-R07 saliera BLOCKED por INVALID_INPUT siempre que si habia plantilla real, nunca llegaba a
+        // comparar de verdad la secuencia esperada contra la propuesta.
+        var shiftDateCode = shiftDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var expectedCells = expectedShiftCode is null ? Array.Empty<object>() : new object[]
+        { new { employeeId = employeeCode, date = shiftDateCode, cell = "DEFAULT", shiftCode = expectedShiftCode } };
+        var proposedCells = expectedShiftCode is null ? Array.Empty<object>() : new object[]
+        { new { employeeId = employeeCode, date = shiftDateCode, cell = "DEFAULT", shiftCode = proposedShiftCode } };
+
+        // Los evaluadores de reglas exigen timestamps ISO-8601 con offset explicito (regex
+        // ^...(?:Z|[+-]\d{2}:\d{2})$ en cada archivo de regla). Los timestamps calculados aqui son
+        // ingenuos (fecha+hora sin zona); se fija -05:00 (Colombia) como convencion, igual que ya usan
+        // los fixtures de prueba existentes (scripts/dev/Verify-SgSuperAppI9MvpIntegration.ps1).
+        static string FormatTimestamp(DateTime value) =>
+            new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Unspecified), TimeSpan.FromHours(-5))
+                .ToString("yyyy-MM-ddTHH:mm:sszzz", CultureInfo.InvariantCulture);
+
+        var facts = new
+        {
+            assignmentId = $"CAND-{employeeCode}",
+            scheduleVersionId = "GENERATION",
+            employeeId = employeeCode,
+            shiftId = $"REQ-{shiftDate:yyyyMMdd}-{destinationPositionCode}",
+            dailyHours,
+            weeklyHours,
+            // 2026-09-03: Legal confirmo que el acuerdo escrito para superar la jornada ordinaria queda
+            // otorgado por defecto al firmar el contrato de todo guarda - no es un dato por verificar
+            // caso a caso, es una clausula estandar. Antes se enviaba false por no tener ninguna fuente
+            // real; ahora true es la fuente real confirmada, no un valor asumido para desbloquear nada.
+            writtenAgreement = true,
+            previousShiftEnd = FormatTimestamp(previous?.End ?? noAgreementAnchor),
+            proposedShiftStart = FormatTimestamp(proposedStart),
+            proposedShiftEnd = FormatTimestamp(proposedEnd),
+            positionCode = destinationPositionCode,
+            shiftStart = FormatTimestamp(proposedStart),
+            shiftEnd = FormatTimestamp(proposedEnd),
+            existingIntervals = intervals.Select(i => new
+            {
+                employeeId = employeeCode,
+                status = i.Row.VersionStatus is "APROBADA" or "PUBLICADA" ? "APPROVED" : "DRAFT",
+                start = FormatTimestamp(i.Start),
+                end = FormatTimestamp(i.End)
+            }).ToArray(),
+            previousAssignmentId = previous is null ? $"NONE-{employeeCode}" : $"PREV-{employeeCode}",
+            originPositionCode = previous?.Row.PositionCode ?? destinationPositionCode,
+            destinationPositionCode,
+            previousShiftStart = FormatTimestamp(previous is null ? noAgreementAnchor.AddHours(-8) : previous.Start),
+            noveltyEvaluations = Array.Empty<object>(),
+            requirementEvaluations = Array.Empty<object>(),
+            templateCode = templateCode ?? "SIN-PLANTILLA",
+            templateVersion = (templateVersion ?? 0).ToString(CultureInfo.InvariantCulture),
+            anchorDate = (anchorDate ?? shiftDate).ToString("yyyy-MM-dd"),
+            expectedCells,
+            proposedCells
+        };
+        return JsonDocument.Parse(JsonSerializer.Serialize(facts)).RootElement;
     }
 
     public Task<ScheduleWorkflowResponse?> GetScheduleVersionAsync(long id, CancellationToken ct=default) => QueryScheduleAsync("sv.id=@id",id,null,ct);
@@ -3311,15 +3713,36 @@ where exists(select 1 from schedule_versions sv join scheduling_rule_profiles rp
     // CreateScheduleExceptionAsync deliberately carves it out: its evidence is validated by Talento
     // Humano rather than by the requesting actor, so the flag is never set on that path. Without the
     // carve-out an approved R06 decision could never satisfy the gate.
+    //
+    // Fourth (2026-09-05, added once real batch generation started producing hundreds of these): an
+    // evaluation with no assignment_id is pre-decision scratch data from ranking a shift's candidate
+    // pool, not a verdict about anyone's real assignment - EvaluateCandidatesForRequiredShiftsAsync
+    // persists one for every candidate considered, win or lose, so the engine can judge eligibility
+    // before any assignment exists. `current` (which feeds `pending`/`decided`/`unevaluated`) drops
+    // these entirely: grouping them the way bound evaluations are grouped would collapse an entire
+    // version's worth of them - every rejected candidate, across every shift - into one arbitrary row
+    // per rule, and a pending EXCEPTION_REQUIRED among them would demand a decision for guards nobody
+    // assigned. Only a verdict re-persisted bound to the real schedule_assignments.id it belongs to
+    // (which the generation flow does immediately after picking a winner) satisfies `current` here.
+    // The standalone `blocked` count deliberately keeps reading every row regardless of binding: a
+    // version-level BLOCKED with no assignment_id is a real, already-tested case (a block that
+    // predates any assignment existing at all) and must still condemn the version - that is the
+    // existing fail-closed behavior the third point above describes, unrelated to the scratch rows
+    // this point is about. `total` (the RULE_EVALUATION_MISSING check) reads the same unrestricted
+    // way, for the identical reason: a version can be blocked before it has a single assignment, and
+    // that must not read as "nothing was ever evaluated". VACANTE rows never get a bound verdict
+    // either way - there is no selected candidate whose compliance needs certifying - so
+    // `unevaluated` only requires one of ASIGNADA rows; a vacancy's real reasons already live in
+    // schedule_assignments.reasons, not a bound verdict.
     private static async Task<SchedulingTransitionEvidence> RequireEveryRuleDecidedAsync(
         NpgsqlConnection cn,NpgsqlTransaction tx,long versionId,CancellationToken ct)
     {
         const string sql=@"with current as (
-  select distinct on (coalesce(e.assignment_id,0),e.rule_code)
+  select distinct on (e.assignment_id,e.rule_code)
          e.id,e.assignment_id,e.rule_code,e.scope_hash,e.outcome,e.exception_allowed,e.evaluated_at
   from scheduling_rule_evaluations e
-  where e.schedule_version_id=@version
-  order by coalesce(e.assignment_id,0),e.rule_code,e.evaluated_at desc,e.id desc),
+  where e.schedule_version_id=@version and e.assignment_id is not null
+  order by e.assignment_id,e.rule_code,e.evaluated_at desc,e.id desc),
 decided as (
   select c.id from current c
   where c.outcome='EXCEPTION_REQUIRED' and (c.exception_allowed or c.rule_code='I9-R06') and exists(
@@ -3327,7 +3750,7 @@ decided as (
     where x.evaluation_id=c.id and x.rule_code=c.rule_code and x.scope_hash=c.scope_hash
       and x.decision='APPROVED'))
 select sv.simulated,coalesce(sv.rule_profile_id,0),coalesce(sv.rule_profile_version,0),
-(select count(*) from current),
+(select count(*) from scheduling_rule_evaluations e3 where e3.schedule_version_id=sv.id),
 (select count(*) from current c join schedule_assignments a on a.id=c.assignment_id
    where a.updated_at>c.evaluated_at),
 (select count(*) from scheduling_rule_evaluations b
@@ -3337,7 +3760,7 @@ select sv.simulated,coalesce(sv.rule_profile_id,0),coalesce(sv.rule_profile_vers
 (select count(*) from current c where c.outcome='WARNING'),
 (select count(*) from current c where c.outcome='EXCEPTION_REQUIRED' and c.id not in(select id from decided)),
 (select count(*) from decided),
-(select count(*) from schedule_assignments a where a.schedule_version_id=sv.id
+(select count(*) from schedule_assignments a where a.schedule_version_id=sv.id and a.status='ASIGNADA'
    and not exists(select 1 from current c where c.assignment_id=a.id))
 from schedule_versions sv where sv.id=@version";
         bool simulated; long profileId,profileVersion,total,superseded,blocked,unverified,pending,decided,unevaluated;
@@ -3422,8 +3845,85 @@ where x.schedule_version_id=@version and e.assignment_id=@assignment and a.updat
     { await using var cmd=new NpgsqlCommand("update schedule_versions sv set vacancy_count=(select count(*) from schedule_assignments where schedule_version_id=sv.id and status='VACANTE'),exception_count=(select count(*) from schedule_exceptions x where x.schedule_version_id=sv.id and not "+SupersededDecisionPredicate+"),coverage_percent=coalesce((select round(100.0*count(*) filter(where status='ASIGNADA')/nullif(count(*),0),2) from schedule_assignments where schedule_version_id=sv.id),0) where sv.id=@id",cn,tx);cmd.Parameters.AddWithValue("id",id);await cmd.ExecuteNonQueryAsync(ct); }
 
     private async Task<ScheduleWorkflowResponse?> QueryScheduleAsync(string filter,long id,DateOnly? period,CancellationToken ct)
-    { await using var cn=new NpgsqlConnection(_connectionString);await cn.OpenAsync(ct);await using var cmd=new NpgsqlCommand($"select sv.id,sv.schedule_id,s.project_id,sv.version_number,sv.status,s.period_start,s.period_end,sv.coverage_percent,sv.vacancy_count,sv.exception_count,coalesce((sv.source_snapshot->>'acceptedVacancy')::boolean,false),sv.created_by,sv.approved_by,sv.published_by from schedule_versions sv join schedules s on s.id=sv.schedule_id where {filter}",cn);cmd.Parameters.AddWithValue("id",id);if(period.HasValue)cmd.Parameters.AddWithValue("period",period.Value);await using var rd=await cmd.ExecuteReaderAsync(ct);return await rd.ReadAsync(ct)?ReadScheduleWorkflow(rd):null; }
-    private static ScheduleWorkflowResponse ReadScheduleWorkflow(NpgsqlDataReader r){var created=r.GetString(11);var approved=r.IsDBNull(12)?null:r.GetString(12);var published=r.IsDBNull(13)?null:r.GetString(13);return new(r.GetInt64(0),r.GetInt64(1),r.GetInt64(2),r.GetInt32(3),r.GetString(4),r.GetFieldValue<DateOnly>(5).ToString("yyyy-MM-dd"),r.GetFieldValue<DateOnly>(6).ToString("yyyy-MM-dd"),r.GetDecimal(7),r.GetInt32(8),r.GetInt32(9),r.GetBoolean(10),created,approved,published,published is not null&&created==approved&&approved==published);}
+    {
+        await using var cn=new NpgsqlConnection(_connectionString);await cn.OpenAsync(ct);
+        await using var cmd=new NpgsqlCommand($"select sv.id,sv.schedule_id,s.project_id,sv.version_number,sv.status,s.period_start,s.period_end,sv.coverage_percent,sv.vacancy_count,sv.exception_count,coalesce((sv.source_snapshot->>'acceptedVacancy')::boolean,false),sv.created_by,sv.approved_by,sv.published_by from schedule_versions sv join schedules s on s.id=sv.schedule_id where {filter}",cn);
+        cmd.Parameters.AddWithValue("id",id);if(period.HasValue)cmd.Parameters.AddWithValue("period",period.Value);
+        ScheduleWorkflowResponse? workflow;
+        await using (var rd=await cmd.ExecuteReaderAsync(ct)) { workflow = await rd.ReadAsync(ct) ? ReadScheduleWorkflow(rd) : null; }
+        if (workflow is null) return null;
+        var assignments = await LoadScheduleAssignmentsAsync(cn, workflow.VersionId, ct);
+        var exceptions = await LoadScheduleExceptionsAsync(cn, workflow.VersionId, ct);
+        return workflow with { Assignments = assignments, Exceptions = exceptions };
+    }
+    private static ScheduleWorkflowResponse ReadScheduleWorkflow(NpgsqlDataReader r){var created=r.GetString(11);var approved=r.IsDBNull(12)?null:r.GetString(12);var published=r.IsDBNull(13)?null:r.GetString(13);return new(r.GetInt64(0),r.GetInt64(1),r.GetInt64(2),r.GetInt32(3),r.GetString(4),r.GetFieldValue<DateOnly>(5).ToString("yyyy-MM-dd"),r.GetFieldValue<DateOnly>(6).ToString("yyyy-MM-dd"),r.GetDecimal(7),r.GetInt32(8),r.GetInt32(9),r.GetBoolean(10),created,approved,published,published is not null&&created==approved&&approved==published,Array.Empty<ScheduleAssignmentResponse>(),Array.Empty<ScheduleExceptionResponse>());}
+
+    // A required shift's D/N label is a display convenience, not a legal threshold: it just tells the
+    // reader which side of midnight the shift starts on, the same convention the pilot's own fixtures
+    // use (08:00-20:00 for D, 20:00-08:00 for N). No rule or export path in this codebase derives it
+    // today, so this is the first place that needs to, and it must never be confused with a rule verdict.
+    private static string DeriveShiftCode(TimeOnly startsAt, TimeOnly endsAt) => startsAt < endsAt ? "D" : "N";
+
+    private static async Task<IReadOnlyList<ScheduleAssignmentResponse>> LoadScheduleAssignmentsAsync(NpgsqlConnection cn, long versionId, CancellationToken ct)
+    {
+        const string sql = @"select sa.id, rs.shift_date, rs.starts_at, rs.ends_at, rs.position_id, sa.employee_id, sa.status, sa.score, sa.reasons, e.full_name
+from schedule_assignments sa join required_shifts rs on rs.id = sa.required_shift_id
+left join employees e on e.id = sa.employee_id
+where sa.schedule_version_id = @id order by rs.shift_date, rs.starts_at, sa.employee_id";
+        await using var cmd = new NpgsqlCommand(sql, cn); cmd.Parameters.AddWithValue("id", versionId);
+        var results = new List<ScheduleAssignmentResponse>();
+        await using var rd = await cmd.ExecuteReaderAsync(ct);
+        while (await rd.ReadAsync(ct))
+        {
+            var startsAt = rd.GetFieldValue<TimeOnly>(2); var endsAt = rd.GetFieldValue<TimeOnly>(3);
+            results.Add(new ScheduleAssignmentResponse(
+                rd.GetInt64(0), rd.GetFieldValue<DateOnly>(1).ToString("yyyy-MM-dd"),
+                startsAt.ToString("HH:mm"), endsAt.ToString("HH:mm"), rd.GetInt64(4),
+                rd.IsDBNull(5) ? null : rd.GetInt64(5), rd.IsDBNull(9) ? null : rd.GetString(9),
+                DeriveShiftCode(startsAt, endsAt), rd.GetString(6),
+                rd.IsDBNull(7) ? null : rd.GetDecimal(7), ParseReasons(rd.GetString(8))));
+        }
+        return results;
+    }
+
+    // schedule_assignments.reasons has only ever been written as a JSON array of plain explanation
+    // strings (SchedulingRecommendationEngine.Generate() and every seed script agree on that shape).
+    // The frontend contract wants {code,severity,message}. Rather than rewrite the write path, this
+    // wraps a bare string as an informational reason; an already-structured object passes through.
+    private static IReadOnlyList<ScheduleReasonResponse> ParseReasons(string reasonsJson)
+    {
+        using var document = JsonDocument.Parse(reasonsJson);
+        var results = new List<ScheduleReasonResponse>();
+        foreach (var item in document.RootElement.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.String)
+                results.Add(new ScheduleReasonResponse("", "INFORMATIVA", item.GetString() ?? ""));
+            else if (item.ValueKind == JsonValueKind.Object)
+                results.Add(new ScheduleReasonResponse(
+                    item.TryGetProperty("code", out var code) ? code.GetString() ?? "" : "",
+                    item.TryGetProperty("severity", out var severity) ? severity.GetString() ?? "INFORMATIVA" : "INFORMATIVA",
+                    item.TryGetProperty("message", out var message) ? message.GetString() ?? "" : ""));
+        }
+        return results;
+    }
+
+    private static async Task<IReadOnlyList<ScheduleExceptionResponse>> LoadScheduleExceptionsAsync(NpgsqlConnection cn, long versionId, CancellationToken ct)
+    {
+        const string sql = @"select id, assignment_id, exception_type, reason, responsible, decision_detail->>'resolutionDate', status, rule_code, scope_hash, motive_code, decision
+from schedule_exceptions where schedule_version_id = @id order by id";
+        await using var cmd = new NpgsqlCommand(sql, cn); cmd.Parameters.AddWithValue("id", versionId);
+        var results = new List<ScheduleExceptionResponse>();
+        await using var rd = await cmd.ExecuteReaderAsync(ct);
+        while (await rd.ReadAsync(ct))
+        {
+            results.Add(new ScheduleExceptionResponse(
+                rd.GetInt64(0), rd.IsDBNull(1) ? null : rd.GetInt64(1), rd.GetString(2), rd.GetString(3),
+                rd.GetString(4), rd.IsDBNull(5) ? null : rd.GetString(5), rd.GetString(6),
+                rd.IsDBNull(7) ? null : rd.GetString(7), rd.IsDBNull(8) ? null : rd.GetString(8),
+                rd.IsDBNull(9) ? null : rd.GetString(9), rd.IsDBNull(10) ? null : rd.GetString(10)));
+        }
+        return results;
+    }
 
     private async Task<bool> UpdateSchedulingConfigurationAsync(string sql, string eventType, string entityType, long id, Action<NpgsqlCommand> addParameters, long actorUserId, string actorUsername, CancellationToken cancellationToken)
     {

@@ -64,11 +64,24 @@ public sealed record PersistedSchedulingRuleBatchResponse(
     IReadOnlyList<PersistedSchedulingRuleEvaluationResponse> Evaluations,
     SchedulingRuleSummaryResponse Summary);
 
+public sealed record ScheduleReasonResponse(string Code, string Severity, string Message);
+
+public sealed record ScheduleAssignmentResponse(
+    long Id, string Date, string StartsAt, string EndsAt, long PositionId, long? EmployeeId,
+    string? EmployeeName, string ShiftCode, string Status, decimal? Score, IReadOnlyList<ScheduleReasonResponse> Reasons);
+
+public sealed record ScheduleExceptionResponse(
+    long Id, long? AssignmentId, string ExceptionType, string Reason, string Responsible,
+    string? ResolutionDate, string Status, string? RuleCode, string? ScopeHash,
+    string? MotiveCode, string? Decision);
+
 public sealed record ScheduleWorkflowResponse(
     long VersionId, long ScheduleId, long ProjectId, int VersionNumber, string Status,
     string PeriodStart, string PeriodEnd, decimal CoveragePercent, int VacancyCount,
     int ExceptionCount, bool AcceptedVacancy, string CreatedBy, string? ApprovedBy,
-    string? PublishedBy, bool SelfManaged);
+    string? PublishedBy, bool SelfManaged,
+    IReadOnlyList<ScheduleAssignmentResponse> Assignments,
+    IReadOnlyList<ScheduleExceptionResponse> Exceptions);
 
 public sealed record ScheduleAuditResponse(
     long Id, string EventType, string ActorUsername, string CreatedAt, string Detail);

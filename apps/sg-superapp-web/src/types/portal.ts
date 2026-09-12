@@ -31,6 +31,7 @@ export interface ScheduleAssignment {
   endsAt: string;
   positionId: number;
   employeeId?: number;
+  employeeName?: string;
   shiftCode: ShiftCode;
   status: "ASIGNADA" | "VACANTE";
   score?: number;
