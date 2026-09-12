@@ -66,4 +66,18 @@ if ($hugePage.Body.Count -ne 0) {
     throw "Un page absurdamente grande (mas alla del total de registros) debe devolver un arreglo vacio, devolvio $($hugePage.Body.Count) registros."
 }
 
+# page sin pageSize no debe causar overflow de int32 ni truncar: pageSize se resuelve al
+# sentinel "sin limite" (int.MaxValue), por lo que page se ignora y se fuerza a 1, devolviendo
+# el arreglo completo igual que sin parametros.
+$pageOnly = Invoke-EmployeesRequest -Uri "$ApiBaseUrl/portal/employees?page=2" -Headers $headers
+if ($pageOnly.Status -ne 200) {
+    throw "page sin pageSize debe devolver 200, devolvio $($pageOnly.Status)."
+}
+if ($pageOnly.Body.Count -ne $unpaged.Body.Count) {
+    throw "page=2 sin pageSize debe devolver el arreglo completo (identico a sin parametros). Arreglo: $($pageOnly.Body.Count), esperado: $($unpaged.Body.Count)."
+}
+if ($pageOnly.TotalCount -ne $unpaged.TotalCount) {
+    throw "El total con page=2 sin pageSize ($($pageOnly.TotalCount)) debe coincidir con el total sin paginar ($($unpaged.TotalCount))."
+}
+
 Write-Host "Employees pagination verification completed."

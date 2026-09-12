@@ -650,8 +650,13 @@ public static class PortalEndpoints
             // capped at 100, (100_000 - 1) * 100 stays well within int32 range, so the offset
             // computed in GetEmployeesAsync can never overflow regardless of the requested page.
             const int maxPage = 100_000;
-            var resolvedPage = page.HasValue ? Math.Clamp(page.Value, 1, maxPage) : 1;
             var resolvedPageSize = pageSize.HasValue ? Math.Clamp(pageSize.Value, 1, 100) : int.MaxValue;
+            // Paging only makes sense once pageSize is actually bounded. When pageSize is omitted,
+            // resolvedPageSize is the "unbounded" sentinel (int.MaxValue) and any page > 1 would
+            // overflow int32 in (page - 1) * pageSize (offset), so ignore the caller's page in that
+            // case and force page 1 — this also preserves the "omit both -> identical to old
+            // unpaginated behavior" guarantee even when only page is supplied without pageSize.
+            var resolvedPage = !pageSize.HasValue ? 1 : (page.HasValue ? Math.Clamp(page.Value, 1, maxPage) : 1);
 
             var includeSalary = await repository.HasPermissionAsync(userContext.User!.Id, "EMPLOYEES", "VIEW_SALARY", cancellationToken);
             var (employees, totalCount) = await repository.GetEmployeesAsync(search, status, jobTitle, completeness, includeSalary, resolvedPage, resolvedPageSize, cancellationToken);
