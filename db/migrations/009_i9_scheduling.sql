@@ -313,7 +313,7 @@ SELECT pg_temp.i9_constraint('position_coverage_rules','ck_position_coverage_rul
 SELECT pg_temp.i9_constraint('position_coverage_rules','ck_position_coverage_rules_time_range','c','CHECK (ends_at <> starts_at)');
 SELECT pg_temp.i9_constraint('position_coverage_rules','position_coverage_rules_required_quantity_check','c','CHECK (required_quantity > 0)');
 SELECT pg_temp.i9_constraint('position_coverage_rules','ck_position_coverage_rules_dates','c','CHECK ((effective_to IS NULL) OR (effective_to >= effective_from))');
-SELECT pg_temp.i9_constraint('position_coverage_rules','uq_position_coverage_rules_period','u','UNIQUE (position_id, template_id, effective_from)');
+SELECT pg_temp.i9_constraint('position_coverage_rules','uq_position_coverage_rules_period','u','UNIQUE (position_id, template_id, effective_from, starts_at)');
 SELECT pg_temp.i9_constraint('position_coverage_rules','position_coverage_rules_status_check','c','CHECK ((status)::text = ANY ((ARRAY[''ACTIVO''::character varying, ''INACTIVO''::character varying])::text[]))');
 SELECT pg_temp.i9_constraint('scheduling_rules','scheduling_rules_pkey','p','PRIMARY KEY (id)');
 SELECT pg_temp.i9_constraint('scheduling_rules','scheduling_rules_status_check','c','CHECK ((status)::text = ANY ((ARRAY[''ACTIVO''::character varying, ''INACTIVO''::character varying])::text[]))');

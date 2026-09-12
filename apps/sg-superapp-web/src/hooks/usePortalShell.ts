@@ -43,6 +43,7 @@ export function usePortalShell(): PortalShellState {
 
   const logout = useCallback(() => {
     sessionStorage.removeItem(SESSION_USER_KEY);
+    sessionStorage.removeItem(SESSION_TOKEN_KEY);
     setUser(null);
     setModules([]);
     setNotifications([]);
@@ -81,7 +82,11 @@ export function usePortalShell(): PortalShellState {
     }
 
     void loadShellData(user);
-  }, [user, loadShellData]);
+    // loadShellData succeeds by calling setUser(apiUser) with a freshly parsed object every
+    // time, so depending on `user` itself re-triggers this effect on its own success forever.
+    // Depending on the username instead only re-fires on an actual account change (login/logout).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.username, loadShellData]);
 
   const loginWithCredentials = useCallback(async (request: LoginRequest) => {
     setLoading(true);

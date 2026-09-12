@@ -8,6 +8,7 @@ INSERT INTO shift_templates (
 VALUES
     ('2X2', 'Ciclo 2x2 dia, noche y descanso', 1, CURRENT_DATE, TRUE, 'ACTIVO'),
     ('4X2', 'Ciclo 4x2 dia, noche y descanso', 1, CURRENT_DATE, TRUE, 'ACTIVO'),
+    ('4X4', 'Ciclo 4x4 dia, noche y descanso', 1, CURRENT_DATE, TRUE, 'ACTIVO'),
     ('6X1', 'Ciclo 6x1 dia y descanso', 1, CURRENT_DATE, TRUE, 'ACTIVO')
 ON CONFLICT (code, version) DO UPDATE
 SET name = EXCLUDED.name,
@@ -24,6 +25,12 @@ WITH template_steps(code, version, step_order, shift_code) AS (
         ('4X2', 1, 3, 'D'), ('4X2', 1, 4, 'D'),
         ('4X2', 1, 5, 'N'), ('4X2', 1, 6, 'N'),
         ('4X2', 1, 7, 'X'), ('4X2', 1, 8, 'X'),
+        ('4X4', 1, 1, 'D'), ('4X4', 1, 2, 'D'),
+        ('4X4', 1, 3, 'D'), ('4X4', 1, 4, 'D'),
+        ('4X4', 1, 5, 'N'), ('4X4', 1, 6, 'N'),
+        ('4X4', 1, 7, 'N'), ('4X4', 1, 8, 'N'),
+        ('4X4', 1, 9, 'X'), ('4X4', 1, 10, 'X'),
+        ('4X4', 1, 11, 'X'), ('4X4', 1, 12, 'X'),
         ('6X1', 1, 1, 'D'), ('6X1', 1, 2, 'D'),
         ('6X1', 1, 3, 'D'), ('6X1', 1, 4, 'D'),
         ('6X1', 1, 5, 'D'), ('6X1', 1, 6, 'D'),
@@ -40,12 +47,13 @@ WITH expected_steps(code, version, step_order) AS (
     VALUES
         ('2X2', 1, 1), ('2X2', 1, 2), ('2X2', 1, 3), ('2X2', 1, 4), ('2X2', 1, 5), ('2X2', 1, 6),
         ('4X2', 1, 1), ('4X2', 1, 2), ('4X2', 1, 3), ('4X2', 1, 4), ('4X2', 1, 5), ('4X2', 1, 6), ('4X2', 1, 7), ('4X2', 1, 8),
+        ('4X4', 1, 1), ('4X4', 1, 2), ('4X4', 1, 3), ('4X4', 1, 4), ('4X4', 1, 5), ('4X4', 1, 6), ('4X4', 1, 7), ('4X4', 1, 8), ('4X4', 1, 9), ('4X4', 1, 10), ('4X4', 1, 11), ('4X4', 1, 12),
         ('6X1', 1, 1), ('6X1', 1, 2), ('6X1', 1, 3), ('6X1', 1, 4), ('6X1', 1, 5), ('6X1', 1, 6), ('6X1', 1, 7)
 )
 DELETE FROM shift_template_steps sts
 USING shift_templates st
 WHERE sts.template_id = st.id
-  AND (st.code, st.version) IN (('2X2', 1), ('4X2', 1), ('6X1', 1))
+  AND (st.code, st.version) IN (('2X2', 1), ('4X2', 1), ('4X4', 1), ('6X1', 1))
   AND NOT EXISTS (
       SELECT 1
       FROM expected_steps es
