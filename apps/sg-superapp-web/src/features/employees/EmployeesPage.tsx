@@ -11,6 +11,7 @@ import {
   updateEmployee
 } from "../../services/portalApi";
 import type { CurrentUser, EmployeeDetail, EmployeeSummary, PositionAssignment, ServicePosition } from "../../types/portal";
+import { Modal } from "../../components/Modal";
 
 function describeDetailError(error: unknown): string {
   if (error instanceof PortalApiError && error.status === 404) {
@@ -70,6 +71,8 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
   const [editNotes, setEditNotes] = useState("");
   const [editSalary, setEditSalary] = useState("");
   const [editSalaryEffectiveFrom, setEditSalaryEffectiveFrom] = useState("");
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editErrorMessage, setEditErrorMessage] = useState<string | null>(null);
   const [positionAssignments, setPositionAssignments] = useState<PositionAssignment[]>([]);
   const [availablePositions, setAvailablePositions] = useState<ServicePosition[]>([]);
   const [assignmentPositionId, setAssignmentPositionId] = useState("");
@@ -219,7 +222,7 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
       return;
     }
 
-    setErrorMessage(null);
+    setEditErrorMessage(null);
     try {
       await updateEmployee(selectedEmployee.id, {
         fullName: editFullName,
@@ -236,9 +239,29 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
       const updated = await fetchEmployeeDetail(selectedEmployee.id);
       setSelectedEmployee(updated);
       setEmployees((current) => current.map((employee) => employee.id === updated.id ? updated : employee));
+      setIsEditModalOpen(false);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "No fue posible actualizar el empleado.");
+      setEditErrorMessage(error instanceof Error ? error.message : "No fue posible actualizar el empleado.");
     }
+  }
+
+  function openEditModal() {
+    if (!selectedEmployee) {
+      return;
+    }
+
+    setEditFullName(selectedEmployee.fullName);
+    setEditEmploymentStatus(selectedEmployee.employmentStatus);
+    setEditJobTitle(selectedEmployee.jobTitle);
+    setEditHireDate(selectedEmployee.hireDate || "");
+    setEditTerminationDate(selectedEmployee.terminationDate || "");
+    setEditTerminationReason(selectedEmployee.terminationReason || "");
+    setEditContractType(selectedEmployee.contractType || "");
+    setEditNotes(selectedEmployee.notes || "");
+    setEditSalary(selectedEmployee.currentBaseSalary?.toString() || "");
+    setEditSalaryEffectiveFrom(selectedEmployee.salaryEffectiveFrom || "");
+    setEditErrorMessage(null);
+    setIsEditModalOpen(true);
   }
 
   async function reloadSelectedEmployee(employeeId: number) {
@@ -400,6 +423,12 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
 
           {selectedEmployee ? (
             <div className="employee-detail">
+              {user.role === "ADMIN" || user.role === "TH" ? (
+                <div className="position-form-actions">
+                  <button type="button" onClick={openEditModal}>Editar información</button>
+                </div>
+              ) : null}
+
               <div className="employee-detail-groups">
                 <div className="employee-detail-group">
                   <h4>Identificación</h4>
@@ -579,24 +608,28 @@ export function EmployeesPage({ user }: EmployeesPageProps) {
                 ))}
                 {selectedEmployee.changeHistory.length === 0 ? <p className="muted">Sin cambios registrados.</p> : null}
               </div>
-              {user.role === "ADMIN" || user.role === "TH" ? (
-                <div className="employee-history">
-                  <h4>Edicion manual</h4>
-                  <input value={editFullName} onChange={(event) => setEditFullName(event.target.value)} placeholder="Nombre completo" />
-                  <select value={editEmploymentStatus} onChange={(event) => setEditEmploymentStatus(event.target.value as "ACTIVO" | "RETIRADO")}>
-                    <option value="ACTIVO">Activo</option>
-                    <option value="RETIRADO">Retirado</option>
-                  </select>
-                  <input value={editJobTitle} onChange={(event) => setEditJobTitle(event.target.value)} placeholder="Cargo" />
-                  <input type="date" value={editHireDate} onChange={(event) => setEditHireDate(event.target.value)} />
-                  <input type="date" value={editTerminationDate} onChange={(event) => setEditTerminationDate(event.target.value)} />
-                  <input value={editTerminationReason} onChange={(event) => setEditTerminationReason(event.target.value)} placeholder="Motivo de retiro" />
-                  <input value={editContractType} onChange={(event) => setEditContractType(event.target.value)} placeholder="Tipo de contrato" />
-                  <textarea value={editNotes} onChange={(event) => setEditNotes(event.target.value)} placeholder="Observaciones" />
-                  <input type="number" min="0" value={editSalary} onChange={(event) => setEditSalary(event.target.value)} placeholder="Salario base" />
-                  <input type="date" value={editSalaryEffectiveFrom} onChange={(event) => setEditSalaryEffectiveFrom(event.target.value)} />
-                  <button type="button" onClick={() => void saveEmployee()}>Guardar cambios</button>
-                </div>
+              {isEditModalOpen ? (
+                <Modal title="Editar información" onClose={() => setIsEditModalOpen(false)}>
+                  <div className="position-form">
+                    {editErrorMessage ? <p className="muted">{editErrorMessage}</p> : null}
+                    <input value={editFullName} onChange={(event) => setEditFullName(event.target.value)} placeholder="Nombre completo" />
+                    <select value={editEmploymentStatus} onChange={(event) => setEditEmploymentStatus(event.target.value as "ACTIVO" | "RETIRADO")}>
+                      <option value="ACTIVO">Activo</option>
+                      <option value="RETIRADO">Retirado</option>
+                    </select>
+                    <input value={editJobTitle} onChange={(event) => setEditJobTitle(event.target.value)} placeholder="Cargo" />
+                    <input type="date" value={editHireDate} onChange={(event) => setEditHireDate(event.target.value)} />
+                    <input type="date" value={editTerminationDate} onChange={(event) => setEditTerminationDate(event.target.value)} />
+                    <input value={editTerminationReason} onChange={(event) => setEditTerminationReason(event.target.value)} placeholder="Motivo de retiro" />
+                    <input value={editContractType} onChange={(event) => setEditContractType(event.target.value)} placeholder="Tipo de contrato" />
+                    <textarea value={editNotes} onChange={(event) => setEditNotes(event.target.value)} placeholder="Observaciones" />
+                    <input type="number" min="0" value={editSalary} onChange={(event) => setEditSalary(event.target.value)} placeholder="Salario base" />
+                    <input type="date" value={editSalaryEffectiveFrom} onChange={(event) => setEditSalaryEffectiveFrom(event.target.value)} />
+                    <div className="position-form-actions">
+                      <button type="button" onClick={() => void saveEmployee()}>Guardar cambios</button>
+                    </div>
+                  </div>
+                </Modal>
               ) : null}
             </div>
           ) : (
