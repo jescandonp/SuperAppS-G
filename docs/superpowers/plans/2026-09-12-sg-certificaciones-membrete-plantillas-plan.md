@@ -209,17 +209,19 @@ git commit -m "feat(certificados): agregar PdfSharpCore y resolutor de fuentes c
 
 ---
 
-## Task 3: Componente de membrete compartido (`CertificateLetterhead`)
+## Task 3: Componente de membrete compartido (`CertificateLetterhead`) y sello de firma (`CertificateSignatureStamp`)
 
-Dibuja las 4 imágenes del Task 1 sobre una página en blanco, en las posiciones exactas que ya tenían dentro del PDF original (medidas en puntos, extraídas con PyMuPDF — no son estimaciones).
+Dibuja las 4 imágenes del Task 1 sobre una página en blanco, en las posiciones exactas que ya tenían dentro del PDF original (medidas en puntos, extraídas con PyMuPDF — no son estimaciones). Incluye también `CertificateSignatureStamp`: no depende de las plantillas de contenido (Tasks 5/6), solo de PdfSharpCore, así que se crea aquí para que el proyecto compile limpio en cada task siguiente en vez de quedar roto hasta el Task 7.
 
 **Files:**
 - Create: `apps/sg-superapp-api/Certificates/CertificateLetterhead.cs`
+- Create: `apps/sg-superapp-api/Certificates/CertificateSignatureStamp.cs`
 - Test: `apps/sg-superapp-api/Certificates/Assets/letterhead-smoke-test.ps1` (script de humo standalone, no requiere BD ni API corriendo)
 
 **Interfaces:**
 - Consumes: `CertificateFontResolver.EnsureRegistered()` (Task 2).
-- Produces: `CertificateLetterhead.Draw(XGraphics gfx)` — usada por Task 4 y Task 5 antes de dibujar el contenido de cada plantilla.
+- Produces: `CertificateLetterhead.Draw(XGraphics gfx)` — usada por Task 5 y Task 6 antes de dibujar el contenido de cada plantilla.
+- Produces: `CertificateSignatureStamp.DrawIfAvailable(XGraphics gfx, string? signaturePath, double x, double signatureLineY)` — usada por Task 5 y Task 6.
 
 - [ ] **Step 1: Escribir `CertificateLetterhead`**
 
@@ -269,7 +271,57 @@ public static class CertificateLetterhead
 }
 ```
 
-- [ ] **Step 2: Escribir un smoke test standalone (sin BD, sin API)**
+- [ ] **Step 2: Escribir el sello de firma**
+
+```csharp
+// apps/sg-superapp-api/Certificates/CertificateSignatureStamp.cs
+using PdfSharpCore.Drawing;
+
+namespace Sg.SuperApp.Api.Certificates;
+
+/// <summary>
+/// Incrusta la imagen de firma escaneada del firmante activo sobre la linea de firma,
+/// si el firmante tiene una ruta de imagen configurada y el archivo existe. Si no,
+/// no dibuja nada y el documento queda igual que hoy (espacio en blanco para firma fisica).
+/// </summary>
+public static class CertificateSignatureStamp
+{
+    private static string SignaturesDirectory =>
+        Environment.GetEnvironmentVariable("SG_CERTIFICATE_SIGNATURES_DIR")
+        is { Length: > 0 } configured
+            ? configured
+            : Path.Combine(AppContext.BaseDirectory, "certificate-signatures");
+
+    public static void DrawIfAvailable(XGraphics gfx, string? signaturePath, double x, double signatureLineY)
+    {
+        var resolved = Resolve(signaturePath);
+        if (resolved is null)
+        {
+            return;
+        }
+
+        using var image = XImage.FromFile(resolved);
+        var height = 40.0;
+        var width = height * image.PixelWidth / image.PixelHeight;
+        gfx.DrawImage(image, x, signatureLineY - height, width, height);
+    }
+
+    private static string? Resolve(string? signaturePath)
+    {
+        if (string.IsNullOrWhiteSpace(signaturePath))
+        {
+            return null;
+        }
+
+        var resolved = Path.IsPathRooted(signaturePath)
+            ? signaturePath
+            : Path.Combine(SignaturesDirectory, signaturePath);
+        return File.Exists(resolved) ? resolved : null;
+    }
+}
+```
+
+- [ ] **Step 3: Escribir un smoke test standalone (sin BD, sin API)**
 
 ```powershell
 # apps/sg-superapp-api/Certificates/Assets/letterhead-smoke-test.ps1
@@ -296,7 +348,7 @@ Write-Output "Assets en: $(Join-Path $tempRoot 'Certificates/Assets')"
 Get-ChildItem (Join-Path $tempRoot 'Certificates/Assets') | ForEach-Object { Write-Output " - $($_.Name)" }
 ```
 
-- [ ] **Step 3: Ejecutar el smoke test**
+- [ ] **Step 4: Ejecutar el smoke test**
 
 ```powershell
 powershell -File "apps/sg-superapp-api/Certificates/Assets/letterhead-smoke-test.ps1"
@@ -304,11 +356,11 @@ powershell -File "apps/sg-superapp-api/Certificates/Assets/letterhead-smoke-test
 
 Expected: `LETTERHEAD SMOKE PASS` y el listado de los 4 archivos de assets junto al binario compilado (confirma que `CopyToOutputDirectory` del Task 2 funciona).
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add apps/sg-superapp-api/Certificates/CertificateLetterhead.cs apps/sg-superapp-api/Certificates/Assets/letterhead-smoke-test.ps1
-git commit -m "feat(certificados): componente de membrete compartido (header, pie, marca de agua)"
+git add apps/sg-superapp-api/Certificates/CertificateLetterhead.cs apps/sg-superapp-api/Certificates/CertificateSignatureStamp.cs apps/sg-superapp-api/Certificates/Assets/letterhead-smoke-test.ps1
+git commit -m "feat(certificados): componente de membrete compartido y sello de firma incrustada"
 ```
 
 ---
@@ -511,8 +563,8 @@ Reproduce el certificado estándar (dirigido a entidad financiera), con el desgl
 - Create: `apps/sg-superapp-api/Certificates/StandardCertificateTemplate.cs`
 
 **Interfaces:**
-- Consumes: `CertificateDocumentData` (Task 4), `CertificateLetterhead.Draw` (Task 3).
-- Produces: `StandardCertificateTemplate.Draw(XGraphics gfx, CertificateDocumentData data)` — usada por Task 6.
+- Consumes: `CertificateDocumentData` (Task 4), `CertificateLetterhead.Draw` y `CertificateSignatureStamp.DrawIfAvailable` (Task 3).
+- Produces: `StandardCertificateTemplate.Draw(XGraphics gfx, CertificateDocumentData data)` — usada por Task 7 (`CertificateDocumentBuilder`).
 
 - [ ] **Step 1: Escribir la plantilla**
 
@@ -646,7 +698,7 @@ public static class StandardCertificateTemplate
 "C:\tmp\dotnet6\dotnet.exe" build apps/sg-superapp-api/sg-superapp-api.csproj
 ```
 
-Expected: falla con `CS0103: The name 'CertificateSignatureStamp' does not exist` — es esperado, esa clase se crea en el Task 7. Confirma que el resto del archivo (todo lo demás) compila sin otros errores señalando esa única clase faltante.
+Expected: `Build succeeded.` — `CertificateLetterhead` y `CertificateSignatureStamp` ya existen desde el Task 3, así que este archivo compila limpio sin dejar el proyecto roto.
 
 - [ ] **Step 3: Commit**
 
@@ -665,8 +717,8 @@ Reproduce el certificado de retiro, incluyendo el bloque legal del Decreto 1562 
 - Create: `apps/sg-superapp-api/Certificates/RetirementCertificateTemplate.cs`
 
 **Interfaces:**
-- Consumes: `CertificateDocumentData` (Task 4), `CertificateLetterhead.Draw` (Task 3).
-- Produces: `RetirementCertificateTemplate.Draw(XGraphics gfx, CertificateDocumentData data)` — usada por Task 7.
+- Consumes: `CertificateDocumentData` (Task 4), `CertificateLetterhead.Draw` y `CertificateSignatureStamp.DrawIfAvailable` (Task 3).
+- Produces: `RetirementCertificateTemplate.Draw(XGraphics gfx, CertificateDocumentData data)` — usada por Task 7 (`CertificateDocumentBuilder`).
 
 - [ ] **Step 1: Escribir la plantilla**
 
@@ -773,7 +825,7 @@ public static class RetirementCertificateTemplate
 "C:\tmp\dotnet6\dotnet.exe" build apps/sg-superapp-api/sg-superapp-api.csproj
 ```
 
-Expected: mismo error esperado de `CertificateSignatureStamp` no encontrada (se crea en el Task 7) — sin otros errores en este archivo.
+Expected: `Build succeeded.` — `CertificateLetterhead` y `CertificateSignatureStamp` ya existen desde el Task 3, así que este archivo compila limpio sin dejar el proyecto roto.
 
 - [ ] **Step 3: Commit**
 
@@ -789,7 +841,6 @@ git commit -m "feat(certificados): plantilla de layout narrativo para certificad
 Junta las dos plantillas en un único punto de entrada, incrusta la firma escaneada cuando existe, y reemplaza el uso de `BuildCertificatePdf`/`EscapePdfText` en `PostgresPortalRepository`.
 
 **Files:**
-- Create: `apps/sg-superapp-api/Certificates/CertificateSignatureStamp.cs`
 - Create: `apps/sg-superapp-api/Certificates/CertificateDocumentBuilder.cs`
 - Modify: `apps/sg-superapp-api/Services/PostgresPortalRepository.cs:2122-2257` (`PersistGeneratedCertificateAsync`)
 - Modify: `apps/sg-superapp-api/Services/PostgresPortalRepository.cs:5291-5379` (elimina `BuildCertificatePdf` y `EscapePdfText`, conserva `GetCertificatePdfPath`)
@@ -799,55 +850,13 @@ Junta las dos plantillas en un único punto de entrada, incrusta la firma escane
 - Produces: `CertificateDocumentBuilder.Build(CertificateDocumentData data) : byte[]` — reemplaza `BuildCertificatePdf(preview, certificateNumber)`.
 - Produces: `PersistGeneratedCertificateAsync(CertificatePreviewResponse preview, long actorUserId, string actorUsername, string actorFullName, CancellationToken)` — gana el parámetro `actorFullName`.
 
-- [ ] **Step 1: Escribir el sello de firma**
+- [ ] **Step 1: Verificar que `CertificateSignatureStamp.cs` ya existe (creado en el Task 3)**
 
-```csharp
-// apps/sg-superapp-api/Certificates/CertificateSignatureStamp.cs
-using PdfSharpCore.Drawing;
-
-namespace Sg.SuperApp.Api.Certificates;
-
-/// <summary>
-/// Incrusta la imagen de firma escaneada del firmante activo sobre la linea de firma,
-/// si el firmante tiene una ruta de imagen configurada y el archivo existe. Si no,
-/// no dibuja nada y el documento queda igual que hoy (espacio en blanco para firma fisica).
-/// </summary>
-public static class CertificateSignatureStamp
-{
-    private static string SignaturesDirectory =>
-        Environment.GetEnvironmentVariable("SG_CERTIFICATE_SIGNATURES_DIR")
-        is { Length: > 0 } configured
-            ? configured
-            : Path.Combine(AppContext.BaseDirectory, "certificate-signatures");
-
-    public static void DrawIfAvailable(XGraphics gfx, string? signaturePath, double x, double signatureLineY)
-    {
-        var resolved = Resolve(signaturePath);
-        if (resolved is null)
-        {
-            return;
-        }
-
-        using var image = XImage.FromFile(resolved);
-        var height = 40.0;
-        var width = height * image.PixelWidth / image.PixelHeight;
-        gfx.DrawImage(image, x, signatureLineY - height, width, height);
-    }
-
-    private static string? Resolve(string? signaturePath)
-    {
-        if (string.IsNullOrWhiteSpace(signaturePath))
-        {
-            return null;
-        }
-
-        var resolved = Path.IsPathRooted(signaturePath)
-            ? signaturePath
-            : Path.Combine(SignaturesDirectory, signaturePath);
-        return File.Exists(resolved) ? resolved : null;
-    }
-}
+```bash
+test -f "apps/sg-superapp-api/Certificates/CertificateSignatureStamp.cs" && echo "OK: ya existe, no se recrea"
 ```
+
+Expected: `OK: ya existe, no se recrea`. No se toca este archivo en este task — ya fue creado y commiteado en el Task 3 junto con `CertificateLetterhead`.
 
 - [ ] **Step 2: Escribir el orquestador**
 
@@ -954,7 +963,7 @@ Expected: `Build succeeded.` con 0 errores — este es el primer build limpio de
 - [ ] **Step 6: Commit**
 
 ```bash
-git add apps/sg-superapp-api/Certificates/CertificateSignatureStamp.cs apps/sg-superapp-api/Certificates/CertificateDocumentBuilder.cs apps/sg-superapp-api/Services/PostgresPortalRepository.cs apps/sg-superapp-api/Endpoints/PortalEndpoints.cs
+git add apps/sg-superapp-api/Certificates/CertificateDocumentBuilder.cs apps/sg-superapp-api/Services/PostgresPortalRepository.cs apps/sg-superapp-api/Endpoints/PortalEndpoints.cs
 git commit -m "feat(certificados): reemplazar generador de PDF crudo por CertificateDocumentBuilder"
 ```
 
