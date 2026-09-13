@@ -106,6 +106,7 @@ public static class StandardCertificateTemplate
     {
         "ENTIDAD_FINANCIERA" => "ENTIDAD FINANCIERA",
         "CLIENTE" => "CLIENTE",
+        "CESANTIAS" => "EL FONDO DE CESANTIAS",
         "TRAMITE_GENERAL" => "QUIEN INTERESE",
         "INTERESADO" => "QUIEN INTERESE",
         _ => "QUIEN INTERESE"
