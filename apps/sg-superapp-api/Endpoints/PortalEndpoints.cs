@@ -1134,7 +1134,7 @@ public static class PortalEndpoints
                 return previewError;
             }
 
-            var certificate = await repository.PersistGeneratedCertificateAsync(preview!, userContext.User!.Id, userContext.User.Username, cancellationToken);
+            var certificate = await repository.PersistGeneratedCertificateAsync(preview!, userContext.User!.Id, userContext.User.Username, userContext.User.FullName, cancellationToken);
             return Results.Ok(certificate);
         });
 
