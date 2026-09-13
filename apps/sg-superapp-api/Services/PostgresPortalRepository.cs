@@ -2076,6 +2076,8 @@ public sealed class PostgresPortalRepository
             previewLines.AddRange(variables.Select(variable => $"{variable.ConceptLabel}: {variable.Amount:0.00}"));
         }
 
+        var addressedTo = string.IsNullOrWhiteSpace(request.AddressedTo) ? null : request.AddressedTo.Trim();
+
         var snapshot = new Dictionary<string, object?>
         {
             ["employeeId"] = employeeId,
@@ -2094,6 +2096,7 @@ public sealed class PostgresPortalRepository
             ["signerId"] = signer.Id,
             ["signerFullName"] = signer.FullName,
             ["signerJobTitle"] = signer.JobTitle,
+            ["addressedTo"] = addressedTo,
             ["variables"] = certificateType == "ACTIVO" ? variables : Array.Empty<CertificateVariableResponse>()
         };
 
@@ -2116,7 +2119,9 @@ public sealed class PostgresPortalRepository
             signer.JobTitle,
             certificateType == "ACTIVO" ? variables : Array.Empty<CertificateVariableResponse>(),
             string.Join("\n", previewLines),
-            snapshot);
+            snapshot,
+            addressedTo,
+            signer.SignaturePath);
     }
 
     public async Task<LaborCertificateResponse> PersistGeneratedCertificateAsync(CertificatePreviewResponse preview, long actorUserId, string actorUsername, CancellationToken cancellationToken = default)

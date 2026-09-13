@@ -19,4 +19,6 @@ public sealed record CertificatePreviewResponse(
     string SignerJobTitle,
     IReadOnlyList<CertificateVariableResponse> Variables,
     string PreviewContent,
-    IReadOnlyDictionary<string, object?> Snapshot);
+    IReadOnlyDictionary<string, object?> Snapshot,
+    string? AddressedTo = null,
+    string? SignerSignaturePath = null);
