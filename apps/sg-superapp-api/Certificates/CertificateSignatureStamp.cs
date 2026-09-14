@@ -23,10 +23,24 @@ public static class CertificateSignatureStamp
             return;
         }
 
-        using var image = XImage.FromFile(resolved);
-        var height = 40.0;
-        var width = height * image.PixelWidth / image.PixelHeight;
-        gfx.DrawImage(image, x, signatureLineY - height, width, height);
+        XImage image;
+        try
+        {
+            image = XImage.FromFile(resolved);
+        }
+        catch (Exception)
+        {
+            // Firma corrupta o ilegible: el certificado se emite igual, con el espacio
+            // en blanco para firma fisica, en vez de convertirse en un error 500.
+            return;
+        }
+
+        using (image)
+        {
+            var height = 40.0;
+            var width = height * image.PixelWidth / image.PixelHeight;
+            gfx.DrawImage(image, x, signatureLineY - height, width, height);
+        }
     }
 
     private static string? Resolve(string? signaturePath)
@@ -36,9 +50,38 @@ public static class CertificateSignatureStamp
             return null;
         }
 
-        var resolved = Path.IsPathRooted(signaturePath)
-            ? signaturePath
-            : Path.Combine(SignaturesDirectory, signaturePath);
+        string resolved;
+        if (Path.IsPathRooted(signaturePath))
+        {
+            resolved = signaturePath;
+        }
+        else
+        {
+            // Ruta relativa: debe quedar dentro del directorio de firmas despues de
+            // normalizar, para que un "..\..\algo" no pueda leer archivos arbitrarios.
+            var baseDirectory = Path.GetFullPath(SignaturesDirectory);
+            var baseWithSeparator = baseDirectory.EndsWith(Path.DirectorySeparatorChar)
+                ? baseDirectory
+                : baseDirectory + Path.DirectorySeparatorChar;
+
+            string candidate;
+            try
+            {
+                candidate = Path.GetFullPath(Path.Combine(baseDirectory, signaturePath));
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+
+            if (!candidate.StartsWith(baseWithSeparator, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            resolved = candidate;
+        }
+
         return File.Exists(resolved) ? resolved : null;
     }
 }

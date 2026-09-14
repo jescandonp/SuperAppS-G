@@ -1,7 +1,6 @@
 using Npgsql;
 using NpgsqlTypes;
 using System.Globalization;
-using System.Text;
 using System.Text.Json;
 using System.Data;
 using Sg.SuperApp.Api.Certificates;

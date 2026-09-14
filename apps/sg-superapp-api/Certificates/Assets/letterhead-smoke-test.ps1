@@ -1,5 +1,7 @@
-# Genera un PDF de una sola pagina solo con el membrete, para verificar visualmente
-# que las 4 imagenes quedan bien ubicadas antes de construir el contenido encima.
+# Smoke test de build del membrete: compila sg-superapp-api en un directorio temporal
+# y confirma que los 4 assets del membrete (header.jpg, footer.jpg, watermark.png y
+# sidebar-mark.png) quedaron copiados a Certificates/Assets del output, listandolos.
+# No genera ningun PDF; solo verifica que el build pasa y que los assets viajan con el.
 [CmdletBinding()]
 param()
 
