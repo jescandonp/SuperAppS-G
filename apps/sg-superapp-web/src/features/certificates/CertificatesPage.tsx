@@ -71,6 +71,22 @@ export function CertificatesPage({ user }: CertificatesPageProps) {
   const canGenerate = user.role === "TH";
   const canAnnul = user.role === "ADMIN" || user.role === "TH";
   const canManageSigners = user.role === "ADMIN";
+  const selectedEmployee = employees.find((employee) => employee.id === selectedEmployeeId) ?? null;
+  const isActiveEmployee = selectedEmployee?.employmentStatus === "ACTIVO";
+  const showAddressedTo = purpose === "ENTIDAD_FINANCIERA";
+
+  useEffect(() => {
+    if (!showAddressedTo) {
+      setAddressedTo("");
+    }
+  }, [showAddressedTo]);
+
+  useEffect(() => {
+    if (!isActiveEmployee) {
+      setTransportAllowance("");
+      setOvertimeAmount("");
+    }
+  }, [isActiveEmployee]);
 
   useEffect(() => {
     let ignore = false;
@@ -223,10 +239,10 @@ export function CertificatesPage({ user }: CertificatesPageProps) {
               notes: null
             }
           : null,
-        transportAllowance
+        isActiveEmployee && transportAllowance
           ? { conceptCode: "AUXILIO_TRANSPORTE", conceptLabel: "Auxilio de transporte", amount: Number(transportAllowance), notes: null }
           : null,
-        overtimeAmount
+        isActiveEmployee && overtimeAmount
           ? { conceptCode: "EXTRAS", conceptLabel: "Extras", amount: Number(overtimeAmount), notes: null }
           : null
       ].filter((variable): variable is NonNullable<typeof variable> => variable !== null);
@@ -235,7 +251,7 @@ export function CertificatesPage({ user }: CertificatesPageProps) {
         purpose,
         issueDate,
         variables,
-        addressedTo: addressedTo.trim() || null
+        addressedTo: showAddressedTo ? addressedTo.trim() || null : null
       });
       setPreview(result);
       setMessage("Preview generado.");
@@ -510,34 +526,40 @@ export function CertificatesPage({ user }: CertificatesPageProps) {
               <input value={variableLabel} onChange={(event) => setVariableLabel(event.target.value)} placeholder="Concepto" />
               <input value={variableAmount} onChange={(event) => setVariableAmount(event.target.value)} type="number" min="0" placeholder="Valor" />
             </label>
-            <label>
-              Dirigido a
-              <input
-                value={addressedTo}
-                onChange={(event) => setAddressedTo(event.target.value)}
-                placeholder="Ej: BANCOLOMBIA (opcional)"
-              />
-            </label>
-            <label>
-              Auxilio de transporte
-              <input
-                value={transportAllowance}
-                onChange={(event) => setTransportAllowance(event.target.value)}
-                type="number"
-                min="0"
-                placeholder="Valor (opcional)"
-              />
-            </label>
-            <label>
-              Extras
-              <input
-                value={overtimeAmount}
-                onChange={(event) => setOvertimeAmount(event.target.value)}
-                type="number"
-                min="0"
-                placeholder="Valor (opcional)"
-              />
-            </label>
+            {showAddressedTo ? (
+              <label>
+                Dirigido a
+                <input
+                  value={addressedTo}
+                  onChange={(event) => setAddressedTo(event.target.value)}
+                  placeholder="Ej: BANCOLOMBIA (opcional)"
+                />
+              </label>
+            ) : null}
+            {isActiveEmployee ? (
+              <>
+                <label>
+                  Auxilio de transporte
+                  <input
+                    value={transportAllowance}
+                    onChange={(event) => setTransportAllowance(event.target.value)}
+                    type="number"
+                    min="0"
+                    placeholder="Valor (opcional)"
+                  />
+                </label>
+                <label>
+                  Extras
+                  <input
+                    value={overtimeAmount}
+                    onChange={(event) => setOvertimeAmount(event.target.value)}
+                    type="number"
+                    min="0"
+                    placeholder="Valor (opcional)"
+                  />
+                </label>
+              </>
+            ) : null}
           </div>
           <div className="position-form-actions">
             <button type="button" onClick={() => void runPreview()} disabled={actionPending}>Preview</button>

@@ -63,3 +63,57 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 Write-Output 'CERTIFICATES TEMPLATE STATIC PASS'
+
+# --- Fase ejecutable: genera 3 certificados reales (ACTIVO, RETIRADO/CESANTIAS,
+# RETIRADO/TRAMITE_GENERAL) llamando directamente a CertificateDocumentBuilder
+# -- sin servidor web, sin base de datos, sin depender de ningun puerto -- y
+# valida el TEXTO del PDF resultante (nombre, numero de certificado, bloque
+# legal del Decreto 1562 solo para cesantias, disclaimer de emision unica en
+# todo retirado, y al menos una tilde/enie en el cuerpo).
+$dotnetCandidates = [System.Collections.Generic.List[string]]::new()
+$bundledDotnet = 'C:\tmp\dotnet6\dotnet.exe'
+if (Test-Path -LiteralPath $bundledDotnet -PathType Leaf) { $dotnetCandidates.Add($bundledDotnet) }
+$dotnetCommand = Get-Command dotnet -ErrorAction SilentlyContinue
+if ($null -ne $dotnetCommand -and -not [string]::IsNullOrWhiteSpace($dotnetCommand.Source) -and
+    (Test-Path -LiteralPath $dotnetCommand.Source -PathType Leaf)) {
+    $dotnetCandidates.Add($dotnetCommand.Source)
+}
+$dotnetPath = $dotnetCandidates | Select-Object -First 1
+
+$pythonCommand = Get-Command python3 -ErrorAction SilentlyContinue
+if ($null -eq $pythonCommand) { $pythonCommand = Get-Command python -ErrorAction SilentlyContinue }
+
+if ([string]::IsNullOrWhiteSpace($dotnetPath) -or $null -eq $pythonCommand) {
+    Write-Output 'CERTIFICATES TEMPLATE EXECUTABLE PHASE BLOCKED: dotnet o python3 no disponibles'
+    exit 2
+}
+
+$renderProject = Join-Path $repoRoot 'scripts\dev\CertificateRenderCheck\CertificateRenderCheck.csproj'
+$verifyScript = Join-Path $repoRoot 'scripts\dev\verify-certificate-render.py'
+$env:DOTNET_CLI_HOME = if ($env:DOTNET_CLI_HOME) { $env:DOTNET_CLI_HOME } else { 'C:\tmp\dotnet-home' }
+$renderOutput = Join-Path ([System.IO.Path]::GetTempPath()) ("sg-cert-render-" + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $renderOutput | Out-Null
+
+try {
+    try {
+        $renderOutputLines = & $dotnetPath run --project $renderProject -- $renderOutput 2>&1
+        $renderOutputLines | ForEach-Object { Write-Output $_ }
+        if ($LASTEXITCODE -ne 0) {
+            throw "CertificateRenderCheck no pudo generar los certificados de prueba"
+        }
+
+        $verifyOutputLines = & $pythonCommand.Source $verifyScript $renderOutput 2>&1
+        $verifyOutputLines | ForEach-Object { Write-Output $_ }
+        if ($LASTEXITCODE -ne 0) {
+            throw "verify-certificate-render.py fallo"
+        }
+    }
+    catch {
+        Write-Output "CERTIFICATES TEMPLATE FAIL: $($_.Exception.Message)"
+        exit 1
+    }
+} finally {
+    Remove-Item -LiteralPath $renderOutput -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Write-Output 'CERTIFICATES TEMPLATE EXECUTABLE PHASE PASS'
