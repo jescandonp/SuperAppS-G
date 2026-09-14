@@ -435,6 +435,7 @@ export interface CertificatePreviewRequest {
   purpose: CertificatePurpose;
   issueDate: string;
   variables: CertificateVariableRequest[];
+  addressedTo?: string | null;
 }
 
 export interface CertificatePreview {
@@ -457,6 +458,7 @@ export interface CertificatePreview {
   variables: CertificateVariable[];
   previewContent: string;
   snapshot: Record<string, unknown>;
+  addressedTo: string | null;
 }
 
 export interface LaborCertificate {

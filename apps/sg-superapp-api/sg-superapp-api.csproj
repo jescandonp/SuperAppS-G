@@ -8,5 +8,13 @@
   <ItemGroup>
     <PackageReference Include="DocumentFormat.OpenXml" Version="3.0.2" />
     <PackageReference Include="Npgsql" Version="6.0.10" />
+    <PackageReference Include="PdfSharpCore" Version="1.3.65" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Solo las imagenes del membrete: los scripts auxiliares (.py/.ps1) que viven en
+         esa carpeta no deben terminar en el output de build ni en el publish. -->
+    <Content Include="Certificates\Assets\**\*.jpg;Certificates\Assets\**\*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 </Project>

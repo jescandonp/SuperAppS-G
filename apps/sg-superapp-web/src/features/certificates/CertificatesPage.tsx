@@ -55,6 +55,9 @@ export function CertificatesPage({ user }: CertificatesPageProps) {
   const [issueDate, setIssueDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [variableLabel, setVariableLabel] = useState("");
   const [variableAmount, setVariableAmount] = useState("");
+  const [addressedTo, setAddressedTo] = useState("");
+  const [transportAllowance, setTransportAllowance] = useState("");
+  const [overtimeAmount, setOvertimeAmount] = useState("");
   const [preview, setPreview] = useState<CertificatePreview | null>(null);
   const [signers, setSigners] = useState<CertificateSigner[]>([]);
   const [selectedSignerId, setSelectedSignerId] = useState<number | null>(null);
@@ -68,6 +71,22 @@ export function CertificatesPage({ user }: CertificatesPageProps) {
   const canGenerate = user.role === "TH";
   const canAnnul = user.role === "ADMIN" || user.role === "TH";
   const canManageSigners = user.role === "ADMIN";
+  const selectedEmployee = employees.find((employee) => employee.id === selectedEmployeeId) ?? null;
+  const isActiveEmployee = selectedEmployee?.employmentStatus === "ACTIVO";
+  const showAddressedTo = purpose === "ENTIDAD_FINANCIERA";
+
+  useEffect(() => {
+    if (!showAddressedTo) {
+      setAddressedTo("");
+    }
+  }, [showAddressedTo]);
+
+  useEffect(() => {
+    if (!isActiveEmployee) {
+      setTransportAllowance("");
+      setOvertimeAmount("");
+    }
+  }, [isActiveEmployee]);
 
   useEffect(() => {
     let ignore = false;
@@ -211,19 +230,28 @@ export function CertificatesPage({ user }: CertificatesPageProps) {
     setActionPending(true);
     setMessage(null);
     try {
-      const variables = variableLabel.trim() && variableAmount
-        ? [{
-            conceptCode: variableLabel.trim().toUpperCase().replace(/\s+/g, "_"),
-            conceptLabel: variableLabel.trim(),
-            amount: Number(variableAmount),
-            notes: null
-          }]
-        : [];
+      const variables = [
+        variableLabel.trim() && variableAmount
+          ? {
+              conceptCode: variableLabel.trim().toUpperCase().replace(/\s+/g, "_"),
+              conceptLabel: variableLabel.trim(),
+              amount: Number(variableAmount),
+              notes: null
+            }
+          : null,
+        isActiveEmployee && transportAllowance
+          ? { conceptCode: "AUXILIO_TRANSPORTE", conceptLabel: "Auxilio de transporte", amount: Number(transportAllowance), notes: null }
+          : null,
+        isActiveEmployee && overtimeAmount
+          ? { conceptCode: "EXTRAS", conceptLabel: "Extras", amount: Number(overtimeAmount), notes: null }
+          : null
+      ].filter((variable): variable is NonNullable<typeof variable> => variable !== null);
       const result = await previewCertificate({
         employeeId: Number(selectedEmployeeId),
         purpose,
         issueDate,
-        variables
+        variables,
+        addressedTo: showAddressedTo ? addressedTo.trim() || null : null
       });
       setPreview(result);
       setMessage("Preview generado.");
@@ -248,7 +276,8 @@ export function CertificatesPage({ user }: CertificatesPageProps) {
         employeeId: preview.employeeId,
         purpose: preview.purpose,
         issueDate: preview.issueDate,
-        variables: preview.variables
+        variables: preview.variables,
+        addressedTo: preview.addressedTo
       });
       setPreview(null);
       setSelectedCertificateId(generated.id);
@@ -497,6 +526,40 @@ export function CertificatesPage({ user }: CertificatesPageProps) {
               <input value={variableLabel} onChange={(event) => setVariableLabel(event.target.value)} placeholder="Concepto" />
               <input value={variableAmount} onChange={(event) => setVariableAmount(event.target.value)} type="number" min="0" placeholder="Valor" />
             </label>
+            {showAddressedTo ? (
+              <label>
+                Dirigido a
+                <input
+                  value={addressedTo}
+                  onChange={(event) => setAddressedTo(event.target.value)}
+                  placeholder="Ej: BANCOLOMBIA (opcional)"
+                />
+              </label>
+            ) : null}
+            {isActiveEmployee ? (
+              <>
+                <label>
+                  Auxilio de transporte
+                  <input
+                    value={transportAllowance}
+                    onChange={(event) => setTransportAllowance(event.target.value)}
+                    type="number"
+                    min="0"
+                    placeholder="Valor (opcional)"
+                  />
+                </label>
+                <label>
+                  Extras
+                  <input
+                    value={overtimeAmount}
+                    onChange={(event) => setOvertimeAmount(event.target.value)}
+                    type="number"
+                    min="0"
+                    placeholder="Valor (opcional)"
+                  />
+                </label>
+              </>
+            ) : null}
           </div>
           <div className="position-form-actions">
             <button type="button" onClick={() => void runPreview()} disabled={actionPending}>Preview</button>

@@ -1,9 +1,9 @@
 using Npgsql;
 using NpgsqlTypes;
 using System.Globalization;
-using System.Text;
 using System.Text.Json;
 using System.Data;
+using Sg.SuperApp.Api.Certificates;
 using Sg.SuperApp.Api.Configuration;
 using Sg.SuperApp.Api.Contracts.Auth;
 using Sg.SuperApp.Api.Contracts.Portal;
@@ -2076,6 +2076,8 @@ public sealed class PostgresPortalRepository
             previewLines.AddRange(variables.Select(variable => $"{variable.ConceptLabel}: {variable.Amount:0.00}"));
         }
 
+        var addressedTo = string.IsNullOrWhiteSpace(request.AddressedTo) ? null : request.AddressedTo.Trim();
+
         var snapshot = new Dictionary<string, object?>
         {
             ["employeeId"] = employeeId,
@@ -2094,6 +2096,7 @@ public sealed class PostgresPortalRepository
             ["signerId"] = signer.Id,
             ["signerFullName"] = signer.FullName,
             ["signerJobTitle"] = signer.JobTitle,
+            ["addressedTo"] = addressedTo,
             ["variables"] = certificateType == "ACTIVO" ? variables : Array.Empty<CertificateVariableResponse>()
         };
 
@@ -2116,10 +2119,12 @@ public sealed class PostgresPortalRepository
             signer.JobTitle,
             certificateType == "ACTIVO" ? variables : Array.Empty<CertificateVariableResponse>(),
             string.Join("\n", previewLines),
-            snapshot);
+            snapshot,
+            addressedTo,
+            signer.SignaturePath);
     }
 
-    public async Task<LaborCertificateResponse> PersistGeneratedCertificateAsync(CertificatePreviewResponse preview, long actorUserId, string actorUsername, CancellationToken cancellationToken = default)
+    public async Task<LaborCertificateResponse> PersistGeneratedCertificateAsync(CertificatePreviewResponse preview, long actorUserId, string actorUsername, string actorFullName, CancellationToken cancellationToken = default)
     {
         const string nextIdSql = "select nextval(pg_get_serial_sequence('labor_certificates', 'id'));";
         const string insertCertificateSql = @"
@@ -2149,19 +2154,42 @@ public sealed class PostgresPortalRepository
                 ?? throw new InvalidOperationException("No fue posible generar consecutivo de certificado."));
         }
 
-        var templateVersion = "I4-MVP-1";
+        var templateVersion = "I4-MVP-2";
         var certificateNumber = $"SG-I4-{DateTime.UtcNow:yyyyMMdd}-{id:000000}";
         var snapshot = new Dictionary<string, object?>(preview.Snapshot, StringComparer.OrdinalIgnoreCase)
         {
             ["certificateNumber"] = certificateNumber,
             ["templateVersion"] = templateVersion,
             ["approvedBy"] = actorUsername,
-            ["generatedBy"] = actorUsername
+            ["generatedBy"] = actorUsername,
+            ["preparedByFullName"] = actorFullName
         };
+
+        var documentData = new CertificateDocumentData(
+            certificateNumber,
+            preview.CertificateType,
+            preview.Purpose,
+            DateOnly.Parse(preview.IssueDate),
+            preview.EmployeeFullName,
+            preview.IdentificationType,
+            preview.IdentificationNumber,
+            DateOnly.Parse(preview.HireDate),
+            preview.TerminationDate is null ? null : DateOnly.Parse(preview.TerminationDate),
+            preview.TerminationReason,
+            preview.JobTitle,
+            preview.ContractType,
+            preview.BaseSalary,
+            preview.AddressedTo,
+            preview.Variables,
+            preview.SignerFullName,
+            preview.SignerJobTitle,
+            preview.SignerSignaturePath,
+            actorFullName);
+
         var pdfFileName = $"{certificateNumber}.pdf";
         var pdfPath = GetCertificatePdfPath(pdfFileName);
         Directory.CreateDirectory(Path.GetDirectoryName(pdfPath)!);
-        await File.WriteAllBytesAsync(pdfPath, BuildCertificatePdf(preview, certificateNumber), cancellationToken);
+        await File.WriteAllBytesAsync(pdfPath, CertificateDocumentBuilder.Build(documentData), cancellationToken);
 
         DateTimeOffset createdAt;
         DateTimeOffset approvedAt;
@@ -5295,88 +5323,6 @@ from schedule_exceptions where schedule_version_id = @id order by id";
             ? Path.Combine(AppContext.BaseDirectory, "generated-certificates")
             : configuredDirectory;
         return Path.Combine(directory, fileName);
-    }
-
-    private static byte[] BuildCertificatePdf(CertificatePreviewResponse preview, string certificateNumber)
-    {
-        var contentLines = new[]
-        {
-            "S&G Seguridad y Gestion",
-            $"Certificado laboral {certificateNumber}",
-            $"Tipo: {preview.CertificateType}",
-            $"Fecha de expedicion: {preview.IssueDate}",
-            string.Empty,
-            preview.PreviewContent,
-            string.Empty,
-            $"Firmante: {preview.SignerFullName} - {preview.SignerJobTitle}"
-        };
-        var textCommands = new StringBuilder();
-        var y = 760;
-        foreach (var rawLine in string.Join("\n", contentLines).Split('\n'))
-        {
-            textCommands.Append("BT /F1 10 Tf 50 ")
-                .Append(y)
-                .Append(" Td (")
-                .Append(EscapePdfText(rawLine))
-                .AppendLine(") Tj ET");
-            y -= 16;
-        }
-
-        var stream = textCommands.ToString();
-        var objects = new List<string>
-        {
-            "<< /Type /Catalog /Pages 2 0 R >>",
-            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
-            "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-            $"<< /Length {Encoding.ASCII.GetByteCount(stream)} >>\nstream\n{stream}endstream"
-        };
-
-        var pdf = new StringBuilder();
-        pdf.AppendLine("%PDF-1.4");
-        var offsets = new List<int> { 0 };
-        foreach (var item in objects.Select((value, index) => (value, index)))
-        {
-            offsets.Add(Encoding.ASCII.GetByteCount(pdf.ToString()));
-            pdf.Append(item.index + 1).AppendLine(" 0 obj");
-            pdf.AppendLine(item.value);
-            pdf.AppendLine("endobj");
-        }
-
-        var xrefOffset = Encoding.ASCII.GetByteCount(pdf.ToString());
-        pdf.AppendLine("xref");
-        pdf.Append("0 ").Append(objects.Count + 1).AppendLine();
-        pdf.AppendLine("0000000000 65535 f ");
-        foreach (var offset in offsets.Skip(1))
-        {
-            pdf.Append(offset.ToString("0000000000", System.Globalization.CultureInfo.InvariantCulture)).AppendLine(" 00000 n ");
-        }
-
-        pdf.AppendLine("trailer");
-        pdf.Append("<< /Size ").Append(objects.Count + 1).AppendLine(" /Root 1 0 R >>");
-        pdf.AppendLine("startxref");
-        pdf.AppendLine(xrefOffset.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        pdf.AppendLine("%%EOF");
-        return Encoding.ASCII.GetBytes(pdf.ToString());
-    }
-
-    private static string EscapePdfText(string value)
-    {
-        return value
-            .Normalize(NormalizationForm.FormD)
-            .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark)
-            .Aggregate(new StringBuilder(), (builder, c) =>
-            {
-                return c switch
-                {
-                    '(' => builder.Append("\\("),
-                    ')' => builder.Append("\\)"),
-                    '\\' => builder.Append("\\\\"),
-                    _ when c < 32 || c > 126 => builder.Append(' '),
-                    _ => builder.Append(c)
-                };
-            })
-            .ToString();
     }
 
     private static PositionAssignmentResponse ReadPositionAssignment(NpgsqlDataReader reader)

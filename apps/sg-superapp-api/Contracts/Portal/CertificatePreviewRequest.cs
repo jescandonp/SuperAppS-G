@@ -4,4 +4,5 @@ public sealed record CertificatePreviewRequest(
     long EmployeeId,
     string Purpose,
     string IssueDate,
-    IReadOnlyList<CertificateVariableRequest> Variables);
+    IReadOnlyList<CertificateVariableRequest> Variables,
+    string? AddressedTo = null);
