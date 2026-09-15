@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createServicePosition, fetchServicePositionAssignments, fetchServicePositionDetail, fetchServicePositions, inactivateServicePosition, PortalApiError, updateServicePosition } from "../../services/portalApi";
+import { createServicePosition, fetchServicePositionAssignments, fetchServicePositionDetail, fetchServicePositionsPage, inactivateServicePosition, PortalApiError, updateServicePosition } from "../../services/portalApi";
 import type { CurrentUser, PositionAssignment, ServicePosition, ServicePositionRequest, ServicePositionStatus } from "../../types/portal";
 
 function describeDetailError(error: unknown): string {
@@ -34,6 +34,10 @@ export function PositionsPage({ user }: PositionsPageProps) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<ServicePositionStatus | "">("");
   const [positions, setPositions] = useState<ServicePosition[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalCount, setTotalCount] = useState(0);
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedPosition, setSelectedPosition] = useState<ServicePosition | null>(null);
   const [assignments, setAssignments] = useState<PositionAssignment[]>([]);
@@ -52,6 +56,10 @@ export function PositionsPage({ user }: PositionsPageProps) {
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
+    setPage(1);
+  }, [search, status]);
+
+  useEffect(() => {
     let ignore = false;
 
     async function loadPositions() {
@@ -59,27 +67,29 @@ export function PositionsPage({ user }: PositionsPageProps) {
       setErrorMessage(null);
 
       try {
-        const data = await fetchServicePositions({ search, status: status || undefined });
+        const { items, totalCount: total } = await fetchServicePositionsPage({ search, status: status || undefined, page, pageSize });
         if (ignore) {
           return;
         }
 
-        setPositions(data);
-        if (data.length === 0) {
+        setPositions(items);
+        setTotalCount(total);
+        if (items.length === 0) {
           setSelectedId(null);
           setSelectedPosition(null);
           setAssignments([]);
           return;
         }
 
-        const nextId = selectedId !== null && data.some((position) => position.id === selectedId)
+        const nextId = selectedId !== null && items.some((position) => position.id === selectedId)
           ? selectedId
-          : data[0].id;
+          : items[0].id;
         setSelectedId(nextId);
       } catch (error) {
         if (!ignore) {
           setErrorMessage(error instanceof Error ? error.message : "No fue posible cargar puestos de servicio.");
           setPositions([]);
+          setTotalCount(0);
           setSelectedId(null);
           setSelectedPosition(null);
           setAssignments([]);
@@ -96,7 +106,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
     return () => {
       ignore = true;
     };
-  }, [search, status, selectedId, refreshKey]);
+  }, [search, status, selectedId, refreshKey, page, pageSize]);
 
   useEffect(() => {
     if (selectedId === null) {
@@ -296,7 +306,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
         <section className="panel employee-list-panel">
           <div className="panel-header">
             <h3>Listado</h3>
-            <span>{loading ? "Cargando..." : `${positions.length} puestos`}</span>
+            <span>{loading ? "Cargando..." : `${totalCount} puestos`}</span>
           </div>
 
           <div className="employee-table">
@@ -321,6 +331,21 @@ export function PositionsPage({ user }: PositionsPageProps) {
             ))}
 
             {!loading && positions.length === 0 ? <div className="panel-empty">No hay puestos para los filtros actuales.</div> : null}
+          </div>
+
+          <div className="pagination-controls">
+            <button type="button" className="ghost-button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
+              Anterior
+            </button>
+            <span className="muted">{totalCount === 0 ? "Sin resultados" : `Página ${page} de ${totalPages}`}</span>
+            <button type="button" className="ghost-button" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}>
+              Siguiente
+            </button>
+            <select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }}>
+              <option value={25}>25 por página</option>
+              <option value={50}>50 por página</option>
+              <option value={100}>100 por página</option>
+            </select>
           </div>
         </section>
 
