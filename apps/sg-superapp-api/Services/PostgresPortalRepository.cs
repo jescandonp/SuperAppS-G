@@ -1196,8 +1196,17 @@ public sealed class PostgresPortalRepository
         return (employees, totalCount);
     }
 
-    public async Task<IReadOnlyList<ServicePositionResponse>> GetServicePositionsAsync(string? search, string? status, CancellationToken cancellationToken = default)
+    public async Task<(IReadOnlyList<ServicePositionResponse> Items, int TotalCount)> GetServicePositionsAsync(string? search, string? status, int page, int pageSize, CancellationToken cancellationToken = default)
     {
+        const string countSql = @"
+            select count(*)
+            from service_positions sp
+            where (@search is null
+                or sp.name ilike '%' || @search || '%'
+                or sp.code ilike '%' || @search || '%'
+                or sp.client_text ilike '%' || @search || '%')
+              and (@status is null or sp.status = @status);";
+
         const string sql = @"
             select
                 sp.id,
@@ -1218,13 +1227,22 @@ public sealed class PostgresPortalRepository
                 or sp.client_text ilike '%' || @search || '%')
               and (@status is null or sp.status = @status)
             group by sp.id
-            order by sp.name;";
+            order by sp.name
+            limit @pageSize offset @offset;";
 
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
+
+        await using var countCommand = new NpgsqlCommand(countSql, connection);
+        countCommand.Parameters.Add("search", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(search) ? DBNull.Value : search.Trim();
+        countCommand.Parameters.Add("status", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(status) ? DBNull.Value : status.Trim().ToUpperInvariant();
+        var totalCount = Convert.ToInt32(await countCommand.ExecuteScalarAsync(cancellationToken));
+
         await using var command = new NpgsqlCommand(sql, connection);
         command.Parameters.Add("search", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(search) ? DBNull.Value : search.Trim();
         command.Parameters.Add("status", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(status) ? DBNull.Value : status.Trim().ToUpperInvariant();
+        command.Parameters.Add("pageSize", NpgsqlDbType.Integer).Value = pageSize;
+        command.Parameters.Add("offset", NpgsqlDbType.Integer).Value = (page - 1) * pageSize;
 
         var positions = new List<ServicePositionResponse>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -1233,7 +1251,7 @@ public sealed class PostgresPortalRepository
             positions.Add(ReadServicePosition(reader));
         }
 
-        return positions;
+        return (positions, totalCount);
     }
 
     public async Task<ServicePositionResponse?> GetServicePositionByIdAsync(long positionId, CancellationToken cancellationToken = default)
