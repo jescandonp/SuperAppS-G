@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createPositionAssignment, createServicePosition, fetchEmployees, fetchServicePositionAssignments, fetchServicePositionDetail, fetchServicePositionsPage, inactivateServicePosition, PortalApiError, updateServicePosition } from "../../services/portalApi";
+import { createPositionAssignment, createServicePosition, fetchEmployees, fetchServicePositionAssignments, fetchServicePositionDetail, fetchServicePositionsPage, finalizePositionAssignment, inactivateServicePosition, PortalApiError, updateServicePosition } from "../../services/portalApi";
 import type { CurrentUser, EmployeeSummary, PositionAssignment, ServicePosition, ServicePositionRequest, ServicePositionStatus } from "../../types/portal";
 import { Modal } from "../../components/Modal";
 
@@ -65,6 +65,12 @@ export function PositionsPage({ user }: PositionsPageProps) {
   const [assignNotes, setAssignNotes] = useState("");
   const [assignPending, setAssignPending] = useState(false);
   const [assignMessage, setAssignMessage] = useState<string | null>(null);
+  const [finalizingAssignmentId, setFinalizingAssignmentId] = useState<number | null>(null);
+  const [finalizeEndDate, setFinalizeEndDate] = useState("");
+  const [finalizeReason, setFinalizeReason] = useState("");
+  const [finalizeNotes, setFinalizeNotes] = useState("");
+  const [finalizePending, setFinalizePending] = useState(false);
+  const [finalizeMessage, setFinalizeMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setPage(1);
@@ -256,6 +262,41 @@ export function PositionsPage({ user }: PositionsPageProps) {
       setAssignMessage(error instanceof Error ? error.message : "No fue posible crear la asignacion.");
     } finally {
       setAssignPending(false);
+    }
+  }
+
+  function openFinalizeModal(assignmentId: number) {
+    setFinalizeEndDate(new Date().toISOString().slice(0, 10));
+    setFinalizeReason("");
+    setFinalizeNotes("");
+    setFinalizeMessage(null);
+    setFinalizingAssignmentId(assignmentId);
+  }
+
+  async function finalizeAssignment() {
+    if (!selectedPosition || finalizingAssignmentId === null) {
+      return;
+    }
+
+    if (!finalizeEndDate) {
+      setFinalizeMessage("La fecha fin es obligatoria.");
+      return;
+    }
+
+    setFinalizePending(true);
+    setFinalizeMessage(null);
+    try {
+      await finalizePositionAssignment(finalizingAssignmentId, {
+        endDate: finalizeEndDate,
+        changeReason: finalizeReason.trim() || null,
+        notes: finalizeNotes.trim() || null
+      });
+      await reloadPosition(selectedPosition.id);
+      setFinalizingAssignmentId(null);
+    } catch (error) {
+      setFinalizeMessage(error instanceof Error ? error.message : "No fue posible finalizar la asignacion.");
+    } finally {
+      setFinalizePending(false);
     }
   }
 
@@ -473,6 +514,22 @@ export function PositionsPage({ user }: PositionsPageProps) {
                 </Modal>
               ) : null}
 
+              {finalizingAssignmentId !== null ? (
+                <Modal title="Finalizar asignación" onClose={() => setFinalizingAssignmentId(null)}>
+                  <div className="position-form">
+                    {finalizeMessage ? <p className="muted">{finalizeMessage}</p> : null}
+                    <input type="date" value={finalizeEndDate} onChange={(event) => setFinalizeEndDate(event.target.value)} />
+                    <input value={finalizeReason} onChange={(event) => setFinalizeReason(event.target.value)} placeholder="Motivo opcional" />
+                    <textarea value={finalizeNotes} onChange={(event) => setFinalizeNotes(event.target.value)} placeholder="Notas opcionales" />
+                    <div className="position-form-actions">
+                      <button type="button" onClick={() => void finalizeAssignment()} disabled={finalizePending}>
+                        {finalizePending ? "Finalizando..." : "Finalizar"}
+                      </button>
+                    </div>
+                  </div>
+                </Modal>
+              ) : null}
+
               <dl>
                 <div>
                   <dt>Estado</dt>
@@ -500,10 +557,17 @@ export function PositionsPage({ user }: PositionsPageProps) {
                 {currentAssignments.map((assignment) => (
                   <article key={assignment.id} className="assignment-card">
                     <div>
-                      <strong>Empleado #{assignment.employeeId}</strong>
-                      <p className="muted">{formatDate(assignment.startDate)} · {assignment.createdBy || "sin usuario"}</p>
+                      <strong>{assignment.employeeFullName}</strong>
+                      <p className="muted">{assignment.employeeIdentificationNumber} · {formatDate(assignment.startDate)} · {assignment.createdBy || "sin usuario"}</p>
                     </div>
-                    <span className={`status-chip ${getStatusClass(assignment.status)}`}>{assignment.status}</span>
+                    <div className="employee-row-meta">
+                      <span className={`status-chip ${getStatusClass(assignment.status)}`}>{assignment.status}</span>
+                      {canManagePositions ? (
+                        <button type="button" className="ghost-button" onClick={() => openFinalizeModal(assignment.id)}>
+                          Finalizar
+                        </button>
+                      ) : null}
+                    </div>
                   </article>
                 ))}
                 {currentAssignments.length === 0 ? <div className="panel-empty compact-empty">Sin asignaciones vigentes.</div> : null}
@@ -517,7 +581,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
                 {historicalAssignments.map((assignment) => (
                   <article key={assignment.id} className="assignment-card">
                     <div>
-                      <strong>Empleado #{assignment.employeeId}</strong>
+                      <strong>{assignment.employeeFullName}</strong>
                       <p className="muted">
                         {formatDate(assignment.startDate)} - {formatDate(assignment.endDate)} · {assignment.changeReason || "sin motivo"}
                       </p>
