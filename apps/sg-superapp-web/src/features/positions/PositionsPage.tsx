@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { createServicePosition, fetchServicePositionAssignments, fetchServicePositionDetail, fetchServicePositionsPage, inactivateServicePosition, PortalApiError, updateServicePosition } from "../../services/portalApi";
-import type { CurrentUser, PositionAssignment, ServicePosition, ServicePositionRequest, ServicePositionStatus } from "../../types/portal";
+import { createPositionAssignment, createServicePosition, fetchEmployees, fetchServicePositionAssignments, fetchServicePositionDetail, fetchServicePositionsPage, inactivateServicePosition, PortalApiError, updateServicePosition } from "../../services/portalApi";
+import type { CurrentUser, EmployeeSummary, PositionAssignment, ServicePosition, ServicePositionRequest, ServicePositionStatus } from "../../types/portal";
 import { Modal } from "../../components/Modal";
 
 function describeDetailError(error: unknown): string {
@@ -56,6 +56,15 @@ export function PositionsPage({ user }: PositionsPageProps) {
   const [formNotes, setFormNotes] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [isPositionModalOpen, setIsPositionModalOpen] = useState(false);
+  const [isAssignEmployeeModalOpen, setIsAssignEmployeeModalOpen] = useState(false);
+  const [employeeSearch, setEmployeeSearch] = useState("");
+  const [employeeOptions, setEmployeeOptions] = useState<EmployeeSummary[]>([]);
+  const [assignEmployeeId, setAssignEmployeeId] = useState("");
+  const [assignStartDate, setAssignStartDate] = useState("");
+  const [assignReason, setAssignReason] = useState("");
+  const [assignNotes, setAssignNotes] = useState("");
+  const [assignPending, setAssignPending] = useState(false);
+  const [assignMessage, setAssignMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setPage(1);
@@ -109,6 +118,31 @@ export function PositionsPage({ user }: PositionsPageProps) {
       ignore = true;
     };
   }, [search, status, selectedId, refreshKey, page, pageSize]);
+
+  useEffect(() => {
+    if (!isAssignEmployeeModalOpen) {
+      return;
+    }
+
+    let ignore = false;
+    async function loadEmployeeOptions() {
+      try {
+        const data = await fetchEmployees({ search: employeeSearch || undefined, status: "ACTIVO" });
+        if (!ignore) {
+          setEmployeeOptions(data.slice(0, 20));
+        }
+      } catch {
+        if (!ignore) {
+          setEmployeeOptions([]);
+        }
+      }
+    }
+
+    void loadEmployeeOptions();
+    return () => {
+      ignore = true;
+    };
+  }, [isAssignEmployeeModalOpen, employeeSearch]);
 
   useEffect(() => {
     if (selectedId === null) {
@@ -184,6 +218,45 @@ export function PositionsPage({ user }: PositionsPageProps) {
     setFormNotes(selectedPosition.notes || "");
     setActionMessage(null);
     setIsPositionModalOpen(true);
+  }
+
+  function openAssignEmployeeModal() {
+    setEmployeeSearch("");
+    setEmployeeOptions([]);
+    setAssignEmployeeId("");
+    setAssignStartDate(new Date().toISOString().slice(0, 10));
+    setAssignReason("");
+    setAssignNotes("");
+    setAssignMessage(null);
+    setIsAssignEmployeeModalOpen(true);
+  }
+
+  async function assignEmployee() {
+    if (!selectedPosition) {
+      return;
+    }
+
+    if (!assignEmployeeId || !assignStartDate) {
+      setAssignMessage("Seleccione un empleado y una fecha de inicio.");
+      return;
+    }
+
+    setAssignPending(true);
+    setAssignMessage(null);
+    try {
+      await createPositionAssignment(Number(assignEmployeeId), {
+        positionId: selectedPosition.id,
+        startDate: assignStartDate,
+        changeReason: assignReason.trim() || null,
+        notes: assignNotes.trim() || null
+      });
+      await reloadPosition(selectedPosition.id);
+      setIsAssignEmployeeModalOpen(false);
+    } catch (error) {
+      setAssignMessage(error instanceof Error ? error.message : "No fue posible crear la asignacion.");
+    } finally {
+      setAssignPending(false);
+    }
   }
 
   function buildRequest(): ServicePositionRequest | null {
@@ -367,6 +440,37 @@ export function PositionsPage({ user }: PositionsPageProps) {
                 <div className="position-form-actions">
                   <button type="button" onClick={openEditModal}>Editar puesto</button>
                 </div>
+              ) : null}
+
+              {canManagePositions && selectedPosition.status === "ACTIVO" ? (
+                <div className="position-form-actions">
+                  <button type="button" onClick={openAssignEmployeeModal}>Asignar empleado</button>
+                </div>
+              ) : null}
+
+              {isAssignEmployeeModalOpen ? (
+                <Modal title="Asignar empleado" onClose={() => setIsAssignEmployeeModalOpen(false)}>
+                  <div className="position-form">
+                    {assignMessage ? <p className="muted">{assignMessage}</p> : null}
+                    <input value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} placeholder="Buscar empleado" />
+                    <select value={assignEmployeeId} onChange={(event) => setAssignEmployeeId(event.target.value)}>
+                      <option value="">Seleccione empleado</option>
+                      {employeeOptions.map((employee) => (
+                        <option key={employee.id} value={employee.id}>
+                          {employee.fullName} · {employee.identificationNumber} · {employee.employmentStatus}
+                        </option>
+                      ))}
+                    </select>
+                    <input type="date" value={assignStartDate} onChange={(event) => setAssignStartDate(event.target.value)} />
+                    <input value={assignReason} onChange={(event) => setAssignReason(event.target.value)} placeholder="Motivo opcional" />
+                    <textarea value={assignNotes} onChange={(event) => setAssignNotes(event.target.value)} placeholder="Notas opcionales" />
+                    <div className="position-form-actions">
+                      <button type="button" onClick={() => void assignEmployee()} disabled={assignPending}>
+                        {assignPending ? "Asignando..." : "Asignar"}
+                      </button>
+                    </div>
+                  </div>
+                </Modal>
               ) : null}
 
               <dl>
