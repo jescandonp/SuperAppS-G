@@ -783,7 +783,9 @@ Reemplazar el bloque completo desde `{selectedPosition || formMode === "create" 
               ) : null}
 ```
 
-Nota: el `) : (` que sigue en el original (con el `<div className="panel-empty">Seleccione un puesto para ver su detalle.</div>`) se mantiene tal cual como rama `else` de este `selectedPosition ?` — ya no hace falta la rama especial para `formMode === "create"` porque crear ya no depende de tener algo (o nada) seleccionado.
+Nota: el `) : (` que sigue en el original (con el `<div className="panel-empty">Seleccione un puesto para ver su detalle.</div>`) se mantiene tal cual como rama `else` de este `selectedPosition ?`.
+
+**Fix aplicado durante la revisión de esta tarea (corrección al texto de arriba):** la afirmación "ya no hace falta la rama especial para `formMode === "create"` porque crear ya no depende de tener algo seleccionado" era **incorrecta** — tal como está escrito el bloque de arriba, el modal de crear/editar queda anidado dentro de `{selectedPosition ? (...) : (<panel-empty>)}`, así que con la lista de puestos vacía (o un filtro sin resultados) `selectedPosition` es `null`, el modal nunca se monta, y el botón "Nuevo puesto" no hace nada visible. El revisor de la tarea lo encontró y se corrigió: el bloque `{isPositionModalOpen ? (<Modal>...) : null}` (líneas 762-783 de arriba) se reubicó como hermano de `<div className="employees-grid">`, a nivel superior dentro de `<div className="employees-workspace">` — fuera de la rama `selectedPosition ?` — para que "Nuevo puesto" funcione sin importar si hay algo seleccionado. El contenido del modal no cambió, solo su posición en el árbol. Las Tasks 6 y 7 (sus propios modales de Asignar empleado/Finalizar) sí se quedan anidados dentro de `.employee-detail`, porque esos dos correctamente requieren un puesto seleccionado.
 
 Las secciones "Asignaciones vigentes", "Historial basico" y el `<p className="muted role-note">` final (líneas 406-446 originales) **no cambian en este task** — Task 6 y 7 las tocan.
 
@@ -935,7 +937,7 @@ Agregar, inmediatamente después del bloque `{canManagePositions ? (<div classNa
               ) : null}
 ```
 
-Y agregar el modal, después del cierre del modal de crear/editar (`{isPositionModalOpen ? (...) : null}` de Task 5), todavía dentro de `.employee-detail`:
+Y agregar el modal, inmediatamente después del bloque del botón "Asignar empleado" que se acaba de agregar en este mismo paso, todavía dentro de `.employee-detail` (nota de fix: el modal de crear/editar de Task 5 ya no vive dentro de `.employee-detail` — un fix aplicado durante la ejecución lo movió al nivel superior del componente para que "Nuevo puesto" funcione sin ningún puesto seleccionado; este modal de asignar SÍ se queda dentro de `.employee-detail` porque requiere un puesto seleccionado por diseño):
 
 ```tsx
               {isAssignEmployeeModalOpen ? (
