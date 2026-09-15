@@ -69,7 +69,7 @@ patrón ya usado por `fetchEmployees`). La llamada de
 `PositionsPage` guarda `page`/`pageSize` en estado (`pageSize` inicia en
 25). Cambiar `search` o `status` reinicia `page` a 1. Debajo de la tabla:
 controles "Anterior"/"Siguiente" (deshabilitados en los extremos),
-indicador "Página X de Y", selector de tamaño (20/50/100) — idéntico a
+indicador "Página X de Y", selector de tamaño (25/50/100) — idéntico a
 Empleados.
 
 ## 4. Panel de Detalle — se mantiene el resumen, se saca el formulario
@@ -161,6 +161,22 @@ iteración — con solo 2 usos reales y selectores de entrada distintos
 añade complejidad sin beneficio claro (YAGNI). Lo único compartido son las
 funciones ya existentes de `portalApi.ts` (`createPositionAssignment`/
 `finalizePositionAssignment`) y el primitivo `Modal`.
+
+## 8bis. Adenda — nombre del empleado en `PositionAssignment`
+
+Detectado al planear la implementación: las tarjetas de "Asignaciones
+vigentes" hoy muestran literalmente "Empleado #{id}" — inservible para un
+botón "Finalizar" recién agregado, donde hace falta saber a quién se le
+está finalizando la asignación sin salir de Puestos. `PositionAssignment`
+ya denormaliza `positionName`/`positionCode`/`clientText` del lado del
+puesto (para que Empleados no necesite un segundo query); se agrega el
+mismo tratamiento del lado del empleado: `employeeFullName` e
+`employeeIdentificationNumber`, vía un `join employees e on e.id =
+epa.employee_id` en las tres consultas que arman `PositionAssignmentResponse`
+(`GetEmployeePositionAssignmentsAsync`, `GetPositionAssignmentsAsync`,
+`GetPositionAssignmentByIdAsync`, todas en `PostgresPortalRepository.cs`).
+Beneficia también a Empleados (aunque no lo necesite hoy, ya sabe de quién
+es la tarjeta) sin quitarle nada.
 
 ## 9. Fuera de alcance
 
