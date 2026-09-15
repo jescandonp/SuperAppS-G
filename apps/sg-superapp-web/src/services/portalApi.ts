@@ -457,6 +457,47 @@ export async function fetchServicePositions(filters: { search?: string; status?:
   return getJson<ServicePosition[]>(`/portal/positions${query ? `?${query}` : ""}`);
 }
 
+export interface ServicePositionsPageResult {
+  items: ServicePosition[];
+  totalCount: number;
+}
+
+export async function fetchServicePositionsPage(filters: {
+  search?: string;
+  status?: ServicePositionStatus;
+  page: number;
+  pageSize: number;
+}): Promise<ServicePositionsPageResult> {
+  const params = new URLSearchParams();
+
+  if (filters.search) {
+    params.set("search", filters.search);
+  }
+
+  if (filters.status) {
+    params.set("status", filters.status);
+  }
+
+  params.set("page", String(filters.page));
+  params.set("pageSize", String(filters.pageSize));
+
+  const response = await fetch(`${API_BASE_URL}/portal/positions?${params.toString()}`, {
+    headers: getSessionHeaders()
+  });
+
+  if (!response.ok) {
+    throw new PortalApiError(await readProblem(response));
+  }
+
+  const items = (await response.json()) as ServicePosition[];
+  const totalCountHeader = response.headers.get("X-Total-Count");
+  if (totalCountHeader === null) {
+    console.warn("fetchServicePositionsPage: falta el header X-Total-Count en la respuesta; usando la longitud de la pagina actual como total.");
+  }
+  const totalCount = Number(totalCountHeader ?? items.length);
+  return { items, totalCount };
+}
+
 export async function fetchServicePositionDetail(positionId: number): Promise<ServicePosition> {
   return getJson<ServicePosition>(`/portal/positions/${positionId}`);
 }
