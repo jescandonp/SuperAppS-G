@@ -388,29 +388,6 @@ export function PositionsPage({ user }: PositionsPageProps) {
                 </div>
               </dl>
 
-              {isPositionModalOpen ? (
-                <Modal title={formMode === "create" ? "Crear puesto" : "Editar puesto"} onClose={() => setIsPositionModalOpen(false)}>
-                  <div className="position-form">
-                    {actionMessage ? <p className="muted">{actionMessage}</p> : null}
-                    <input value={formCode} onChange={(event) => setFormCode(event.target.value)} placeholder="Codigo opcional" />
-                    <input value={formName} onChange={(event) => setFormName(event.target.value)} placeholder="Nombre obligatorio" />
-                    <input value={formClientText} onChange={(event) => setFormClientText(event.target.value)} placeholder="Cliente texto libre" />
-                    <input value={formLocationText} onChange={(event) => setFormLocationText(event.target.value)} placeholder="Ubicacion" />
-                    <textarea value={formNotes} onChange={(event) => setFormNotes(event.target.value)} placeholder="Observaciones" />
-                    <div className="position-form-actions">
-                      <button type="button" onClick={() => void savePosition()} disabled={actionPending}>
-                        {actionPending ? "Guardando..." : formMode === "create" ? "Crear puesto" : "Guardar cambios"}
-                      </button>
-                      {selectedPosition.status === "ACTIVO" && formMode === "edit" ? (
-                        <button type="button" className="danger-action" onClick={() => void deactivateSelectedPosition()} disabled={actionPending}>
-                          Inactivar
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                </Modal>
-              ) : null}
-
               {selectedPosition ? <div className="position-detail-section">
                 <div className="panel-header compact-header">
                   <h4>Asignaciones vigentes</h4>
@@ -458,6 +435,29 @@ export function PositionsPage({ user }: PositionsPageProps) {
           )}
         </aside>
       </div>
+
+      {isPositionModalOpen ? (
+        <Modal title={formMode === "create" ? "Crear puesto" : "Editar puesto"} onClose={() => setIsPositionModalOpen(false)}>
+          <div className="position-form">
+            {actionMessage ? <p className="muted">{actionMessage}</p> : null}
+            <input value={formCode} onChange={(event) => setFormCode(event.target.value)} placeholder="Codigo opcional" />
+            <input value={formName} onChange={(event) => setFormName(event.target.value)} placeholder="Nombre obligatorio" />
+            <input value={formClientText} onChange={(event) => setFormClientText(event.target.value)} placeholder="Cliente texto libre" />
+            <input value={formLocationText} onChange={(event) => setFormLocationText(event.target.value)} placeholder="Ubicacion" />
+            <textarea value={formNotes} onChange={(event) => setFormNotes(event.target.value)} placeholder="Observaciones" />
+            <div className="position-form-actions">
+              <button type="button" onClick={() => void savePosition()} disabled={actionPending}>
+                {actionPending ? "Guardando..." : formMode === "create" ? "Crear puesto" : "Guardar cambios"}
+              </button>
+              {selectedPosition?.status === "ACTIVO" && formMode === "edit" ? (
+                <button type="button" className="danger-action" onClick={() => void deactivateSelectedPosition()} disabled={actionPending}>
+                  Inactivar
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   );
 }
