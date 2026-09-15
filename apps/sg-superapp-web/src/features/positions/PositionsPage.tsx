@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createServicePosition, fetchServicePositionAssignments, fetchServicePositionDetail, fetchServicePositionsPage, inactivateServicePosition, PortalApiError, updateServicePosition } from "../../services/portalApi";
 import type { CurrentUser, PositionAssignment, ServicePosition, ServicePositionRequest, ServicePositionStatus } from "../../types/portal";
+import { Modal } from "../../components/Modal";
 
 function describeDetailError(error: unknown): string {
   if (error instanceof PortalApiError && error.status === 404) {
@@ -54,6 +55,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
   const [formLocationText, setFormLocationText] = useState("");
   const [formNotes, setFormNotes] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isPositionModalOpen, setIsPositionModalOpen] = useState(false);
 
   useEffect(() => {
     setPage(1);
@@ -150,18 +152,6 @@ export function PositionsPage({ user }: PositionsPageProps) {
     };
   }, [selectedId]);
 
-  useEffect(() => {
-    if (!selectedPosition || formMode !== "edit") {
-      return;
-    }
-
-    setFormCode(selectedPosition.code || "");
-    setFormName(selectedPosition.name);
-    setFormClientText(selectedPosition.clientText || "");
-    setFormLocationText(selectedPosition.locationText || "");
-    setFormNotes(selectedPosition.notes || "");
-  }, [selectedPosition, formMode]);
-
   const canManagePositions = user.role === "ADMIN" || user.role === "TH";
   const currentAssignments = assignments.filter((assignment) => assignment.status === "VIGENTE");
   const historicalAssignments = assignments.filter((assignment) => assignment.status !== "VIGENTE");
@@ -172,6 +162,28 @@ export function PositionsPage({ user }: PositionsPageProps) {
     setFormClientText("");
     setFormLocationText("");
     setFormNotes("");
+  }
+
+  function openCreateModal() {
+    setFormMode("create");
+    clearForm();
+    setActionMessage(null);
+    setIsPositionModalOpen(true);
+  }
+
+  function openEditModal() {
+    if (!selectedPosition) {
+      return;
+    }
+
+    setFormMode("edit");
+    setFormCode(selectedPosition.code || "");
+    setFormName(selectedPosition.name);
+    setFormClientText(selectedPosition.clientText || "");
+    setFormLocationText(selectedPosition.locationText || "");
+    setFormNotes(selectedPosition.notes || "");
+    setActionMessage(null);
+    setIsPositionModalOpen(true);
   }
 
   function buildRequest(): ServicePositionRequest | null {
@@ -219,9 +231,8 @@ export function PositionsPage({ user }: PositionsPageProps) {
         setSelectedId(created.id);
         setSelectedPosition(created);
         setAssignments([]);
-        setFormMode("edit");
         setRefreshKey((current) => current + 1);
-        setActionMessage("Puesto creado.");
+        setIsPositionModalOpen(false);
         return;
       }
 
@@ -233,7 +244,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
       const updated = await updateServicePosition(selectedPosition.id, request);
       setSelectedPosition(updated);
       setPositions((current) => current.map((item) => item.id === updated.id ? updated : item));
-      setActionMessage("Puesto actualizado.");
+      setIsPositionModalOpen(false);
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "No fue posible guardar el puesto.");
     } finally {
@@ -281,19 +292,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
             <option value="INACTIVO">Inactivos</option>
           </select>
           {canManagePositions ? (
-            <button
-              type="button"
-              className="secondary-action"
-              onClick={() => {
-                setFormMode("create");
-                setSelectedId(null);
-                setSelectedPosition(null);
-                setAssignments([]);
-                setDetailErrorMessage(null);
-                clearForm();
-                setActionMessage(null);
-              }}
-            >
+            <button type="button" className="secondary-action" onClick={openCreateModal}>
               Nuevo puesto
             </button>
           ) : null}
@@ -357,23 +356,20 @@ export function PositionsPage({ user }: PositionsPageProps) {
 
           {detailErrorMessage ? <div className="panel-empty">{detailErrorMessage}</div> : null}
 
-          {selectedPosition || formMode === "create" ? (
+          {selectedPosition ? (
             <div className="employee-detail">
-              {selectedPosition ? (
-                <>
-                  <h4>{selectedPosition.name}</h4>
-                  <p className="muted">
-                    {selectedPosition.code || "Sin codigo"} · {selectedPosition.clientText || "Sin cliente"}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <h4>Nuevo puesto de servicio</h4>
-                  <p className="muted">Registro maestro con cliente como texto libre.</p>
-                </>
-              )}
+              <h4>{selectedPosition.name}</h4>
+              <p className="muted">
+                {selectedPosition.code || "Sin codigo"} · {selectedPosition.clientText || "Sin cliente"}
+              </p>
 
-              {selectedPosition ? <dl>
+              {canManagePositions ? (
+                <div className="position-form-actions">
+                  <button type="button" onClick={openEditModal}>Editar puesto</button>
+                </div>
+              ) : null}
+
+              <dl>
                 <div>
                   <dt>Estado</dt>
                   <dd><span className={`status-chip ${getStatusClass(selectedPosition.status)}`}>{selectedPosition.status}</span></dd>
@@ -390,42 +386,29 @@ export function PositionsPage({ user }: PositionsPageProps) {
                   <dt>Observaciones</dt>
                   <dd>{selectedPosition.notes || "Sin observaciones"}</dd>
                 </div>
-              </dl> : null}
+              </dl>
 
-              {canManagePositions ? (
-                <div className="position-form">
-                  <div className="panel-header compact-header">
-                    <h4>{formMode === "create" ? "Crear puesto" : "Editar puesto"}</h4>
-                    {formMode === "create" && positions.length > 0 ? (
-                      <button
-                        type="button"
-                        className="ghost-button"
-                        onClick={() => {
-                          setFormMode("edit");
-                          setSelectedId(positions[0].id);
-                        }}
-                      >
-                        Cancelar
+              {isPositionModalOpen ? (
+                <Modal title={formMode === "create" ? "Crear puesto" : "Editar puesto"} onClose={() => setIsPositionModalOpen(false)}>
+                  <div className="position-form">
+                    {actionMessage ? <p className="muted">{actionMessage}</p> : null}
+                    <input value={formCode} onChange={(event) => setFormCode(event.target.value)} placeholder="Codigo opcional" />
+                    <input value={formName} onChange={(event) => setFormName(event.target.value)} placeholder="Nombre obligatorio" />
+                    <input value={formClientText} onChange={(event) => setFormClientText(event.target.value)} placeholder="Cliente texto libre" />
+                    <input value={formLocationText} onChange={(event) => setFormLocationText(event.target.value)} placeholder="Ubicacion" />
+                    <textarea value={formNotes} onChange={(event) => setFormNotes(event.target.value)} placeholder="Observaciones" />
+                    <div className="position-form-actions">
+                      <button type="button" onClick={() => void savePosition()} disabled={actionPending}>
+                        {actionPending ? "Guardando..." : formMode === "create" ? "Crear puesto" : "Guardar cambios"}
                       </button>
-                    ) : null}
+                      {selectedPosition.status === "ACTIVO" && formMode === "edit" ? (
+                        <button type="button" className="danger-action" onClick={() => void deactivateSelectedPosition()} disabled={actionPending}>
+                          Inactivar
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
-                  <input value={formCode} onChange={(event) => setFormCode(event.target.value)} placeholder="Codigo opcional" />
-                  <input value={formName} onChange={(event) => setFormName(event.target.value)} placeholder="Nombre obligatorio" />
-                  <input value={formClientText} onChange={(event) => setFormClientText(event.target.value)} placeholder="Cliente texto libre" />
-                  <input value={formLocationText} onChange={(event) => setFormLocationText(event.target.value)} placeholder="Ubicacion" />
-                  <textarea value={formNotes} onChange={(event) => setFormNotes(event.target.value)} placeholder="Observaciones" />
-                  <div className="position-form-actions">
-                    <button type="button" onClick={() => void savePosition()} disabled={actionPending}>
-                      {actionPending ? "Guardando..." : formMode === "create" ? "Crear puesto" : "Guardar cambios"}
-                    </button>
-                    {selectedPosition && selectedPosition.status === "ACTIVO" && formMode === "edit" ? (
-                      <button type="button" className="danger-action" onClick={() => void deactivateSelectedPosition()} disabled={actionPending}>
-                        Inactivar
-                      </button>
-                    ) : null}
-                  </div>
-                  {actionMessage ? <p className="muted">{actionMessage}</p> : null}
-                </div>
+                </Modal>
               ) : null}
 
               {selectedPosition ? <div className="position-detail-section">
