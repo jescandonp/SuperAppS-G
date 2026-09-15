@@ -2630,6 +2630,8 @@ public sealed class PostgresPortalRepository
             select
                 epa.id,
                 epa.employee_id,
+                e.full_name as employee_full_name,
+                e.identification_number as employee_identification_number,
                 epa.position_id,
                 sp.name as position_name,
                 sp.code as position_code,
@@ -2644,6 +2646,7 @@ public sealed class PostgresPortalRepository
                 epa.updated_at
             from employee_position_assignments epa
             join service_positions sp on sp.id = epa.position_id
+            join employees e on e.id = epa.employee_id
             where epa.employee_id = @employeeId
             order by epa.start_date desc, epa.id desc;";
 
@@ -2668,6 +2671,8 @@ public sealed class PostgresPortalRepository
             select
                 epa.id,
                 epa.employee_id,
+                e.full_name as employee_full_name,
+                e.identification_number as employee_identification_number,
                 epa.position_id,
                 sp.name as position_name,
                 sp.code as position_code,
@@ -2682,6 +2687,7 @@ public sealed class PostgresPortalRepository
                 epa.updated_at
             from employee_position_assignments epa
             join service_positions sp on sp.id = epa.position_id
+            join employees e on e.id = epa.employee_id
             where epa.position_id = @positionId
             order by
                 case when epa.status = 'VIGENTE' then 0 else 1 end,
@@ -2709,6 +2715,8 @@ public sealed class PostgresPortalRepository
             select
                 epa.id,
                 epa.employee_id,
+                e.full_name as employee_full_name,
+                e.identification_number as employee_identification_number,
                 epa.position_id,
                 sp.name as position_name,
                 sp.code as position_code,
@@ -2723,6 +2731,7 @@ public sealed class PostgresPortalRepository
                 epa.updated_at
             from employee_position_assignments epa
             join service_positions sp on sp.id = epa.position_id
+            join employees e on e.id = epa.employee_id
             where epa.id = @assignmentId
             limit 1;";
 
@@ -5330,6 +5339,8 @@ from schedule_exceptions where schedule_version_id = @id order by id";
         return new PositionAssignmentResponse(
             reader.GetInt64(reader.GetOrdinal("id")),
             reader.GetInt64(reader.GetOrdinal("employee_id")),
+            reader.GetString(reader.GetOrdinal("employee_full_name")),
+            reader.GetString(reader.GetOrdinal("employee_identification_number")),
             reader.GetInt64(reader.GetOrdinal("position_id")),
             reader.GetString(reader.GetOrdinal("position_name")),
             reader.IsDBNull(reader.GetOrdinal("position_code")) ? null : reader.GetString(reader.GetOrdinal("position_code")),

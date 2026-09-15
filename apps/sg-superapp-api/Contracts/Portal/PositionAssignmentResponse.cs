@@ -3,6 +3,8 @@ namespace Sg.SuperApp.Api.Contracts.Portal;
 public sealed record PositionAssignmentResponse(
     long Id,
     long EmployeeId,
+    string EmployeeFullName,
+    string EmployeeIdentificationNumber,
     long PositionId,
     string PositionName,
     string? PositionCode,

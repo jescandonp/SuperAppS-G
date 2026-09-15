@@ -366,6 +366,8 @@ export type PositionAssignmentStatus = "VIGENTE" | "FINALIZADA";
 export interface PositionAssignment {
   id: number;
   employeeId: number;
+  employeeFullName: string;
+  employeeIdentificationNumber: string;
   positionId: number;
   positionName: string;
   positionCode: string | null;
