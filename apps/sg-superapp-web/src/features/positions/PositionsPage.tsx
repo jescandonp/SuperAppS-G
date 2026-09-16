@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPositionAssignment, createServicePosition, fetchEmployees, fetchServicePositionAssignments, fetchServicePositionDetail, fetchServicePositionsPage, finalizePositionAssignment, inactivateServicePosition, PortalApiError, updateServicePosition } from "../../services/portalApi";
 import type { CurrentUser, EmployeeSummary, PositionAssignment, ServicePosition, ServicePositionRequest, ServicePositionStatus } from "../../types/portal";
 import { Modal } from "../../components/Modal";
@@ -31,6 +31,11 @@ function getStatusClass(status: ServicePosition["status"] | PositionAssignment["
   return status === "ACTIVO" || status === "VIGENTE" ? "status-active" : "status-retired";
 }
 
+type FinalizeTarget = {
+  assignment: PositionAssignment;
+  position: ServicePosition;
+};
+
 export function PositionsPage({ user }: PositionsPageProps) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<ServicePositionStatus | "">("");
@@ -40,6 +45,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
   const [totalCount, setTotalCount] = useState(0);
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const selectedIdRef = useRef<number | null>(null);
   const [selectedPosition, setSelectedPosition] = useState<ServicePosition | null>(null);
   const [assignments, setAssignments] = useState<PositionAssignment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,12 +71,36 @@ export function PositionsPage({ user }: PositionsPageProps) {
   const [assignNotes, setAssignNotes] = useState("");
   const [assignPending, setAssignPending] = useState(false);
   const [assignMessage, setAssignMessage] = useState<string | null>(null);
-  const [finalizingAssignmentId, setFinalizingAssignmentId] = useState<number | null>(null);
+  const [finalizeTarget, setFinalizeTarget] = useState<FinalizeTarget | null>(null);
+  const finalizeTargetRef = useRef<FinalizeTarget | null>(null);
   const [finalizeEndDate, setFinalizeEndDate] = useState("");
   const [finalizeReason, setFinalizeReason] = useState("");
   const [finalizeNotes, setFinalizeNotes] = useState("");
   const [finalizePending, setFinalizePending] = useState(false);
   const [finalizeMessage, setFinalizeMessage] = useState<string | null>(null);
+
+  function closeFinalizeModal() {
+    finalizeTargetRef.current = null;
+    setFinalizeTarget(null);
+    setFinalizeEndDate("");
+    setFinalizeReason("");
+    setFinalizeNotes("");
+    setFinalizePending(false);
+    setFinalizeMessage(null);
+  }
+
+  function selectPosition(positionId: number | null) {
+    if (selectedIdRef.current === positionId) {
+      return;
+    }
+
+    selectedIdRef.current = positionId;
+    closeFinalizeModal();
+    setSelectedId(positionId);
+    setSelectedPosition(null);
+    setAssignments([]);
+    setDetailErrorMessage(null);
+  }
 
   useEffect(() => {
     setPage(1);
@@ -92,24 +122,20 @@ export function PositionsPage({ user }: PositionsPageProps) {
         setPositions(items);
         setTotalCount(total);
         if (items.length === 0) {
-          setSelectedId(null);
-          setSelectedPosition(null);
-          setAssignments([]);
+          selectPosition(null);
           return;
         }
 
         const nextId = selectedId !== null && items.some((position) => position.id === selectedId)
           ? selectedId
           : items[0].id;
-        setSelectedId(nextId);
+        selectPosition(nextId);
       } catch (error) {
         if (!ignore) {
           setErrorMessage(error instanceof Error ? error.message : "No fue posible cargar puestos de servicio.");
           setPositions([]);
           setTotalCount(0);
-          setSelectedId(null);
-          setSelectedPosition(null);
-          setAssignments([]);
+          selectPosition(null);
         }
       } finally {
         if (!ignore) {
@@ -157,6 +183,8 @@ export function PositionsPage({ user }: PositionsPageProps) {
 
     const positionId = selectedId;
     let ignore = false;
+
+    closeFinalizeModal();
 
     async function loadDetail() {
       setDetailLoading(true);
@@ -265,16 +293,23 @@ export function PositionsPage({ user }: PositionsPageProps) {
     }
   }
 
-  function openFinalizeModal(assignmentId: number) {
+  function openFinalizeModal(assignment: PositionAssignment) {
+    if (!selectedPosition || assignment.status !== "VIGENTE") {
+      return;
+    }
+
     setFinalizeEndDate(new Date().toISOString().slice(0, 10));
     setFinalizeReason("");
     setFinalizeNotes("");
     setFinalizeMessage(null);
-    setFinalizingAssignmentId(assignmentId);
+    const target = { assignment, position: selectedPosition };
+    finalizeTargetRef.current = target;
+    setFinalizeTarget(target);
   }
 
   async function finalizeAssignment() {
-    if (!selectedPosition || finalizingAssignmentId === null) {
+    const target = finalizeTargetRef.current;
+    if (!target) {
       return;
     }
 
@@ -286,17 +321,23 @@ export function PositionsPage({ user }: PositionsPageProps) {
     setFinalizePending(true);
     setFinalizeMessage(null);
     try {
-      await finalizePositionAssignment(finalizingAssignmentId, {
+      await finalizePositionAssignment(target.assignment.id, {
         endDate: finalizeEndDate,
         changeReason: finalizeReason.trim() || null,
         notes: finalizeNotes.trim() || null
       });
-      await reloadPosition(selectedPosition.id);
-      setFinalizingAssignmentId(null);
+      await reloadPosition(target.position.id);
+      if (finalizeTargetRef.current === target) {
+        closeFinalizeModal();
+      }
     } catch (error) {
-      setFinalizeMessage(error instanceof Error ? error.message : "No fue posible finalizar la asignacion.");
+      if (finalizeTargetRef.current === target) {
+        setFinalizeMessage(error instanceof Error ? error.message : "No fue posible finalizar la asignacion.");
+      }
     } finally {
-      setFinalizePending(false);
+      if (finalizeTargetRef.current === target) {
+        setFinalizePending(false);
+      }
     }
   }
 
@@ -321,9 +362,11 @@ export function PositionsPage({ user }: PositionsPageProps) {
       fetchServicePositionDetail(positionId),
       fetchServicePositionAssignments(positionId)
     ]);
-    setSelectedPosition(position);
-    setAssignments(positionAssignments);
     setPositions((current) => current.map((item) => item.id === position.id ? position : item));
+    if (selectedIdRef.current === positionId) {
+      setSelectedPosition(position);
+      setAssignments(positionAssignments);
+    }
   }
 
   async function savePosition() {
@@ -342,7 +385,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
     try {
       if (formMode === "create") {
         const created = await createServicePosition(request);
-        setSelectedId(created.id);
+        selectPosition(created.id);
         setSelectedPosition(created);
         setAssignments([]);
         setRefreshKey((current) => current + 1);
@@ -428,7 +471,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
                 key={position.id}
                 type="button"
                 className={position.id === selectedId ? "employee-row selected" : "employee-row"}
-                onClick={() => setSelectedId(position.id)}
+                onClick={() => selectPosition(position.id)}
               >
                 <div>
                   <strong>{position.name}</strong>
@@ -514,10 +557,16 @@ export function PositionsPage({ user }: PositionsPageProps) {
                 </Modal>
               ) : null}
 
-              {finalizingAssignmentId !== null ? (
-                <Modal title="Finalizar asignación" onClose={() => setFinalizingAssignmentId(null)}>
+              {finalizeTarget ? (
+                <Modal title="Finalizar asignación" onClose={closeFinalizeModal}>
                   <div className="position-form">
                     {finalizeMessage ? <p className="muted">{finalizeMessage}</p> : null}
+                    <p className="muted">
+                      Empleado: {finalizeTarget.assignment.employeeFullName} · Documento: {finalizeTarget.assignment.employeeIdentificationNumber}
+                    </p>
+                    <p className="muted">
+                      Puesto: {finalizeTarget.position.name} · {finalizeTarget.position.code || "Sin codigo"} · {finalizeTarget.position.clientText || "Sin cliente"}
+                    </p>
                     <input type="date" value={finalizeEndDate} onChange={(event) => setFinalizeEndDate(event.target.value)} />
                     <input value={finalizeReason} onChange={(event) => setFinalizeReason(event.target.value)} placeholder="Motivo opcional" />
                     <textarea value={finalizeNotes} onChange={(event) => setFinalizeNotes(event.target.value)} placeholder="Notas opcionales" />
@@ -563,7 +612,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
                     <div className="employee-row-meta">
                       <span className={`status-chip ${getStatusClass(assignment.status)}`}>{assignment.status}</span>
                       {canManagePositions ? (
-                        <button type="button" className="ghost-button" onClick={() => openFinalizeModal(assignment.id)}>
+                        <button type="button" className="ghost-button" onClick={() => openFinalizeModal(assignment)}>
                           Finalizar
                         </button>
                       ) : null}
