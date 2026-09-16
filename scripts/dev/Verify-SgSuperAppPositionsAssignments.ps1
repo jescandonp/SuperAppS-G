@@ -34,14 +34,19 @@ function Invoke-PositionAssignmentRequest {
         }
 
         $response = Invoke-WebRequest @parameters
-        return @{ Status = [int]$response.StatusCode; Body = ($response.Content | ConvertFrom-Json) }
+        $totalCountRaw = $response.Headers["X-Total-Count"]
+        return @{
+            Status = [int]$response.StatusCode
+            Body = ($response.Content | ConvertFrom-Json)
+            TotalCount = if ([string]::IsNullOrWhiteSpace("$totalCountRaw")) { $null } else { [int]("$totalCountRaw") }
+        }
     }
     catch {
         if ($null -eq $_.Exception.Response) {
             throw
         }
 
-        return @{ Status = [int]$_.Exception.Response.StatusCode; Body = $null }
+        return @{ Status = [int]$_.Exception.Response.StatusCode; Body = $null; TotalCount = $null }
     }
 }
 
@@ -63,23 +68,41 @@ if (@($activePositions.Body).Count -eq 0) {
 }
 
 $position = @($activePositions.Body)[0]
-$activeEmployees = Invoke-PositionAssignmentRequest -Method "GET" -Uri "$ApiBaseUrl/portal/employees?status=ACTIVO&pageSize=50" -Headers $headers
-Assert-Status -Response $activeEmployees -ExpectedStatus 200 -Message "TH must list active employees."
+$employeePageSize = 100
+$firstActiveEmployees = Invoke-PositionAssignmentRequest -Method "GET" -Uri "$ApiBaseUrl/portal/employees?status=ACTIVO&page=1&pageSize=$employeePageSize" -Headers $headers
+Assert-Status -Response $firstActiveEmployees -ExpectedStatus 200 -Message "TH must list active employees."
+if ($null -eq $firstActiveEmployees.TotalCount -or $firstActiveEmployees.TotalCount -lt @($firstActiveEmployees.Body).Count) {
+    throw "La respuesta paginada de empleados ACTIVOS debe incluir un X-Total-Count consistente para recorrer todas las paginas."
+}
 
 $freeEmployee = $null
-foreach ($employee in @($activeEmployees.Body)) {
-    $employeeAssignments = Invoke-PositionAssignmentRequest -Method "GET" -Uri "$ApiBaseUrl/portal/employees/$($employee.id)/position-assignments" -Headers $headers
-    Assert-Status -Response $employeeAssignments -ExpectedStatus 200 -Message "TH must read employee assignment history."
+$activeEmployeePageCount = [int][Math]::Ceiling($firstActiveEmployees.TotalCount / [double]$employeePageSize)
+for ($page = 1; $page -le $activeEmployeePageCount -and $null -eq $freeEmployee; $page++) {
+    if ($page -eq 1) {
+        $activeEmployees = $firstActiveEmployees
+    }
+    else {
+        $activeEmployees = Invoke-PositionAssignmentRequest -Method "GET" -Uri "$ApiBaseUrl/portal/employees?status=ACTIVO&page=$page&pageSize=$employeePageSize" -Headers $headers
+        Assert-Status -Response $activeEmployees -ExpectedStatus 200 -Message "TH must list active employees on every page."
+        if ($activeEmployees.TotalCount -ne $firstActiveEmployees.TotalCount) {
+            throw "El X-Total-Count de empleados ACTIVOS cambio durante la verificacion; no se puede afirmar que se recorrio el conjunto completo."
+        }
+    }
 
-    $currentAssignment = @($employeeAssignments.Body | Where-Object { $_.status -eq "VIGENTE" })
-    if ($currentAssignment.Count -eq 0) {
-        $freeEmployee = $employee
-        break
+    foreach ($employee in @($activeEmployees.Body)) {
+        $employeeAssignments = Invoke-PositionAssignmentRequest -Method "GET" -Uri "$ApiBaseUrl/portal/employees/$($employee.id)/position-assignments" -Headers $headers
+        Assert-Status -Response $employeeAssignments -ExpectedStatus 200 -Message "TH must read employee assignment history."
+
+        $currentAssignment = @($employeeAssignments.Body | Where-Object { $_.status -eq "VIGENTE" })
+        if ($currentAssignment.Count -eq 0) {
+            $freeEmployee = $employee
+            break
+        }
     }
 }
 
 if ($null -eq $freeEmployee) {
-    Write-Output "POSITIONS ASSIGNMENTS BLOCKED: no se encontro un empleado ACTIVO sin asignacion vigente entre los primeros 50."
+    Write-Output "POSITIONS ASSIGNMENTS BLOCKED: no se encontro un empleado ACTIVO sin asignacion vigente despues de revisar todas las paginas."
     exit 2
 }
 

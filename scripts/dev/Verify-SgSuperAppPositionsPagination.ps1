@@ -36,6 +36,11 @@ if ($unpaged.Body.Count -lt 2) {
     exit 2
 }
 
+if ($unpaged.Body.Count -lt 101) {
+    Write-Output "POSITIONS PAGINATION BLOCKED: se necesitan al menos 101 puestos en la base de datos para verificar que pageSize=9999 se limite a 100."
+    exit 2
+}
+
 $page1 = Invoke-PositionsRequest -Uri "$ApiBaseUrl/portal/positions?page=1&pageSize=1" -Headers $headers
 if ($page1.Body.Count -ne 1) {
     throw "La pagina 1 con pageSize=1 debio traer un registro, trajo $($page1.Body.Count)."
@@ -53,8 +58,8 @@ if ($page2.Body[0].id -eq $page1.Body[0].id) {
 }
 
 $oversized = Invoke-PositionsRequest -Uri "$ApiBaseUrl/portal/positions?page=1&pageSize=9999" -Headers $headers
-if ($oversized.Body.Count -gt 100) {
-    throw "pageSize debe limitarse a 100 como maximo, devolvio $($oversized.Body.Count)."
+if ($oversized.Body.Count -ne 100) {
+    throw "Con al menos 101 puestos, pageSize debe limitarse a 100. Devolvio $($oversized.Body.Count) registros."
 }
 if ($oversized.TotalCount -ne $unpaged.TotalCount) {
     throw "El total con pageSize fuera de rango ($($oversized.TotalCount)) debe coincidir con el total sin paginar ($($unpaged.TotalCount))."
@@ -81,8 +86,25 @@ if ($pageOnly.TotalCount -ne $unpaged.TotalCount) {
 
 $activeUnpaged = Invoke-PositionsRequest -Uri "$ApiBaseUrl/portal/positions?status=ACTIVO" -Headers $headers
 $activePaged = Invoke-PositionsRequest -Uri "$ApiBaseUrl/portal/positions?status=ACTIVO&page=1&pageSize=1" -Headers $headers
+if ($activeUnpaged.Body.Count -eq 0) {
+    Write-Output "POSITIONS PAGINATION BLOCKED: se necesita al menos un puesto ACTIVO en la base de datos para verificar la paginacion filtrada."
+    exit 2
+}
 if ($activeUnpaged.Body.Count -ne $activeUnpaged.TotalCount) {
     throw "Con status=ACTIVO sin paginar, el arreglo debe tener el mismo tamano que X-Total-Count. Arreglo: $($activeUnpaged.Body.Count), Total: $($activeUnpaged.TotalCount)."
+}
+foreach ($activePosition in @($activeUnpaged.Body)) {
+    if ($activePosition.status -ne "ACTIVO") {
+        throw "La consulta sin paginar con status=ACTIVO no debe incluir puestos con estado '$($activePosition.status)'."
+    }
+}
+if ($activePaged.Body.Count -ne 1) {
+    throw "Con al menos un puesto ACTIVO, la pagina 1 con pageSize=1 debe devolver exactamente un registro. Devolvio $($activePaged.Body.Count)."
+}
+foreach ($activePosition in @($activePaged.Body)) {
+    if ($activePosition.status -ne "ACTIVO") {
+        throw "La consulta paginada con status=ACTIVO no debe incluir puestos con estado '$($activePosition.status)'."
+    }
 }
 if ($activePaged.TotalCount -ne $activeUnpaged.TotalCount) {
     throw "Con status=ACTIVO, el total paginado ($($activePaged.TotalCount)) debe coincidir con el total sin paginar ($($activeUnpaged.TotalCount))."
