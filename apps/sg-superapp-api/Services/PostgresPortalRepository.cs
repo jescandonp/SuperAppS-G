@@ -1196,8 +1196,17 @@ public sealed class PostgresPortalRepository
         return (employees, totalCount);
     }
 
-    public async Task<IReadOnlyList<ServicePositionResponse>> GetServicePositionsAsync(string? search, string? status, CancellationToken cancellationToken = default)
+    public async Task<(IReadOnlyList<ServicePositionResponse> Items, int TotalCount)> GetServicePositionsAsync(string? search, string? status, int page, int pageSize, CancellationToken cancellationToken = default)
     {
+        const string countSql = @"
+            select count(*)
+            from service_positions sp
+            where (@search is null
+                or sp.name ilike '%' || @search || '%'
+                or sp.code ilike '%' || @search || '%'
+                or sp.client_text ilike '%' || @search || '%')
+              and (@status is null or sp.status = @status);";
+
         const string sql = @"
             select
                 sp.id,
@@ -1218,13 +1227,22 @@ public sealed class PostgresPortalRepository
                 or sp.client_text ilike '%' || @search || '%')
               and (@status is null or sp.status = @status)
             group by sp.id
-            order by sp.name;";
+            order by sp.name
+            limit @pageSize offset @offset;";
 
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
+
+        await using var countCommand = new NpgsqlCommand(countSql, connection);
+        countCommand.Parameters.Add("search", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(search) ? DBNull.Value : search.Trim();
+        countCommand.Parameters.Add("status", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(status) ? DBNull.Value : status.Trim().ToUpperInvariant();
+        var totalCount = Convert.ToInt32(await countCommand.ExecuteScalarAsync(cancellationToken));
+
         await using var command = new NpgsqlCommand(sql, connection);
         command.Parameters.Add("search", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(search) ? DBNull.Value : search.Trim();
         command.Parameters.Add("status", NpgsqlDbType.Text).Value = string.IsNullOrWhiteSpace(status) ? DBNull.Value : status.Trim().ToUpperInvariant();
+        command.Parameters.Add("pageSize", NpgsqlDbType.Integer).Value = pageSize;
+        command.Parameters.Add("offset", NpgsqlDbType.Integer).Value = (page - 1) * pageSize;
 
         var positions = new List<ServicePositionResponse>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -1233,7 +1251,7 @@ public sealed class PostgresPortalRepository
             positions.Add(ReadServicePosition(reader));
         }
 
-        return positions;
+        return (positions, totalCount);
     }
 
     public async Task<ServicePositionResponse?> GetServicePositionByIdAsync(long positionId, CancellationToken cancellationToken = default)
@@ -2630,6 +2648,8 @@ public sealed class PostgresPortalRepository
             select
                 epa.id,
                 epa.employee_id,
+                e.full_name as employee_full_name,
+                e.identification_number as employee_identification_number,
                 epa.position_id,
                 sp.name as position_name,
                 sp.code as position_code,
@@ -2644,6 +2664,7 @@ public sealed class PostgresPortalRepository
                 epa.updated_at
             from employee_position_assignments epa
             join service_positions sp on sp.id = epa.position_id
+            join employees e on e.id = epa.employee_id
             where epa.employee_id = @employeeId
             order by epa.start_date desc, epa.id desc;";
 
@@ -2668,6 +2689,8 @@ public sealed class PostgresPortalRepository
             select
                 epa.id,
                 epa.employee_id,
+                e.full_name as employee_full_name,
+                e.identification_number as employee_identification_number,
                 epa.position_id,
                 sp.name as position_name,
                 sp.code as position_code,
@@ -2682,6 +2705,7 @@ public sealed class PostgresPortalRepository
                 epa.updated_at
             from employee_position_assignments epa
             join service_positions sp on sp.id = epa.position_id
+            join employees e on e.id = epa.employee_id
             where epa.position_id = @positionId
             order by
                 case when epa.status = 'VIGENTE' then 0 else 1 end,
@@ -2709,6 +2733,8 @@ public sealed class PostgresPortalRepository
             select
                 epa.id,
                 epa.employee_id,
+                e.full_name as employee_full_name,
+                e.identification_number as employee_identification_number,
                 epa.position_id,
                 sp.name as position_name,
                 sp.code as position_code,
@@ -2723,6 +2749,7 @@ public sealed class PostgresPortalRepository
                 epa.updated_at
             from employee_position_assignments epa
             join service_positions sp on sp.id = epa.position_id
+            join employees e on e.id = epa.employee_id
             where epa.id = @assignmentId
             limit 1;";
 
@@ -5330,6 +5357,8 @@ from schedule_exceptions where schedule_version_id = @id order by id";
         return new PositionAssignmentResponse(
             reader.GetInt64(reader.GetOrdinal("id")),
             reader.GetInt64(reader.GetOrdinal("employee_id")),
+            reader.GetString(reader.GetOrdinal("employee_full_name")),
+            reader.GetString(reader.GetOrdinal("employee_identification_number")),
             reader.GetInt64(reader.GetOrdinal("position_id")),
             reader.GetString(reader.GetOrdinal("position_name")),
             reader.IsDBNull(reader.GetOrdinal("position_code")) ? null : reader.GetString(reader.GetOrdinal("position_code")),

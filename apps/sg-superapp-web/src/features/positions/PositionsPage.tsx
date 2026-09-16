@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
-import { createServicePosition, fetchServicePositionAssignments, fetchServicePositionDetail, fetchServicePositions, inactivateServicePosition, PortalApiError, updateServicePosition } from "../../services/portalApi";
-import type { CurrentUser, PositionAssignment, ServicePosition, ServicePositionRequest, ServicePositionStatus } from "../../types/portal";
+import { useEffect, useRef, useState } from "react";
+import { createPositionAssignment, createServicePosition, fetchEmployees, fetchServicePositionAssignments, fetchServicePositionDetail, fetchServicePositionsPage, finalizePositionAssignment, inactivateServicePosition, PortalApiError, updateServicePosition } from "../../services/portalApi";
+import type { CurrentUser, EmployeeSummary, PositionAssignment, ServicePosition, ServicePositionRequest, ServicePositionStatus } from "../../types/portal";
+import { Modal } from "../../components/Modal";
 
 function describeDetailError(error: unknown): string {
   if (error instanceof PortalApiError && error.status === 404) {
@@ -30,11 +31,21 @@ function getStatusClass(status: ServicePosition["status"] | PositionAssignment["
   return status === "ACTIVO" || status === "VIGENTE" ? "status-active" : "status-retired";
 }
 
+type FinalizeTarget = {
+  assignment: PositionAssignment;
+  position: ServicePosition;
+};
+
 export function PositionsPage({ user }: PositionsPageProps) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<ServicePositionStatus | "">("");
   const [positions, setPositions] = useState<ServicePosition[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalCount, setTotalCount] = useState(0);
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const selectedIdRef = useRef<number | null>(null);
   const [selectedPosition, setSelectedPosition] = useState<ServicePosition | null>(null);
   const [assignments, setAssignments] = useState<PositionAssignment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +61,56 @@ export function PositionsPage({ user }: PositionsPageProps) {
   const [formLocationText, setFormLocationText] = useState("");
   const [formNotes, setFormNotes] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isPositionModalOpen, setIsPositionModalOpen] = useState(false);
+  const [isAssignEmployeeModalOpen, setIsAssignEmployeeModalOpen] = useState(false);
+  const [employeeSearch, setEmployeeSearch] = useState("");
+  const [employeeOptions, setEmployeeOptions] = useState<EmployeeSummary[]>([]);
+  const [assignEmployeeId, setAssignEmployeeId] = useState("");
+  const [assignStartDate, setAssignStartDate] = useState("");
+  const [assignReason, setAssignReason] = useState("");
+  const [assignNotes, setAssignNotes] = useState("");
+  const [assignPending, setAssignPending] = useState(false);
+  const [assignMessage, setAssignMessage] = useState<string | null>(null);
+  const [finalizeTarget, setFinalizeTarget] = useState<FinalizeTarget | null>(null);
+  const finalizeTargetRef = useRef<FinalizeTarget | null>(null);
+  const [finalizeEndDate, setFinalizeEndDate] = useState("");
+  const [finalizeReason, setFinalizeReason] = useState("");
+  const [finalizeNotes, setFinalizeNotes] = useState("");
+  const [finalizePending, setFinalizePending] = useState(false);
+  const [finalizeMessage, setFinalizeMessage] = useState<string | null>(null);
+
+  function closeFinalizeModal() {
+    finalizeTargetRef.current = null;
+    setFinalizeTarget(null);
+    setFinalizeEndDate("");
+    setFinalizeReason("");
+    setFinalizeNotes("");
+    setFinalizePending(false);
+    setFinalizeMessage(null);
+  }
+
+  function requestCloseFinalizeModal() {
+    if (!finalizePending) {
+      closeFinalizeModal();
+    }
+  }
+
+  function selectPosition(positionId: number | null) {
+    if (selectedIdRef.current === positionId) {
+      return;
+    }
+
+    selectedIdRef.current = positionId;
+    closeFinalizeModal();
+    setSelectedId(positionId);
+    setSelectedPosition(null);
+    setAssignments([]);
+    setDetailErrorMessage(null);
+  }
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, status]);
 
   useEffect(() => {
     let ignore = false;
@@ -59,30 +120,28 @@ export function PositionsPage({ user }: PositionsPageProps) {
       setErrorMessage(null);
 
       try {
-        const data = await fetchServicePositions({ search, status: status || undefined });
+        const { items, totalCount: total } = await fetchServicePositionsPage({ search, status: status || undefined, page, pageSize });
         if (ignore) {
           return;
         }
 
-        setPositions(data);
-        if (data.length === 0) {
-          setSelectedId(null);
-          setSelectedPosition(null);
-          setAssignments([]);
+        setPositions(items);
+        setTotalCount(total);
+        if (items.length === 0) {
+          selectPosition(null);
           return;
         }
 
-        const nextId = selectedId !== null && data.some((position) => position.id === selectedId)
+        const nextId = selectedId !== null && items.some((position) => position.id === selectedId)
           ? selectedId
-          : data[0].id;
-        setSelectedId(nextId);
+          : items[0].id;
+        selectPosition(nextId);
       } catch (error) {
         if (!ignore) {
           setErrorMessage(error instanceof Error ? error.message : "No fue posible cargar puestos de servicio.");
           setPositions([]);
-          setSelectedId(null);
-          setSelectedPosition(null);
-          setAssignments([]);
+          setTotalCount(0);
+          selectPosition(null);
         }
       } finally {
         if (!ignore) {
@@ -96,7 +155,32 @@ export function PositionsPage({ user }: PositionsPageProps) {
     return () => {
       ignore = true;
     };
-  }, [search, status, selectedId, refreshKey]);
+  }, [search, status, selectedId, refreshKey, page, pageSize]);
+
+  useEffect(() => {
+    if (!isAssignEmployeeModalOpen) {
+      return;
+    }
+
+    let ignore = false;
+    async function loadEmployeeOptions() {
+      try {
+        const data = await fetchEmployees({ search: employeeSearch || undefined, status: "ACTIVO" });
+        if (!ignore) {
+          setEmployeeOptions(data.slice(0, 20));
+        }
+      } catch {
+        if (!ignore) {
+          setEmployeeOptions([]);
+        }
+      }
+    }
+
+    void loadEmployeeOptions();
+    return () => {
+      ignore = true;
+    };
+  }, [isAssignEmployeeModalOpen, employeeSearch]);
 
   useEffect(() => {
     if (selectedId === null) {
@@ -105,6 +189,8 @@ export function PositionsPage({ user }: PositionsPageProps) {
 
     const positionId = selectedId;
     let ignore = false;
+
+    closeFinalizeModal();
 
     async function loadDetail() {
       setDetailLoading(true);
@@ -140,18 +226,6 @@ export function PositionsPage({ user }: PositionsPageProps) {
     };
   }, [selectedId]);
 
-  useEffect(() => {
-    if (!selectedPosition || formMode !== "edit") {
-      return;
-    }
-
-    setFormCode(selectedPosition.code || "");
-    setFormName(selectedPosition.name);
-    setFormClientText(selectedPosition.clientText || "");
-    setFormLocationText(selectedPosition.locationText || "");
-    setFormNotes(selectedPosition.notes || "");
-  }, [selectedPosition, formMode]);
-
   const canManagePositions = user.role === "ADMIN" || user.role === "TH";
   const currentAssignments = assignments.filter((assignment) => assignment.status === "VIGENTE");
   const historicalAssignments = assignments.filter((assignment) => assignment.status !== "VIGENTE");
@@ -162,6 +236,115 @@ export function PositionsPage({ user }: PositionsPageProps) {
     setFormClientText("");
     setFormLocationText("");
     setFormNotes("");
+  }
+
+  function openCreateModal() {
+    setFormMode("create");
+    clearForm();
+    setActionMessage(null);
+    setIsPositionModalOpen(true);
+  }
+
+  function openEditModal() {
+    if (!selectedPosition) {
+      return;
+    }
+
+    setFormMode("edit");
+    setFormCode(selectedPosition.code || "");
+    setFormName(selectedPosition.name);
+    setFormClientText(selectedPosition.clientText || "");
+    setFormLocationText(selectedPosition.locationText || "");
+    setFormNotes(selectedPosition.notes || "");
+    setActionMessage(null);
+    setIsPositionModalOpen(true);
+  }
+
+  function openAssignEmployeeModal() {
+    setEmployeeSearch("");
+    setEmployeeOptions([]);
+    setAssignEmployeeId("");
+    setAssignStartDate(new Date().toISOString().slice(0, 10));
+    setAssignReason("");
+    setAssignNotes("");
+    setAssignMessage(null);
+    setIsAssignEmployeeModalOpen(true);
+  }
+
+  async function assignEmployee() {
+    if (!selectedPosition) {
+      return;
+    }
+
+    if (!assignEmployeeId || !assignStartDate) {
+      setAssignMessage("Seleccione un empleado y una fecha de inicio.");
+      return;
+    }
+
+    setAssignPending(true);
+    setAssignMessage(null);
+    try {
+      await createPositionAssignment(Number(assignEmployeeId), {
+        positionId: selectedPosition.id,
+        startDate: assignStartDate,
+        changeReason: assignReason.trim() || null,
+        notes: assignNotes.trim() || null
+      });
+      await reloadPosition(selectedPosition.id);
+      setIsAssignEmployeeModalOpen(false);
+    } catch (error) {
+      setAssignMessage(error instanceof Error ? error.message : "No fue posible crear la asignacion.");
+    } finally {
+      setAssignPending(false);
+    }
+  }
+
+  function openFinalizeModal(assignment: PositionAssignment) {
+    if (!selectedPosition || assignment.status !== "VIGENTE") {
+      return;
+    }
+
+    setFinalizeEndDate(new Date().toISOString().slice(0, 10));
+    setFinalizeReason("");
+    setFinalizeNotes("");
+    setFinalizeMessage(null);
+    const target = { assignment, position: selectedPosition };
+    finalizeTargetRef.current = target;
+    setFinalizeTarget(target);
+  }
+
+  async function finalizeAssignment() {
+    const target = finalizeTargetRef.current;
+    if (!target) {
+      return;
+    }
+
+    if (!finalizeEndDate) {
+      setFinalizeMessage("La fecha fin es obligatoria.");
+      return;
+    }
+
+    setFinalizePending(true);
+    setFinalizeMessage(null);
+    try {
+      await finalizePositionAssignment(target.assignment.id, {
+        endDate: finalizeEndDate,
+        changeReason: finalizeReason.trim() || null,
+        notes: finalizeNotes.trim() || null
+      });
+      await reloadPosition(target.position.id);
+      if (finalizeTargetRef.current === target) {
+        closeFinalizeModal();
+      }
+    } catch (error) {
+      if (finalizeTargetRef.current === target) {
+        setFinalizeMessage(error instanceof Error ? error.message : "No fue posible finalizar la asignacion.");
+      }
+    } finally {
+      if (finalizeTargetRef.current === target) {
+        setFinalizePending(false);
+      }
+    }
   }
 
   function buildRequest(): ServicePositionRequest | null {
@@ -185,9 +368,11 @@ export function PositionsPage({ user }: PositionsPageProps) {
       fetchServicePositionDetail(positionId),
       fetchServicePositionAssignments(positionId)
     ]);
-    setSelectedPosition(position);
-    setAssignments(positionAssignments);
     setPositions((current) => current.map((item) => item.id === position.id ? position : item));
+    if (selectedIdRef.current === positionId) {
+      setSelectedPosition(position);
+      setAssignments(positionAssignments);
+    }
   }
 
   async function savePosition() {
@@ -206,12 +391,11 @@ export function PositionsPage({ user }: PositionsPageProps) {
     try {
       if (formMode === "create") {
         const created = await createServicePosition(request);
-        setSelectedId(created.id);
+        selectPosition(created.id);
         setSelectedPosition(created);
         setAssignments([]);
-        setFormMode("edit");
         setRefreshKey((current) => current + 1);
-        setActionMessage("Puesto creado.");
+        setIsPositionModalOpen(false);
         return;
       }
 
@@ -223,7 +407,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
       const updated = await updateServicePosition(selectedPosition.id, request);
       setSelectedPosition(updated);
       setPositions((current) => current.map((item) => item.id === updated.id ? updated : item));
-      setActionMessage("Puesto actualizado.");
+      setIsPositionModalOpen(false);
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "No fue posible guardar el puesto.");
     } finally {
@@ -271,19 +455,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
             <option value="INACTIVO">Inactivos</option>
           </select>
           {canManagePositions ? (
-            <button
-              type="button"
-              className="secondary-action"
-              onClick={() => {
-                setFormMode("create");
-                setSelectedId(null);
-                setSelectedPosition(null);
-                setAssignments([]);
-                setDetailErrorMessage(null);
-                clearForm();
-                setActionMessage(null);
-              }}
-            >
+            <button type="button" className="secondary-action" onClick={openCreateModal}>
               Nuevo puesto
             </button>
           ) : null}
@@ -296,7 +468,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
         <section className="panel employee-list-panel">
           <div className="panel-header">
             <h3>Listado</h3>
-            <span>{loading ? "Cargando..." : `${positions.length} puestos`}</span>
+            <span>{loading ? "Cargando..." : `${totalCount} puestos`}</span>
           </div>
 
           <div className="employee-table">
@@ -305,7 +477,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
                 key={position.id}
                 type="button"
                 className={position.id === selectedId ? "employee-row selected" : "employee-row"}
-                onClick={() => setSelectedId(position.id)}
+                onClick={() => selectPosition(position.id)}
               >
                 <div>
                   <strong>{position.name}</strong>
@@ -322,6 +494,21 @@ export function PositionsPage({ user }: PositionsPageProps) {
 
             {!loading && positions.length === 0 ? <div className="panel-empty">No hay puestos para los filtros actuales.</div> : null}
           </div>
+
+          <div className="pagination-controls">
+            <button type="button" className="ghost-button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
+              Anterior
+            </button>
+            <span className="muted">{totalCount === 0 ? "Sin resultados" : `Página ${page} de ${totalPages}`}</span>
+            <button type="button" className="ghost-button" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}>
+              Siguiente
+            </button>
+            <select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }}>
+              <option value={25}>25 por página</option>
+              <option value={50}>50 por página</option>
+              <option value={100}>100 por página</option>
+            </select>
+          </div>
         </section>
 
         <aside className="panel employee-detail-panel">
@@ -332,23 +519,73 @@ export function PositionsPage({ user }: PositionsPageProps) {
 
           {detailErrorMessage ? <div className="panel-empty">{detailErrorMessage}</div> : null}
 
-          {selectedPosition || formMode === "create" ? (
+          {selectedPosition ? (
             <div className="employee-detail">
-              {selectedPosition ? (
-                <>
-                  <h4>{selectedPosition.name}</h4>
-                  <p className="muted">
-                    {selectedPosition.code || "Sin codigo"} · {selectedPosition.clientText || "Sin cliente"}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <h4>Nuevo puesto de servicio</h4>
-                  <p className="muted">Registro maestro con cliente como texto libre.</p>
-                </>
-              )}
+              <h4>{selectedPosition.name}</h4>
+              <p className="muted">
+                {selectedPosition.code || "Sin codigo"} · {selectedPosition.clientText || "Sin cliente"}
+              </p>
 
-              {selectedPosition ? <dl>
+              {canManagePositions ? (
+                <div className="position-form-actions">
+                  <button type="button" onClick={openEditModal}>Editar puesto</button>
+                </div>
+              ) : null}
+
+              {canManagePositions && selectedPosition.status === "ACTIVO" ? (
+                <div className="position-form-actions">
+                  <button type="button" onClick={openAssignEmployeeModal}>Asignar empleado</button>
+                </div>
+              ) : null}
+
+              {isAssignEmployeeModalOpen ? (
+                <Modal title="Asignar empleado" onClose={() => setIsAssignEmployeeModalOpen(false)}>
+                  <div className="position-form">
+                    {assignMessage ? <p className="muted">{assignMessage}</p> : null}
+                    <input value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} placeholder="Buscar empleado" />
+                    <select value={assignEmployeeId} onChange={(event) => setAssignEmployeeId(event.target.value)}>
+                      <option value="">Seleccione empleado</option>
+                      {employeeOptions.map((employee) => (
+                        <option key={employee.id} value={employee.id}>
+                          {employee.fullName} · {employee.identificationNumber} · {employee.employmentStatus}
+                        </option>
+                      ))}
+                    </select>
+                    <input type="date" value={assignStartDate} onChange={(event) => setAssignStartDate(event.target.value)} />
+                    <input value={assignReason} onChange={(event) => setAssignReason(event.target.value)} placeholder="Motivo opcional" />
+                    <textarea value={assignNotes} onChange={(event) => setAssignNotes(event.target.value)} placeholder="Notas opcionales" />
+                    <div className="position-form-actions">
+                      <button type="button" onClick={() => void assignEmployee()} disabled={assignPending}>
+                        {assignPending ? "Asignando..." : "Asignar"}
+                      </button>
+                    </div>
+                  </div>
+                </Modal>
+              ) : null}
+
+              {finalizeTarget ? (
+                <Modal title="Finalizar asignación" onClose={requestCloseFinalizeModal}>
+                  <div className="position-form">
+                    {finalizeMessage ? <p className="muted">{finalizeMessage}</p> : null}
+                    <p className="muted">
+                      Empleado: {finalizeTarget.assignment.employeeFullName} · Documento: {finalizeTarget.assignment.employeeIdentificationNumber}
+                    </p>
+                    <p className="muted">
+                      Puesto: {finalizeTarget.position.name} · {finalizeTarget.position.code || "Sin codigo"} · {finalizeTarget.position.clientText || "Sin cliente"}
+                    </p>
+                    <input type="date" value={finalizeEndDate} onChange={(event) => setFinalizeEndDate(event.target.value)} />
+                    <input value={finalizeReason} onChange={(event) => setFinalizeReason(event.target.value)} placeholder="Motivo opcional" />
+                    <textarea value={finalizeNotes} onChange={(event) => setFinalizeNotes(event.target.value)} placeholder="Notas opcionales" />
+                    <div className="position-form-actions">
+                      <button type="button" onClick={() => void finalizeAssignment()} disabled={finalizePending}>
+                        {finalizePending ? "Finalizando..." : "Finalizar"}
+                      </button>
+                    </div>
+                  </div>
+                </Modal>
+              ) : null}
+
+              <dl>
                 <div>
                   <dt>Estado</dt>
                   <dd><span className={`status-chip ${getStatusClass(selectedPosition.status)}`}>{selectedPosition.status}</span></dd>
@@ -365,43 +602,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
                   <dt>Observaciones</dt>
                   <dd>{selectedPosition.notes || "Sin observaciones"}</dd>
                 </div>
-              </dl> : null}
-
-              {canManagePositions ? (
-                <div className="position-form">
-                  <div className="panel-header compact-header">
-                    <h4>{formMode === "create" ? "Crear puesto" : "Editar puesto"}</h4>
-                    {formMode === "create" && positions.length > 0 ? (
-                      <button
-                        type="button"
-                        className="ghost-button"
-                        onClick={() => {
-                          setFormMode("edit");
-                          setSelectedId(positions[0].id);
-                        }}
-                      >
-                        Cancelar
-                      </button>
-                    ) : null}
-                  </div>
-                  <input value={formCode} onChange={(event) => setFormCode(event.target.value)} placeholder="Codigo opcional" />
-                  <input value={formName} onChange={(event) => setFormName(event.target.value)} placeholder="Nombre obligatorio" />
-                  <input value={formClientText} onChange={(event) => setFormClientText(event.target.value)} placeholder="Cliente texto libre" />
-                  <input value={formLocationText} onChange={(event) => setFormLocationText(event.target.value)} placeholder="Ubicacion" />
-                  <textarea value={formNotes} onChange={(event) => setFormNotes(event.target.value)} placeholder="Observaciones" />
-                  <div className="position-form-actions">
-                    <button type="button" onClick={() => void savePosition()} disabled={actionPending}>
-                      {actionPending ? "Guardando..." : formMode === "create" ? "Crear puesto" : "Guardar cambios"}
-                    </button>
-                    {selectedPosition && selectedPosition.status === "ACTIVO" && formMode === "edit" ? (
-                      <button type="button" className="danger-action" onClick={() => void deactivateSelectedPosition()} disabled={actionPending}>
-                        Inactivar
-                      </button>
-                    ) : null}
-                  </div>
-                  {actionMessage ? <p className="muted">{actionMessage}</p> : null}
-                </div>
-              ) : null}
+              </dl>
 
               {selectedPosition ? <div className="position-detail-section">
                 <div className="panel-header compact-header">
@@ -411,10 +612,17 @@ export function PositionsPage({ user }: PositionsPageProps) {
                 {currentAssignments.map((assignment) => (
                   <article key={assignment.id} className="assignment-card">
                     <div>
-                      <strong>Empleado #{assignment.employeeId}</strong>
-                      <p className="muted">{formatDate(assignment.startDate)} · {assignment.createdBy || "sin usuario"}</p>
+                      <strong>{assignment.employeeFullName}</strong>
+                      <p className="muted">{assignment.employeeIdentificationNumber} · {formatDate(assignment.startDate)} · {assignment.createdBy || "sin usuario"}</p>
                     </div>
-                    <span className={`status-chip ${getStatusClass(assignment.status)}`}>{assignment.status}</span>
+                    <div className="employee-row-meta">
+                      <span className={`status-chip ${getStatusClass(assignment.status)}`}>{assignment.status}</span>
+                      {canManagePositions ? (
+                        <button type="button" className="ghost-button" onClick={() => openFinalizeModal(assignment)}>
+                          Finalizar
+                        </button>
+                      ) : null}
+                    </div>
                   </article>
                 ))}
                 {currentAssignments.length === 0 ? <div className="panel-empty compact-empty">Sin asignaciones vigentes.</div> : null}
@@ -428,7 +636,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
                 {historicalAssignments.map((assignment) => (
                   <article key={assignment.id} className="assignment-card">
                     <div>
-                      <strong>Empleado #{assignment.employeeId}</strong>
+                      <strong>{assignment.employeeFullName}</strong>
                       <p className="muted">
                         {formatDate(assignment.startDate)} - {formatDate(assignment.endDate)} · {assignment.changeReason || "sin motivo"}
                       </p>
@@ -450,6 +658,29 @@ export function PositionsPage({ user }: PositionsPageProps) {
           )}
         </aside>
       </div>
+
+      {isPositionModalOpen ? (
+        <Modal title={formMode === "create" ? "Crear puesto" : "Editar puesto"} onClose={() => setIsPositionModalOpen(false)}>
+          <div className="position-form">
+            {actionMessage ? <p className="muted">{actionMessage}</p> : null}
+            <input value={formCode} onChange={(event) => setFormCode(event.target.value)} placeholder="Codigo opcional" />
+            <input value={formName} onChange={(event) => setFormName(event.target.value)} placeholder="Nombre obligatorio" />
+            <input value={formClientText} onChange={(event) => setFormClientText(event.target.value)} placeholder="Cliente texto libre" />
+            <input value={formLocationText} onChange={(event) => setFormLocationText(event.target.value)} placeholder="Ubicacion" />
+            <textarea value={formNotes} onChange={(event) => setFormNotes(event.target.value)} placeholder="Observaciones" />
+            <div className="position-form-actions">
+              <button type="button" onClick={() => void savePosition()} disabled={actionPending}>
+                {actionPending ? "Guardando..." : formMode === "create" ? "Crear puesto" : "Guardar cambios"}
+              </button>
+              {selectedPosition?.status === "ACTIVO" && formMode === "edit" ? (
+                <button type="button" className="danger-action" onClick={() => void deactivateSelectedPosition()} disabled={actionPending}>
+                  Inactivar
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   );
 }

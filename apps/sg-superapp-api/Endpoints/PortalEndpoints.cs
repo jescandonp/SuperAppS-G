@@ -711,7 +711,7 @@ public static class PortalEndpoints
             }
         });
 
-        app.MapGet("/api/portal/positions", async (string? search, string? status, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
+        app.MapGet("/api/portal/positions", async (string? search, string? status, int? page, int? pageSize, HttpContext httpContext, PortalAuthorizationService authorization, PostgresPortalRepository repository, CancellationToken cancellationToken) =>
         {
             var denied = await authorization.RequireAsync("POSITIONS", "VIEW", cancellationToken);
             if (denied is not null)
@@ -730,7 +730,20 @@ public static class PortalEndpoints
                 return Results.BadRequest(new { message = "El estado de puesto no es valido." });
             }
 
-            var positions = await repository.GetServicePositionsAsync(search, normalizedStatus, cancellationToken);
+            // 100_000 is not a real product limit, just an overflow guard: with resolvedPageSize
+            // capped at 100, (100_000 - 1) * 100 stays well within int32 range, so the offset
+            // computed in GetServicePositionsAsync can never overflow regardless of the requested page.
+            const int maxPage = 100_000;
+            var resolvedPageSize = pageSize.HasValue ? Math.Clamp(pageSize.Value, 1, 100) : int.MaxValue;
+            // Paging only makes sense once pageSize is actually bounded. When pageSize is omitted,
+            // resolvedPageSize is the "unbounded" sentinel (int.MaxValue) and any page > 1 would
+            // overflow int32 in (page - 1) * pageSize (offset), so ignore the caller's page in that
+            // case and force page 1 — this also preserves the "omit both -> identical to old
+            // unpaginated behavior" guarantee even when only page is supplied without pageSize.
+            var resolvedPage = !pageSize.HasValue ? 1 : (page.HasValue ? Math.Clamp(page.Value, 1, maxPage) : 1);
+
+            var (positions, totalCount) = await repository.GetServicePositionsAsync(search, normalizedStatus, resolvedPage, resolvedPageSize, cancellationToken);
+            httpContext.Response.Headers["X-Total-Count"] = totalCount.ToString();
             return Results.Ok(positions);
         });
 

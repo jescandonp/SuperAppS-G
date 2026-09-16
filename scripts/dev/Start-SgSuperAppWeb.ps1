@@ -27,7 +27,13 @@ if (Test-Path $junctionRoot) {
     if (-not ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
         throw "Target path exists and is not a junction: $junctionRoot"
     }
-    Remove-Item -LiteralPath $junctionRoot -Force
+    # Remove-Item sobre una junction lanza NullReferenceException en Windows
+    # PowerShell 5.1 (bug conocido, no reproducible en PowerShell 7). rmdir
+    # (via cmd.exe) borra el reparse point sin tocar su contenido/target.
+    cmd /c rmdir "$junctionRoot" | Out-Null
+    if (Test-Path $junctionRoot) {
+        throw "No fue posible eliminar la junction existente: $junctionRoot"
+    }
 }
 
 New-Item -ItemType Junction -Path $junctionRoot -Target $frontendPath | Out-Null
