@@ -17,9 +17,21 @@ function Invoke-PositionsRequest {
 
     $response = Invoke-WebRequest -Uri $Uri -Headers $Headers -UseBasicParsing
     $totalCountRaw = $response.Headers["X-Total-Count"]
+    $decodedBody = @($response.Content | ConvertFrom-Json)
+    $bodyItems = New-Object System.Collections.ArrayList
+    foreach ($decodedItem in $decodedBody) {
+        if ($decodedItem -is [System.Array]) {
+            foreach ($item in $decodedItem) {
+                [void]$bodyItems.Add($item)
+            }
+        }
+        else {
+            [void]$bodyItems.Add($decodedItem)
+        }
+    }
     return @{
         Status = [int]$response.StatusCode
-        Body = @($response.Content | ConvertFrom-Json)
+        Body = $bodyItems.ToArray()
         TotalCount = [int]("$totalCountRaw")
     }
 }
