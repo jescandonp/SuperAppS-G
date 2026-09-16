@@ -89,6 +89,12 @@ export function PositionsPage({ user }: PositionsPageProps) {
     setFinalizeMessage(null);
   }
 
+  function requestCloseFinalizeModal() {
+    if (!finalizePending) {
+      closeFinalizeModal();
+    }
+  }
+
   function selectPosition(positionId: number | null) {
     if (selectedIdRef.current === positionId) {
       return;
@@ -558,7 +564,7 @@ export function PositionsPage({ user }: PositionsPageProps) {
               ) : null}
 
               {finalizeTarget ? (
-                <Modal title="Finalizar asignación" onClose={closeFinalizeModal}>
+                <Modal title="Finalizar asignación" onClose={requestCloseFinalizeModal}>
                   <div className="position-form">
                     {finalizeMessage ? <p className="muted">{finalizeMessage}</p> : null}
                     <p className="muted">
