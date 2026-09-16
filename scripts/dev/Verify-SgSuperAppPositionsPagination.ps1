@@ -19,7 +19,7 @@ function Invoke-PositionsRequest {
     $totalCountRaw = $response.Headers["X-Total-Count"]
     return @{
         Status = [int]$response.StatusCode
-        Body = ($response.Content | ConvertFrom-Json)
+        Body = @($response.Content | ConvertFrom-Json)
         TotalCount = [int]("$totalCountRaw")
     }
 }

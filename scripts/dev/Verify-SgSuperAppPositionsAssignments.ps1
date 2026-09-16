@@ -107,64 +107,107 @@ if ($null -eq $freeEmployee) {
 }
 
 $today = (Get-Date).ToString("yyyy-MM-dd")
-$create = Invoke-PositionAssignmentRequest -Method "POST" -Uri "$ApiBaseUrl/portal/employees/$($freeEmployee.id)/position-assignments" -Headers $headers -Body @{
-    positionId = $position.id
-    startDate = $today
-    changeReason = $null
-    notes = $null
-}
-Assert-Status -Response $create -ExpectedStatus 200 -Message "TH must create an employee assignment."
+$createdAssignmentId = $null
+$finalizationConfirmed = $false
+$workflowFailed = $false
 
-if ($create.Body.employeeFullName -ne $freeEmployee.fullName -or $create.Body.status -ne "VIGENTE") {
-    throw "La asignacion creada debe retornar employeeFullName del empleado y estado VIGENTE."
-}
-
-$created = $create.Body
-$positionAssignments = Invoke-PositionAssignmentRequest -Method "GET" -Uri "$ApiBaseUrl/portal/positions/$($position.id)/assignments" -Headers $headers
-Assert-Status -Response $positionAssignments -ExpectedStatus 200 -Message "TH must read position assignments."
-$createdInPosition = @($positionAssignments.Body | Where-Object { $_.id -eq $created.id })
-if ($createdInPosition.Count -ne 1 -or $createdInPosition[0].employeeFullName -ne $freeEmployee.fullName) {
-    throw "La asignacion creada debe aparecer exactamente una vez en las asignaciones del puesto con employeeFullName correcto."
-}
-
-$duplicate = Invoke-PositionAssignmentRequest -Method "POST" -Uri "$ApiBaseUrl/portal/employees/$($freeEmployee.id)/position-assignments" -Headers $headers -Body @{
-    positionId = $position.id
-    startDate = $today
-    changeReason = $null
-    notes = $null
-}
-Assert-Status -Response $duplicate -ExpectedStatus 409 -Message "Repetir una asignacion vigente del mismo empleado debe ser rechazado."
-
-$finalize = Invoke-PositionAssignmentRequest -Method "POST" -Uri "$ApiBaseUrl/portal/position-assignments/$($created.id)/finalize" -Headers $headers -Body @{
-    endDate = $today
-    changeReason = "Verificacion automatizada"
-    notes = $null
-}
-Assert-Status -Response $finalize -ExpectedStatus 200 -Message "TH must finalize the assignment."
-if ($finalize.Body.status -ne "FINALIZADA" -or $finalize.Body.employeeFullName -ne $freeEmployee.fullName) {
-    throw "La asignacion finalizada debe retornar employeeFullName del empleado y estado FINALIZADA."
-}
-
-$positionAssignmentsAfterFinalize = Invoke-PositionAssignmentRequest -Method "GET" -Uri "$ApiBaseUrl/portal/positions/$($position.id)/assignments" -Headers $headers
-Assert-Status -Response $positionAssignmentsAfterFinalize -ExpectedStatus 200 -Message "TH must read position assignments after finalizing."
-$createdAfterFinalize = @($positionAssignmentsAfterFinalize.Body | Where-Object { $_.id -eq $created.id })
-if ($createdAfterFinalize.Count -ne 1 -or $createdAfterFinalize[0].status -eq "VIGENTE") {
-    throw "La asignacion creada ya no debe estar VIGENTE despues de finalizarla."
-}
-
-$inactivePositions = Invoke-PositionAssignmentRequest -Method "GET" -Uri "$ApiBaseUrl/portal/positions?status=INACTIVO" -Headers $headers
-Assert-Status -Response $inactivePositions -ExpectedStatus 200 -Message "TH must list inactive positions."
-if (@($inactivePositions.Body).Count -gt 0) {
-    $inactiveAttempt = Invoke-PositionAssignmentRequest -Method "POST" -Uri "$ApiBaseUrl/portal/employees/$($freeEmployee.id)/position-assignments" -Headers $headers -Body @{
-        positionId = @($inactivePositions.Body)[0].id
+try {
+    $create = Invoke-PositionAssignmentRequest -Method "POST" -Uri "$ApiBaseUrl/portal/employees/$($freeEmployee.id)/position-assignments" -Headers $headers -Body @{
+        positionId = $position.id
         startDate = $today
         changeReason = $null
         notes = $null
     }
-    Assert-Status -Response $inactiveAttempt -ExpectedStatus 409 -Message "Inactive positions must be rejected."
+    Assert-Status -Response $create -ExpectedStatus 200 -Message "TH must create an employee assignment."
+
+    $created = $create.Body
+    $createdAssignmentId = $created.id
+    if ($null -eq $createdAssignmentId) {
+        throw "La asignacion creada debe retornar un id para poder limpiarla si falla la verificacion."
+    }
+    if ($created.employeeFullName -ne $freeEmployee.fullName -or $created.status -ne "VIGENTE") {
+        throw "La asignacion creada debe retornar employeeFullName del empleado y estado VIGENTE."
+    }
+
+    $positionAssignments = Invoke-PositionAssignmentRequest -Method "GET" -Uri "$ApiBaseUrl/portal/positions/$($position.id)/assignments" -Headers $headers
+    Assert-Status -Response $positionAssignments -ExpectedStatus 200 -Message "TH must read position assignments."
+    $createdInPosition = @($positionAssignments.Body | Where-Object { $_.id -eq $createdAssignmentId })
+    if ($createdInPosition.Count -ne 1 -or $createdInPosition[0].employeeFullName -ne $freeEmployee.fullName) {
+        throw "La asignacion creada debe aparecer exactamente una vez en las asignaciones del puesto con employeeFullName correcto."
+    }
+
+    $duplicate = Invoke-PositionAssignmentRequest -Method "POST" -Uri "$ApiBaseUrl/portal/employees/$($freeEmployee.id)/position-assignments" -Headers $headers -Body @{
+        positionId = $position.id
+        startDate = $today
+        changeReason = $null
+        notes = $null
+    }
+    Assert-Status -Response $duplicate -ExpectedStatus 409 -Message "Repetir una asignacion vigente del mismo empleado debe ser rechazado."
+
+    $finalize = Invoke-PositionAssignmentRequest -Method "POST" -Uri "$ApiBaseUrl/portal/position-assignments/$createdAssignmentId/finalize" -Headers $headers -Body @{
+        endDate = $today
+        changeReason = "Verificacion automatizada"
+        notes = $null
+    }
+    Assert-Status -Response $finalize -ExpectedStatus 200 -Message "TH must finalize the assignment."
+    if ($finalize.Body.status -ne "FINALIZADA") {
+        throw "La asignacion finalizada debe retornar estado FINALIZADA."
+    }
+    $finalizationConfirmed = $true
+    if ($finalize.Body.employeeFullName -ne $freeEmployee.fullName) {
+        throw "La asignacion finalizada debe retornar employeeFullName del empleado."
+    }
+
+    $positionAssignmentsAfterFinalize = Invoke-PositionAssignmentRequest -Method "GET" -Uri "$ApiBaseUrl/portal/positions/$($position.id)/assignments" -Headers $headers
+    Assert-Status -Response $positionAssignmentsAfterFinalize -ExpectedStatus 200 -Message "TH must read position assignments after finalizing."
+    $createdAfterFinalize = @($positionAssignmentsAfterFinalize.Body | Where-Object { $_.id -eq $createdAssignmentId })
+    if ($createdAfterFinalize.Count -ne 1 -or $createdAfterFinalize[0].status -ne "FINALIZADA") {
+        throw "La asignacion creada debe aparecer exactamente una vez como FINALIZADA despues de finalizarla."
+    }
+
+    $inactivePositions = Invoke-PositionAssignmentRequest -Method "GET" -Uri "$ApiBaseUrl/portal/positions?status=INACTIVO" -Headers $headers
+    Assert-Status -Response $inactivePositions -ExpectedStatus 200 -Message "TH must list inactive positions."
+    if (@($inactivePositions.Body).Count -gt 0) {
+        $inactiveAttempt = Invoke-PositionAssignmentRequest -Method "POST" -Uri "$ApiBaseUrl/portal/employees/$($freeEmployee.id)/position-assignments" -Headers $headers -Body @{
+            positionId = @($inactivePositions.Body)[0].id
+            startDate = $today
+            changeReason = $null
+            notes = $null
+        }
+        Assert-Status -Response $inactiveAttempt -ExpectedStatus 409 -Message "Inactive positions must be rejected."
+    }
+    else {
+        Write-Output "POSITIONS ASSIGNMENTS: sin puestos INACTIVOS en la base de datos, se omite el chequeo de INACTIVE_POSITION."
+    }
 }
-else {
-    Write-Output "POSITIONS ASSIGNMENTS: sin puestos INACTIVOS en la base de datos, se omite el chequeo de INACTIVE_POSITION."
+catch {
+    $workflowFailed = $true
+    throw
+}
+finally {
+    if ($null -ne $createdAssignmentId -and -not $finalizationConfirmed) {
+        try {
+            $cleanup = Invoke-PositionAssignmentRequest -Method "POST" -Uri "$ApiBaseUrl/portal/position-assignments/$createdAssignmentId/finalize" -Headers $headers -Body @{
+                endDate = $today
+                changeReason = "Limpieza tras verificacion fallida"
+                notes = $null
+            }
+            Assert-Status -Response $cleanup -ExpectedStatus 200 -Message "La limpieza de la asignacion creada debe finalizarla."
+            if ($cleanup.Body.status -ne "FINALIZADA") {
+                throw "La limpieza de la asignacion creada no retorno estado FINALIZADA."
+            }
+            $finalizationConfirmed = $true
+        }
+        catch {
+            $cleanupMessage = $_.Exception.Message
+            if ($workflowFailed) {
+                [Console]::Error.WriteLine("POSITIONS ASSIGNMENTS CLEANUP FAILED: $cleanupMessage")
+            }
+            else {
+                throw "POSITIONS ASSIGNMENTS CLEANUP FAILED: $cleanupMessage"
+            }
+        }
+    }
 }
 
 Write-Output "POSITIONS ASSIGNMENTS PASS"
