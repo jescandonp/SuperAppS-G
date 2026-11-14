@@ -91,3 +91,10 @@ Cualquier cambio visual relevante debe actualizar:
   una nueva version.
 - Generar, revisar, aprobar y publicar son acciones separadas. Ninguna pantalla
   presenta aprobacion o publicacion autonoma.
+
+## 8. Criterio De Plataforma Web Moderna
+
+Los componentes de interaccion (dialogos, menus, tabs, formularios, fechas)
+deben priorizar APIs nativas del navegador con accesibilidad incorporada,
+segun `docs/TECNOLOGIA.md` seccion 13. Los patrones propios solo se justifican
+si la API nativa no cumple el criterio de aceptacion de la SPEC.

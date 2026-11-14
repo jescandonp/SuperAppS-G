@@ -170,3 +170,26 @@ I9 no incorpora optimizador comercial, solver remoto, IA generativa ni servicio
 cloud: opera **sin dependencia externa en el MVP**. Una evolucion a otro motor
 requiere evidencia del piloto, actualizacion de arquitectura/tecnologia, nueva
 SPEC aprobada y preservacion del contrato deterministico y auditable.
+
+## 13. Guia De Plataforma Web Moderna (GoogleChrome/modern-web-guidance)
+
+Fuente: https://github.com/GoogleChrome/modern-web-guidance (skills para agentes,
+Apache-2.0; contenido de guias CC-BY 4.0). Se adopta como **referencia de
+criterio para el frontend**, no como dependencia de runtime ni del producto.
+
+Reglas:
+
+- Antes de construir un componente UI nuevo (dialogo, popover, tabs, select,
+  tooltip, validacion de formularios, fechas), consultar la guia y preferir la
+  API nativa de la plataforma sobre codigo propio o librerias.
+- Accesibilidad desde el inicio: teclado, lector de pantalla y
+  `prefers-reduced-motion`.
+- Fallbacks ligeros; no agregar polyfills pesados.
+- Toda API nueva debe validarse contra el navegador objetivo del cliente S&G
+  (ver seccion 7: no se asume compatibilidad moderna sin prueba).
+- La herramienta (`npx modern-web-guidance search|retrieve|legacy-scan`) es solo
+  de desarrollo/CI. No instalar en el servidor productivo. Definir
+  `DISABLE_TELEMETRY=1` al usarla. Requiere internet, que el servidor no tiene.
+- Adoptar la guia no autoriza refactors: todo cambio de codigo derivado entra
+  por SPEC del incremento activo (Constitucion, seccion 2). Los candidatos
+  estan en `docs/backlog/2026-11-14-sg-superapp-backlog-web-moderna.md`.
